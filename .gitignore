@@ -1,0 +1,22 @@
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Xcode. The project is generated from App/project.yml by XcodeGen, so the
+# .xcodeproj is an artefact and the .yml is the source.
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Vendored GEOS is committed on purpose so a clean clone builds without CMake.
+# Only the intermediate build tree is ignored, and that lives under .build/.
+
+# Output from hipparchus-cli runs and manual checks
+/out/
+*.png.actual
+
+# macOS
+.DS_Store
