@@ -42,7 +42,11 @@ let package = Package(
 
         .executableTarget(name: "hipparchus-cli", dependencies: ["HipparchusRender"]),
 
-        .testTarget(name: "HipparchusGeometryTests", dependencies: ["HipparchusGeometry"]),
+        .testTarget(
+            name: "HipparchusGeometryTests",
+            dependencies: ["HipparchusGeometry"],
+            resources: [.process("Fixtures")]
+        ),
         .testTarget(name: "HipparchusGEOSTests", dependencies: ["HipparchusGEOS"]),
         .testTarget(name: "HipparchusDataTests", dependencies: ["HipparchusData"]),
         .testTarget(name: "HipparchusRenderTests", dependencies: ["HipparchusRender"]),
