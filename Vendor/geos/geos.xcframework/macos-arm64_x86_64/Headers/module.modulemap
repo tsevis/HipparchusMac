@@ -1,0 +1,4 @@
+module CGEOS {
+    header "geos_c.h"
+    export *
+}

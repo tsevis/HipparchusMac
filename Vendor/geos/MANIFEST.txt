@@ -1,0 +1,33 @@
+geos.xcframework
+=================
+
+Built by Scripts/build-geos-xcframework.sh. Do not edit by hand; rebuild with
+    Scripts/build-geos-xcframework.sh --force
+
+source          https://download.osgeo.org/geos/geos-3.14.1.tar.bz2
+version         3.14.1
+sha256          3c20919cda9a505db07b5216baa980bacdaa0702da715b43f176fb07eff7e716
+architectures   arm64 x86_64 (single macOS slice, universal)
+deployment      macOS 15.0
+libraries       libgeos.a + libgeos_c.a, merged with libtool -static
+headers         geos_c.h (generated) + module.modulemap declaring module CGEOS
+
+cmake flags
+  -DCMAKE_BUILD_TYPE=Release
+  -DCMAKE_OSX_ARCHITECTURES=<arch>
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+  -DBUILD_SHARED_LIBS=OFF
+  -DBUILD_TESTING=OFF
+  -DBUILD_GEOSOP=OFF
+  -DBUILD_BENCHMARKS=OFF
+  -DBUILD_DOCUMENTATION=OFF
+
+toolchain at build time
+  Xcode 26.3
+  Build version 17C529
+  cmake 4.0.3
+
+GEOS is LGPL-2.1. It is linked statically here, which the licence permits on the
+condition that the object files and this build script are available to anyone
+who receives the binary. Both are in this repository.
