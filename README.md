@@ -25,8 +25,17 @@ touched. See `KICKOFF.md` for the brief and the design it is being built to.
 
 ```sh
 swift build                 # the libraries and the CLI
-swift test                  # every test; no network, no fixtures on disk
+swift test -c release       # every test, about a second
+swift test                  # the same tests, about thirty seconds
 ```
+
+No test touches the network. Tiles are synthesised in-process, and the one real
+tile in the suite is committed as a fixture.
+
+**Run the suite in release.** Contouring is a tight numeric loop over a grid, and
+Swift's unoptimised build runs it roughly fifty times slower — the whole
+difference between the two numbers above. Debug is worth it only when you need a
+debugger.
 
 The app project is generated rather than committed, so `project.yml` is the
 source of truth and there is no `.xcodeproj` to merge:

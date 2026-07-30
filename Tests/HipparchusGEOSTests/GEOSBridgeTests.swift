@@ -36,8 +36,7 @@ final class GEOSBridgeTests: XCTestCase {
             ]]
         )
         let context = GEOSContext()
-        let managed = try context.make(.polygon(polygon))
-        let back = try context.read(managed.borrowed)
+        let back = try context.withGeometry(.polygon(polygon)) { try context.read($0) }
         guard case .polygon(let result) = back else {
             return XCTFail("expected a polygon, got \(back.typeName)")
         }
@@ -57,8 +56,8 @@ final class GEOSBridgeTests: XCTestCase {
 
     func testEmptyGeometryRoundTripsAsEmpty() throws {
         let context = GEOSContext()
-        let managed = try context.make(.empty)
-        XCTAssertEqual(try context.read(managed.borrowed), .empty)
+        let back = try context.withGeometry(.empty) { try context.read($0) }
+        XCTAssertEqual(back, .empty)
     }
 
     // MARK: - Operations the band pipeline needs
@@ -184,8 +183,8 @@ final class GEOSBridgeTests: XCTestCase {
 
     private func assertRoundTrip(_ geometry: Geometry, file: StaticString = #filePath, line: UInt = #line) throws {
         let context = GEOSContext()
-        let managed = try context.make(geometry)
-        XCTAssertEqual(try context.read(managed.borrowed), geometry, file: file, line: line)
+        let back = try context.withGeometry(geometry) { try context.read($0) }
+        XCTAssertEqual(back, geometry, file: file, line: line)
     }
 }
 

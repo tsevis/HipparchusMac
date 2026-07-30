@@ -6,74 +6,88 @@ import HipparchusGeometry
 /// This is the complete list the Python's Shapely usage reduces to. Nothing here
 /// is reimplemented: GEOS is the same engine Shapely binds to, so the ported
 /// pipeline gets bit-comparable answers rather than a second opinion.
+///
+/// Every C call goes through `withGeometry` / `withGeometries`, which keep the
+/// inputs alive for the duration. See the note on `ManagedGeometry`: doing it by
+/// hand worked in debug and segfaulted in release.
 extension GEOSContext {
 
     // MARK: - Predicates
 
     public func isValid(_ geometry: Geometry) throws -> Bool {
-        let managed = try make(geometry)
-        return try predicate(GEOSisValid_r(handle, managed.borrowed), "isValid")
+        try withGeometry(geometry) { try predicate(GEOSisValid_r(handle, $0), "isValid") }
     }
 
     public func isEmpty(_ geometry: Geometry) throws -> Bool {
-        let managed = try make(geometry)
-        return try predicate(GEOSisEmpty_r(handle, managed.borrowed), "isEmpty")
+        try withGeometry(geometry) { try predicate(GEOSisEmpty_r(handle, $0), "isEmpty") }
     }
 
     public func contains(_ container: Geometry, _ contained: Geometry) throws -> Bool {
-        let a = try make(container)
-        let b = try make(contained)
-        return try predicate(GEOSContains_r(handle, a.borrowed, b.borrowed), "contains")
+        try withGeometries(container, contained) {
+            try predicate(GEOSContains_r(handle, $0, $1), "contains")
+        }
     }
 
     public func intersects(_ lhs: Geometry, _ rhs: Geometry) throws -> Bool {
-        let a = try make(lhs)
-        let b = try make(rhs)
-        return try predicate(GEOSIntersects_r(handle, a.borrowed, b.borrowed), "intersects")
+        try withGeometries(lhs, rhs) {
+            try predicate(GEOSIntersects_r(handle, $0, $1), "intersects")
+        }
     }
 
     public func distance(_ lhs: Geometry, _ rhs: Geometry) throws -> Double {
-        let a = try make(lhs)
-        let b = try make(rhs)
-        var result = 0.0
-        guard GEOSDistance_r(handle, a.borrowed, b.borrowed, &result) != 0 else {
-            throw takeError("distance")
+        try withGeometries(lhs, rhs) { first, second in
+            var result = 0.0
+            guard GEOSDistance_r(handle, first, second, &result) != 0 else {
+                throw takeError("distance")
+            }
+            return result
         }
-        return result
     }
 
     public func area(_ geometry: Geometry) throws -> Double {
-        let managed = try make(geometry)
-        var result = 0.0
-        guard GEOSArea_r(handle, managed.borrowed, &result) != 0 else {
-            throw takeError("area")
+        try withGeometry(geometry) { pointer in
+            var result = 0.0
+            guard GEOSArea_r(handle, pointer, &result) != 0 else {
+                throw takeError("area")
+            }
+            return result
         }
-        return result
+    }
+
+    public func length(_ geometry: Geometry) throws -> Double {
+        try withGeometry(geometry) { pointer in
+            var result = 0.0
+            guard GEOSLength_r(handle, pointer, &result) != 0 else {
+                throw takeError("length")
+            }
+            return result
+        }
     }
 
     // MARK: - Constructive
 
     public func intersection(_ lhs: Geometry, _ rhs: Geometry) throws -> Geometry {
-        let a = try make(lhs)
-        let b = try make(rhs)
-        return try consuming(GEOSIntersection_r(handle, a.borrowed, b.borrowed), "intersection")
+        try withGeometries(lhs, rhs) {
+            try consuming(GEOSIntersection_r(handle, $0, $1), "intersection")
+        }
     }
 
     public func difference(_ lhs: Geometry, _ rhs: Geometry) throws -> Geometry {
-        let a = try make(lhs)
-        let b = try make(rhs)
-        return try consuming(GEOSDifference_r(handle, a.borrowed, b.borrowed), "difference")
+        try withGeometries(lhs, rhs) {
+            try consuming(GEOSDifference_r(handle, $0, $1), "difference")
+        }
     }
 
     public func union(_ lhs: Geometry, _ rhs: Geometry) throws -> Geometry {
-        let a = try make(lhs)
-        let b = try make(rhs)
-        return try consuming(GEOSUnion_r(handle, a.borrowed, b.borrowed), "union")
+        try withGeometries(lhs, rhs) {
+            try consuming(GEOSUnion_r(handle, $0, $1), "union")
+        }
     }
 
     public func unaryUnion(_ geometry: Geometry) throws -> Geometry {
-        let managed = try make(geometry)
-        return try consuming(GEOSUnaryUnion_r(handle, managed.borrowed), "unary union")
+        try withGeometry(geometry) {
+            try consuming(GEOSUnaryUnion_r(handle, $0), "unary union")
+        }
     }
 
     /// Dissolve a list into one geometry in a single pass. Folding `union` over a
@@ -82,15 +96,21 @@ extension GEOSContext {
         guard !geometries.isEmpty else { return .empty }
         let parts = try geometries.map(make)
         let collection = try makeCollection(parts, type: GEOS_GEOMETRYCOLLECTION)
-        return try consuming(GEOSUnaryUnion_r(handle, collection.borrowed), "unary union")
+        return try collection.withPointer {
+            try consuming(GEOSUnaryUnion_r(handle, $0), "unary union")
+        }
     }
 
     public func buffer(_ geometry: Geometry, distance: Double, quadrantSegments: Int32 = 8) throws -> Geometry {
-        let managed = try make(geometry)
-        return try consuming(
-            GEOSBufferWithStyle_r(handle, managed.borrowed, distance, quadrantSegments, Int32(GEOSBUF_CAP_ROUND.rawValue), Int32(GEOSBUF_JOIN_ROUND.rawValue), 5.0),
-            "buffer"
-        )
+        try withGeometry(geometry) { pointer in
+            try consuming(
+                GEOSBufferWithStyle_r(
+                    handle, pointer, distance, quadrantSegments,
+                    Int32(GEOSBUF_CAP_ROUND.rawValue), Int32(GEOSBUF_JOIN_ROUND.rawValue), 5.0
+                ),
+                "buffer"
+            )
+        }
     }
 
     /// `buffer(0)`, the repair Shapely leans on throughout the Python. Kept as a
@@ -100,50 +120,54 @@ extension GEOSContext {
     }
 
     public func simplify(_ geometry: Geometry, tolerance: Double, preserveTopology: Bool) throws -> Geometry {
-        let managed = try make(geometry)
-        let simplified = preserveTopology
-            ? GEOSTopologyPreserveSimplify_r(handle, managed.borrowed, tolerance)
-            : GEOSSimplify_r(handle, managed.borrowed, tolerance)
-        return try consuming(simplified, "simplify")
+        try withGeometry(geometry) { pointer in
+            let simplified = preserveTopology
+                ? GEOSTopologyPreserveSimplify_r(handle, pointer, tolerance)
+                : GEOSSimplify_r(handle, pointer, tolerance)
+            return try consuming(simplified, "simplify")
+        }
     }
 
     /// A point guaranteed to be inside the geometry — GEOS's `PointOnSurface`,
     /// which is Shapely's `representative_point`.
     ///
     /// Load-bearing: elevation bands decide whether to keep a polygonized face by
-    /// sampling the elevation field *here*, so containment is measured against
-    /// the data rather than inferred from ring nesting.
+    /// sampling the elevation field *here*, so containment is measured against the
+    /// data rather than inferred from ring nesting.
     public func pointOnSurface(_ geometry: Geometry) throws -> Coordinate? {
-        let managed = try make(geometry)
-        guard let pointer = GEOSPointOnSurface_r(handle, managed.borrowed) else {
-            throw takeError("point on surface")
+        try withGeometry(geometry) { pointer in
+            guard let result = GEOSPointOnSurface_r(handle, pointer) else {
+                throw takeError("point on surface")
+            }
+            return try ManagedGeometry(taking: result, in: self).withPointer { point in
+                if try predicate(GEOSisEmpty_r(handle, point), "isEmpty") { return nil }
+                return try readCoordinates(point).first
+            }
         }
-        let point = ManagedGeometry(taking: pointer, in: self)
-        if try predicate(GEOSisEmpty_r(handle, point.borrowed), "isEmpty") {
-            return nil
-        }
-        return try readCoordinates(point.borrowed).first
     }
 
     public func centroid(_ geometry: Geometry) throws -> Coordinate? {
-        let managed = try make(geometry)
-        guard let pointer = GEOSGetCentroid_r(handle, managed.borrowed) else {
-            throw takeError("centroid")
+        try withGeometry(geometry) { pointer in
+            guard let result = GEOSGetCentroid_r(handle, pointer) else {
+                throw takeError("centroid")
+            }
+            return try ManagedGeometry(taking: result, in: self).withPointer { point in
+                if try predicate(GEOSisEmpty_r(handle, point), "isEmpty") { return nil }
+                return try readCoordinates(point).first
+            }
         }
-        let point = ManagedGeometry(taking: pointer, in: self)
-        if try predicate(GEOSisEmpty_r(handle, point.borrowed), "isEmpty") {
-            return nil
-        }
-        return try readCoordinates(point.borrowed).first
     }
 
+    /// A point a given distance along a line, for label placement.
     public func interpolate(_ line: LineString, distance: Double) throws -> Coordinate? {
-        let managed = try makeLineString(line)
-        guard let pointer = GEOSInterpolate_r(handle, managed.borrowed, distance) else {
-            throw takeError("interpolate")
+        try makeLineString(line).withPointer { pointer in
+            guard let result = GEOSInterpolate_r(handle, pointer, distance) else {
+                throw takeError("interpolate")
+            }
+            return try ManagedGeometry(taking: result, in: self).withPointer { point in
+                try readCoordinates(point).first
+            }
         }
-        let point = ManagedGeometry(taking: pointer, in: self)
-        return try readCoordinates(point.borrowed).first
     }
 
     /// Cut a set of lines into the minimal set of faces they enclose.
@@ -151,18 +175,24 @@ extension GEOSContext {
     /// This is the step that makes elevation bands possible without hand-rolling
     /// ring nesting: closed contour rings go in, every face they bound comes out,
     /// and which faces to keep is then a question the data answers.
+    ///
+    /// `GEOSPolygonize` **borrows** its inputs, so the whole input array has to
+    /// stay alive across the call. This is where getting that wrong crashed.
     public func polygonize(_ lines: [LineString]) throws -> [Polygon] {
         let usable = lines.filter { $0.coordinates.count >= 2 }
         guard !usable.isEmpty else { return [] }
         let managed = try usable.map(makeLineString)
-        var pointers: [OpaquePointer?] = managed.map { $0.borrowed }
-        let result: OpaquePointer? = pointers.withUnsafeMutableBufferPointer { buffer in
-            // GEOSPolygonize borrows its inputs, so `managed` keeps owning them.
-            GEOSPolygonize_r(handle, buffer.baseAddress, UInt32(buffer.count))
+
+        return try withExtendedLifetime(managed) {
+            var pointers: [OpaquePointer?] = managed.map { $0.withPointer { $0 } }
+            let result: OpaquePointer? = pointers.withUnsafeMutableBufferPointer { buffer in
+                GEOSPolygonize_r(handle, buffer.baseAddress, UInt32(buffer.count))
+            }
+            guard let result else { throw takeError("polygonize") }
+            return try ManagedGeometry(taking: result, in: self).withPointer {
+                try read($0).polygons
+            }
         }
-        guard let result else { throw takeError("polygonize") }
-        let collection = ManagedGeometry(taking: result, in: self)
-        return try read(collection.borrowed).polygons
     }
 
     // MARK: -
@@ -170,7 +200,6 @@ extension GEOSContext {
     /// Wrap a freshly returned GEOS pointer, read it, and free it.
     private func consuming(_ pointer: OpaquePointer?, _ what: String) throws -> Geometry {
         guard let pointer else { throw takeError(what) }
-        let managed = ManagedGeometry(taking: pointer, in: self)
-        return try read(managed.borrowed)
+        return try ManagedGeometry(taking: pointer, in: self).withPointer { try read($0) }
     }
 }

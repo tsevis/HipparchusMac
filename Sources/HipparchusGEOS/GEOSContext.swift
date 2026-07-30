@@ -85,13 +85,30 @@ public final class GEOSContext {
 /// GEOS constructors take ownership of their arguments, so `release()` exists to
 /// hand a pointer over without double-freeing it. Everything else is freed on
 /// `deinit`, which is what keeps the conversion code free of `defer` ladders.
+///
+/// **The pointer is only reachable through `withPointer`, and that is deliberate.**
+/// An earlier version exposed it as a plain property, which read fine and passed
+/// every test in a debug build. In release the optimiser is entitled to drop the
+/// last reference as soon as the pointer has been extracted — so for the GEOS
+/// calls that *borrow* their inputs rather than consuming them, notably
+/// `GEOSPolygonize`, the geometry was freed before the call read it. It
+/// segfaulted only with optimisation on. A scoped accessor makes the mistake
+/// unwritable instead of relying on anyone remembering `withExtendedLifetime`.
 final class ManagedGeometry {
     private let context: GEOSContext
-    private(set) var pointer: OpaquePointer?
+    private var pointer: OpaquePointer?
 
     init(taking pointer: OpaquePointer, in context: GEOSContext) {
         self.pointer = pointer
         self.context = context
+    }
+
+    /// Use the pointer with the geometry guaranteed alive for the whole call.
+    func withPointer<R>(_ body: (OpaquePointer) throws -> R) rethrows -> R {
+        guard let pointer else {
+            preconditionFailure("ManagedGeometry used after release")
+        }
+        return try withExtendedLifetime(self) { try body(pointer) }
     }
 
     /// Give up ownership for a GEOS call that will free it itself.
@@ -103,16 +120,31 @@ final class ManagedGeometry {
         return pointer
     }
 
-    var borrowed: OpaquePointer {
-        guard let pointer else {
-            preconditionFailure("ManagedGeometry used after release")
-        }
-        return pointer
-    }
-
     deinit {
         if let pointer {
             GEOSGeom_destroy_r(context.handle, pointer)
+        }
+    }
+}
+
+extension GEOSContext {
+    /// Build a geometry, hand its pointer to `body`, and free it afterwards.
+    func withGeometry<R>(_ geometry: Geometry, _ body: (OpaquePointer) throws -> R) throws -> R {
+        try make(geometry).withPointer(body)
+    }
+
+    /// The two-argument form, for the overlay operations.
+    func withGeometries<R>(
+        _ lhs: Geometry,
+        _ rhs: Geometry,
+        _ body: (OpaquePointer, OpaquePointer) throws -> R
+    ) throws -> R {
+        let a = try make(lhs)
+        let b = try make(rhs)
+        return try a.withPointer { first in
+            try b.withPointer { second in
+                try body(first, second)
+            }
         }
     }
 }

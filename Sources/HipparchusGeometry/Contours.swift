@@ -132,19 +132,40 @@ private let caseSegments: [(caseValue: UInt8, pairs: [(CellEdge, CellEdge)])] = 
     (14, [(.left, .top)]),
 ]
 
-// Ambiguous saddles, resolved by the cell centre. Both variants consume all four
-// crossings, so stitching stays consistent whichever way a saddle is read.
-private let saddleCentreAbove: [UInt8: [(CellEdge, CellEdge)]] = [
-    5: [(.top, .right), (.bottom, .left)],
-    10: [(.left, .top), (.right, .bottom)],
-]
-private let saddleCentreBelow: [UInt8: [(CellEdge, CellEdge)]] = [
-    5: [(.left, .top), (.right, .bottom)],
-    10: [(.top, .right), (.bottom, .left)],
-]
-/// Saddles are handled after the unambiguous cases, in this order, because
-/// segment order decides stitched output order.
-private let saddleCaseOrder: [UInt8] = [5, 10]
+/// Bucket layout, which *is* the emission order the Python produces:
+///
+/// - `0..<12` — the twelve unambiguous cases, in `caseSegments` order, one pair each
+/// - `12, 13` — saddle 5, centre above, first pair then second
+/// - `14, 15` — saddle 5, centre below
+/// - `16, 17` — saddle 10, centre above
+/// - `18, 19` — saddle 10, centre below
+///
+/// Saddles come after every unambiguous case because the Python handles them in a
+/// second loop.
+private let bucketCount = 20
+
+/// Case value to bucket index, or -1 for a case that emits nothing. A 16-entry
+/// table instead of a dictionary lookup per cell.
+private let caseSlot: [Int8] = {
+    var table = [Int8](repeating: -1, count: 16)
+    for (index, entry) in caseSegments.enumerated() {
+        table[Int(entry.caseValue)] = Int8(index)
+    }
+    return table
+}()
+
+private func saddleBucketBase(mask: UInt8, centreAbove: Bool) -> Int {
+    let caseBase = mask == 5 ? 12 : 16
+    return centreAbove ? caseBase : caseBase + 2
+}
+
+private func saddlePairsAbove(_ mask: UInt8) -> [(CellEdge, CellEdge)] {
+    mask == 5 ? [(.top, .right), (.bottom, .left)] : [(.left, .top), (.right, .bottom)]
+}
+
+private func saddlePairsBelow(_ mask: UInt8) -> [(CellEdge, CellEdge)] {
+    mask == 5 ? [(.left, .top), (.right, .bottom)] : [(.top, .right), (.bottom, .left)]
+}
 
 // MARK: - Tracing
 
@@ -212,39 +233,58 @@ public func contourPolylines(_ field: Field2D, level: Double) -> [[GridPoint]] {
         }
     }
 
+    // Segments are bucketed by which pass would have emitted them, then the
+    // buckets are concatenated in pass order.
+    //
+    // The Python runs one vectorised pass over the whole cell grid per case, which
+    // numpy makes nearly free. Transcribing that structure literally cost 18
+    // scalar scans of the grid *per level*, and a fetch that should take under a
+    // second took nine minutes. Bucketing gets the identical ordering out of a
+    // single scan — and the ordering is not cosmetic: it decides how segments
+    // stitch, and therefore what the exported SVG contains.
+    var buckets = [[Int]](repeating: [], count: bucketCount)
+
+    for row in 0..<cellRows {
+        for column in 0..<cellColumns {
+            let mask = cases[row * cellColumns + column]
+            // 0 and 15 are wholly below or wholly above: no crossing.
+            if mask == 0 || mask == 15 { continue }
+
+            if mask == 5 || mask == 10 {
+                // Ambiguous saddle, resolved by the sign of the cell-centre
+                // average. Both variants consume all four crossings, so stitching
+                // stays consistent whichever way a saddle is read.
+                let top = row * width + column
+                let bottom = (row + 1) * width + column
+                let centreAbove = relative[top] + relative[top + 1] + relative[bottom + 1] + relative[bottom] > 0
+                let base = saddleBucketBase(mask: mask, centreAbove: centreAbove)
+                let pairs = centreAbove ? saddlePairsAbove(mask) : saddlePairsBelow(mask)
+                for (offset, pair) in pairs.enumerated() {
+                    buckets[base + offset].append(edgeID(pair.0, row: row, column: column))
+                    buckets[base + offset].append(edgeID(pair.1, row: row, column: column))
+                }
+                continue
+            }
+
+            let slot = Int(caseSlot[Int(mask)])
+            if slot < 0 { continue }
+            let pair = caseSegments[slot].pairs[0]
+            buckets[slot].append(edgeID(pair.0, row: row, column: column))
+            buckets[slot].append(edgeID(pair.1, row: row, column: column))
+        }
+    }
+
     var segmentStart: [Int] = []
     var segmentEnd: [Int] = []
-
-    // Case by case, and within a case pair by pair, matching the Python's
-    // masked-append order exactly.
-    func collect(pairs: [(CellEdge, CellEdge)], where matches: (Int, Int) -> Bool) {
-        for (first, second) in pairs {
-            for row in 0..<cellRows {
-                for column in 0..<cellColumns where matches(row, column) {
-                    segmentStart.append(edgeID(first, row: row, column: column))
-                    segmentEnd.append(edgeID(second, row: row, column: column))
-                }
-            }
-        }
-    }
-
-    for entry in caseSegments {
-        let value = entry.caseValue
-        collect(pairs: entry.pairs) { row, column in cases[row * cellColumns + column] == value }
-    }
-
-    for value in saddleCaseOrder {
-        guard let above = saddleCentreAbove[value], let below = saddleCentreBelow[value] else { continue }
-        func centreIsAbove(_ row: Int, _ column: Int) -> Bool {
-            let top = row * width + column
-            let bottom = (row + 1) * width + column
-            return relative[top] + relative[top + 1] + relative[bottom + 1] + relative[bottom] > 0
-        }
-        collect(pairs: above) { row, column in
-            cases[row * cellColumns + column] == value && centreIsAbove(row, column)
-        }
-        collect(pairs: below) { row, column in
-            cases[row * cellColumns + column] == value && !centreIsAbove(row, column)
+    let total = buckets.reduce(0) { $0 + $1.count } / 2
+    segmentStart.reserveCapacity(total)
+    segmentEnd.reserveCapacity(total)
+    for bucket in buckets {
+        var index = 0
+        while index < bucket.count {
+            segmentStart.append(bucket[index])
+            segmentEnd.append(bucket[index + 1])
+            index += 2
         }
     }
 
