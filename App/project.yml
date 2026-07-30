@@ -1,0 +1,53 @@
+# XcodeGen spec for the app shell.
+#
+# The .xcodeproj is generated, not committed: this file is the source of truth, it
+# diffs readably, and there is no project file to resolve merge conflicts in.
+#
+#   xcodegen generate --spec App/project.yml
+#
+# All the logic lives in the SwiftPM package at the repo root. This target is the
+# window and nothing else.
+name: HipparchusMac
+options:
+  bundleIdPrefix: com.hipparchus
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+  # The spec sits in App/, the package sits at the repo root.
+  minimumXcodeGenVersion: "2.38"
+
+packages:
+  HipparchusMac:
+    path: ..
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    DEAD_CODE_STRIPPING: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+
+targets:
+  HipparchusMac:
+    type: application
+    platform: macOS
+    sources:
+      - path: HipparchusApp
+    dependencies:
+      - package: HipparchusMac
+        product: HipparchusRender
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hipparchus.HipparchusMac
+        PRODUCT_NAME: Hipparchus
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_NSPrincipalClass: NSApplication
+        INFOPLIST_KEY_CFBundleDisplayName: Hipparchus
+        # A document-less app: the window is the app.
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: HipparchusApp/Hipparchus.entitlements
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
