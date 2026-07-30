@@ -10,12 +10,12 @@ here that disagrees with it is a bug here.
 
 **Status: the app is built.** Every online source, the composing source stack,
 the sixteen presets, illuminated contours, the three-column interface and the
-exports are in, with 397 tests and the output checked against real ground. See
+exports are in, with 416 tests and the output checked against real ground. See
 `KICKOFF.md` for the brief.
 
 Not built, and all understood rather than undecided: the file-backed providers
 (`osmium`, `fiona`, `pyarrow`, PMTiles, MVT), which the brief calls the long
-tail, and the simulated-terrain source that stands in for them offline.
+tail.
 
 ## Requirements
 
@@ -185,6 +185,34 @@ that merely pass close.
 
 A relation that never closes keeps its edges as lines rather than vanishing, and
 never claims to be an area.
+
+## The one source that needs nothing
+
+`Simulated terrain` generates its own relief instead of reading anyone's, so
+contour work is reachable on a bare install with no file, no account and no
+network — and so the rest of the pipeline can be exercised offline.
+
+The field is **anchored to geography rather than to the window**: the landform
+size depends only on how wide the window is, never on where it is, so panning at
+one zoom walks across one continuous landscape instead of re-rolling a new one
+each time. That is the difference between a map and wallpaper, and there is a
+test that reads the same ground from two overlapping windows and requires the
+same height back.
+
+The elevations are **invented**, and everything it emits says so — on the
+features, in the merged metadata, and on the scene. A stack holding it can only
+claim `synthetic`, because the weakest claim any source makes is the claim the
+merged map is entitled to.
+
+Its parity fixture checks more than the others: the integer lattice hash bit for
+bit, then value noise, then the fractal sum, then the window-to-landform ladder,
+then full elevation grids for four real windows. Each layer separately, so a
+failure points at the step that moved rather than at the end of a long chain —
+and because a wrong shift in the hash produces a perfectly good landscape that is
+simply not the one the seed names. Two details it pins down: a negative
+coordinate has to become the same very large unsigned integer in both languages,
+and a window landing exactly half-way between two rungs of the ladder has to
+round to even, as Python's `round` does and Swift's default does not.
 
 ## Derived layers
 

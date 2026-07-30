@@ -337,6 +337,11 @@ final class MapModel {
                 if let layer = overrides["layer"]?.stringValue { settings.layer = layer }
                 providers.append(GIBSImageryProvider(settings: settings))
 
+            case SourceID.simulatedTerrain:
+                var settings = TerrainFieldSettings()
+                if let seed = overrides["seed"]?.intValue { settings.seed = seed }
+                providers.append(SimulatedFieldProvider(settings: settings))
+
             default:
                 // A source with no provider yet is reported by the manager as "not
                 // registered" rather than silently doing nothing.
