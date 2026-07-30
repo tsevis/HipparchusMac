@@ -72,6 +72,50 @@ public struct LayerStyle: Sendable, Equatable {
     }
 
     public init() {}
+
+    /// Every field, with the defaults the Python uses.
+    ///
+    /// The preset tables in `PresetTables.swift` are generated against this
+    /// signature and pass only the fields that differ, so a default changed here
+    /// changes every preset that was relying on it. That is intended — they are
+    /// the same defaults in both codebases — but it is worth knowing.
+    public init(
+        strokeWidth: Double = 1.0,
+        strokeColor: RGBAColor = RGBAColor(20, 20, 20),
+        fillColor: RGBAColor = RGBAColor(220, 220, 220, 200),
+        fillEnabled: Bool = true,
+        opacity: Double = 1.0,
+        visible: Bool = true,
+        casingWidth: Double = 0.0,
+        casingColor: RGBAColor = RGBAColor(0, 0, 0),
+        lineCap: LineCap = .butt,
+        labelHaloColor: RGBAColor = RGBAColor(255, 255, 255, 230),
+        labelHaloWidth: Double = 2.0,
+        illumination: Double = 0.0,
+        illuminationAzimuth: Double = 315.0,
+        illuminationBands: Int = 5,
+        illuminationLitScale: Double = 0.4,
+        illuminationShadowScale: Double = 1.9,
+        fillColorHigh: RGBAColor? = nil
+    ) {
+        self.strokeWidth = strokeWidth
+        self.strokeColor = strokeColor
+        self.fillColor = fillColor
+        self.fillEnabled = fillEnabled
+        self.opacity = opacity
+        self.visible = visible
+        self.casingWidth = casingWidth
+        self.casingColor = casingColor
+        self.lineCap = lineCap
+        self.labelHaloColor = labelHaloColor
+        self.labelHaloWidth = labelHaloWidth
+        self.illumination = illumination
+        self.illuminationAzimuth = illuminationAzimuth
+        self.illuminationBands = illuminationBands
+        self.illuminationLitScale = illuminationLitScale
+        self.illuminationShadowScale = illuminationShadowScale
+        self.fillColorHigh = fillColorHigh
+    }
 }
 
 public struct PlaceLabel: Sendable, Equatable {
