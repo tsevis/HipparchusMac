@@ -462,3 +462,83 @@ final class OverpassRelationTests: XCTestCase {
         }
     }
 }
+
+/// A shipping lane is not a body of water.
+///
+/// OSM tags the Piraeus–Serifos ferry `waterway=seaway`, so any rule keyed on the
+/// presence of a `waterway` tag drew an 80-kilometre crossing of the Saronic Gulf
+/// as if it were a river. A deliberate divergence from the Python, which reads the
+/// same tag the same way.
+final class FerryRouteClassificationTests: XCTestCase {
+
+    private func layer(_ tags: String) -> String? {
+        let object = try? JSONSerialization.jsonObject(with: Data(tags.utf8)) as? [String: Any]
+        return OverpassDecode.classify(tags: object ?? [:])
+    }
+
+    /// The real way from an Athens fetch, tagged as OSM tags it.
+    func testTheFerryRouteLeavesTheWaterLayer() {
+        XCTAssertEqual(
+            layer(#"{"route": "ferry", "waterway": "seaway", "name": "Πειραιάς - Σέριφος"}"#),
+            "ferry_routes"
+        )
+    }
+
+    func testEitherTagOnItsOwnIsEnough() {
+        XCTAssertEqual(layer(#"{"route": "ferry"}"#), "ferry_routes")
+        XCTAssertEqual(layer(#"{"waterway": "seaway"}"#), "ferry_routes")
+        XCTAssertEqual(layer(#"{"waterway": "fairway"}"#), "ferry_routes")
+    }
+
+    /// Narrow on purpose. An Athens fetch holds 852 streams, 121 canals, 54 rivers,
+    /// 43 ditches and 39 drains, and every one of them is water.
+    func testWatercoursesStayInTheWaterLayer() {
+        for waterway in ["stream", "canal", "river", "ditch", "drain", "dam", "weir", "dock"] {
+            XCTAssertEqual(layer(#"{"waterway": "\#(waterway)"}"#), "water", waterway)
+        }
+        XCTAssertEqual(layer(#"{"natural": "water"}"#), "water")
+        XCTAssertEqual(layer(#"{"landuse": "reservoir"}"#), "water")
+    }
+
+    /// A road that happens to carry a ferry is still a road.
+    func testAMoreSpecificTagStillWins() {
+        XCTAssertEqual(layer(#"{"highway": "unclassified", "route": "ferry"}"#), "roads")
+        XCTAssertEqual(layer(#"{"railway": "rail", "route": "ferry"}"#), "railways")
+    }
+
+    /// A route tagged only `route=ferry` has no `waterway` at all, so the water
+    /// query would never have returned it.
+    func testTheLayerIsAskedForInItsOwnRight() {
+        let text = OverpassQuery.build(BBoxQuery(
+            bbox: BoundingBox(minLon: 23.5, minLat: 37.8, maxLon: 23.9, maxLat: 38.1),
+            layers: ["ferry_routes"]
+        ))
+        XCTAssertTrue(text.contains(#"way["route"="ferry"]"#))
+        XCTAssertFalse(text.contains(#"way["highway"]"#), "only the layer asked for")
+    }
+
+    func testTheLayerIsListedSoItCanSayNoneHere() {
+        let collection = OverpassDecode.featureCollection(from: ["elements": []])
+        XCTAssertTrue(collection.layerNames.contains("ferry_routes"))
+        XCTAssertTrue(collection.features(in: "ferry_routes").isEmpty)
+    }
+
+    /// End to end: the ferry lands in its own layer and the stream stays put.
+    func testAFerryAndAStreamPartCompany() throws {
+        let payload = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(#"""
+            {"elements": [
+              {"type": "way", "id": 1, "tags": {"route": "ferry", "waterway": "seaway"},
+               "geometry": [{"lat": 37.94, "lon": 23.64}, {"lat": 37.14, "lon": 24.52}]},
+              {"type": "way", "id": 2, "tags": {"waterway": "stream"},
+               "geometry": [{"lat": 38.0, "lon": 23.7}, {"lat": 38.01, "lon": 23.71}]}
+            ]}
+            """#.utf8)) as? [String: Any]
+        )
+        let collection = OverpassDecode.featureCollection(from: payload)
+
+        XCTAssertEqual(collection.features(in: "ferry_routes").count, 1)
+        XCTAssertEqual(collection.features(in: "water").count, 1)
+        XCTAssertEqual(collection.features(in: "water").first?.property("waterway")?.stringValue, "stream")
+    }
+}

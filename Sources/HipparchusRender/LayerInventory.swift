@@ -33,6 +33,7 @@ public enum LayerInventory {
         "shops": "Shops",
         "landuse": "Land use",
         "coastline": "Coastline / sea",
+        "ferry_routes": "Ferry routes",
         "roads": "Roads",
         "roads_motorway": "Motorways",
         "roads_trunk": "Trunk roads",
@@ -70,6 +71,8 @@ public enum LayerInventory {
         "barriers": "Built",
         "power": "Built",
         "railways": "Movement",
+        // A ferry route is transport, not water, and reads beside the railways.
+        "ferry_routes": "Movement",
         "satellite_tracks": "Movement",
         "satellite_footprints": "Movement",
         "earthquakes_shallow": "Movement",

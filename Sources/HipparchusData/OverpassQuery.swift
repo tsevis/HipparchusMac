@@ -16,6 +16,7 @@ public enum OverpassQuery {
         "roads", "buildings", "water", "parks", "railways",
         "forests", "fields", "natural", "coastline", "places",
         "shops", "amenities", "landuse", "barriers", "power",
+        "ferry_routes",
     ]
 
     /// One layer's Overpass clauses. `{bbox}` is substituted with `s,w,n,e`.
@@ -103,6 +104,14 @@ public enum OverpassQuery {
         "power": [
             #"way["power"]({bbox});"#,
             #"node["power"]({bbox});"#,
+        ],
+        // Asked for in its own right rather than arriving as a by-product of the
+        // water query: a ferry route tagged only `route=ferry`, with no `waterway`
+        // at all, would otherwise never be fetched.
+        "ferry_routes": [
+            #"way["route"="ferry"]({bbox});"#,
+            #"relation["route"="ferry"]({bbox});"#,
+            #"way["waterway"~"seaway|fairway"]({bbox});"#,
         ],
     ]
 

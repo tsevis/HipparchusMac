@@ -75,6 +75,23 @@ final class LayerInventoryTests: XCTestCase {
         XCTAssertEqual(order.last, "Derived")
     }
 
+    /// A ferry route is transport, and reads beside the railways rather than in
+    /// with the lakes.
+    func testFerryRoutesReadAsMovementRatherThanWater() {
+        XCTAssertEqual(LayerInventory.label(for: "ferry_routes"), "Ferry routes")
+        XCTAssertEqual(LayerInventory.group(for: "ferry_routes"), "Movement")
+        XCTAssertEqual(LayerInventory.group(for: "water"), "Water & land")
+    }
+
+    /// No preset styles the layer, so it takes the fallback hairline — which is the
+    /// designed behaviour for a layer a preset says nothing about, and is why a new
+    /// layer shows up as *something* the first time it appears.
+    func testAnUnstyledLayerIsAHairlineAndNotFilled() {
+        let style = Presets.preset("Hypsometric Relief").styleProfile.style(for: "ferry_routes")
+        XCTAssertFalse(style.fillEnabled, "a route must never be filled")
+        XCTAssertGreaterThan(style.strokeWidth, 0, "a route nobody styled must still be visible")
+    }
+
     func testAnUnknownLayerStillGetsAReadableName() {
         XCTAssertEqual(LayerInventory.label(for: "zebra_crossings"), "Zebra crossings")
         XCTAssertEqual(LayerInventory.group(for: "zebra_crossings"), "Derived")

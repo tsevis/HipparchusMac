@@ -95,6 +95,16 @@ public enum OverpassDecode {
         if natural == "coastline" { return "coastline" }
         if place == "sea" || place == "ocean" { return "coastline" }
 
+        // A shipping lane is not a body of water, and this has to be asked *before*
+        // the water tests: OSM tags the Piraeus–Serifos ferry `waterway=seaway`, and
+        // any rule keyed on the presence of a `waterway` tag would otherwise draw an
+        // 80-kilometre ferry crossing as if it were a river.
+        //
+        // A deliberate divergence from the Python, which reads the same tag the same
+        // way and puts the route in `water`. Narrow on purpose: streams, canals,
+        // rivers, ditches and drains are watercourses and stay where they were.
+        if isRoute(tags: tags) { return "ferry_routes" }
+
         if natural == "water" || tags["waterway"] != nil || tags["water"] != nil { return "water" }
         if landuse == "reservoir" || landuse == "basin" { return "water" }
 
@@ -125,6 +135,19 @@ public enum OverpassDecode {
         if !landuse.isEmpty { return "landuse" }
 
         return nil
+    }
+
+    /// A way across water that is a *route*, not water.
+    ///
+    /// `route=ferry` is the definitive tag. `seaway` and `fairway` are the two
+    /// `waterway` values that mark navigation rather than a watercourse — they say
+    /// where vessels go, the way a shipping lane on a chart does.
+    static func isRoute(tags: [String: Any]) -> Bool {
+        if (tags["route"] as? String) == "ferry" { return true }
+        if let waterway = tags["waterway"] as? String {
+            return waterway == "seaway" || waterway == "fairway"
+        }
+        return false
     }
 
     // MARK: - Geometry

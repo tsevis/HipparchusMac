@@ -66,7 +66,7 @@ public struct SceneBuilder: Sendable {
         // Roads, major to minor.
         "roads_motorway", "roads_trunk", "roads_primary", "roads_secondary",
         "roads_tertiary", "roads_residential", "roads_service", "roads_other", "roads",
-        "railways",
+        "railways", "ferry_routes",
         // Orbital geometry floats above the ground it passes over.
         "satellite_footprints", "satellite_tracks",
         // Measured point phenomena sit above the base map.

@@ -10,7 +10,7 @@ here that disagrees with it is a bug here.
 
 **Status: the app is built.** Every online source, the composing source stack,
 the sixteen presets, illuminated contours, the three-column interface and the
-exports are in, with 355 tests and the output checked against real ground. See
+exports are in, with 364 tests and the output checked against real ground. See
 `KICKOFF.md` for the brief.
 
 Not built, and all understood rather than undecided: the file-backed providers
@@ -150,12 +150,11 @@ and it is why the check is worth running.
 
 ## Things that are not bugs
 
-- **A ferry route is drawn in the water layer.** OSM tags the Piraeus–Serifos
-  service `waterway=seaway`, and the layer classifier — ported from the Python,
-  which reads the same tag the same way — sends anything tagged `waterway` to
-  `water`. So a ferry route draws as a long straight line across the Saronic
-  Gulf. It is stroked rather than filled, so it reads as a line rather than as a
-  shape, but it is still a shipping lane in the water layer.
+- **A ferry route crosses open water in a straight line**, because it does. OSM
+  tags the Piraeus–Serifos service `route=ferry` and `waterway=seaway`, and it
+  runs 80 km from the Saronic Gulf out to Serifos in eighty vertices. It is drawn
+  in its own `ferry_routes` layer, so it can be turned off in the layer panel if
+  a sheet does not want shipping on it.
 - **Faint straight diagonals** in elevation output are void-fill seams and
   dataset boundaries in the source mosaic. They are in the raw grid before any
   contouring. Removing them properly would mean blurring real terrain.
@@ -188,6 +187,25 @@ that merely pass close.
 
 A relation that never closes keeps its edges as lines rather than vanishing, and
 never claims to be an area.
+
+## Where OSM tags land
+
+Layers are a reading of OSM tags, and the reading is ported from the Python. One
+place it deliberately differs: **routes are not water.** OSM tags the
+Piraeus–Serifos ferry `waterway=seaway`, so a rule keyed on the presence of a
+`waterway` tag drew an 80-kilometre crossing of the Saronic Gulf as if it were a
+river. `route=ferry`, `waterway=seaway` and `waterway=fairway` now land in
+`ferry_routes`, which is asked for in its own right — a route tagged only
+`route=ferry` has no `waterway` at all and the water query would never have
+returned it.
+
+The split is narrow on purpose. An Athens fetch holds 852 streams, 121 canals,
+54 rivers, 43 ditches and 39 drains, and every one of them is still water.
+
+No preset styles `ferry_routes`, so it draws as the fallback hairline. That is
+the designed behaviour for a layer a preset says nothing about, and it is why a
+new layer shows up as *something* the first time it appears rather than silently
+not rendering.
 
 ## Provenance
 
