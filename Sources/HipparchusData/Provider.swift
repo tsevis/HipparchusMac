@@ -176,6 +176,21 @@ public struct FetchCancelled: Error, CustomStringConvertible {
 /// the Python uses with its injectable `http_get`.
 public protocol HTTPFetching: Sendable {
     func data(from url: URL, timeout: TimeInterval) async throws -> Data
+
+    /// Overpass takes its query in a form-encoded body, and a query for a city with
+    /// every layer is far too long for a URL. Defaulted so the many GET-only stubs
+    /// in the suite do not each have to refuse it by hand.
+    func post(
+        _ body: [String: String],
+        to url: URL,
+        timeout: TimeInterval
+    ) async throws -> Data
+}
+
+extension HTTPFetching {
+    public func post(_ body: [String: String], to url: URL, timeout: TimeInterval) async throws -> Data {
+        throw HTTPError(url: url, underlying: "this fetcher does not support POST")
+    }
 }
 
 public struct HTTPError: Error, CustomStringConvertible {
@@ -218,5 +233,36 @@ public struct URLSessionFetcher: HTTPFetching {
             throw HTTPError(url: url, statusCode: http.statusCode)
         }
         return data
+    }
+
+    public func post(_ body: [String: String], to url: URL, timeout: TimeInterval) async throws -> Data {
+        var request = URLRequest(url: url, timeoutInterval: timeout)
+        request.httpMethod = "POST"
+        request.setValue(
+            "application/x-www-form-urlencoded; charset=utf-8",
+            forHTTPHeaderField: "Content-Type"
+        )
+        request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+        request.httpBody = Data(
+            body
+                .map { "\($0.key)=\(Self.formEncoded($0.value))" }
+                .joined(separator: "&")
+                .utf8
+        )
+
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+            throw HTTPError(url: url, statusCode: http.statusCode)
+        }
+        return data
+    }
+
+    /// `application/x-www-form-urlencoded`, which is not the same as percent-encoding
+    /// a URL path: a literal `+` must survive, and a space becomes `%20` rather than
+    /// `+` so an Overpass query body reads back exactly as it was written.
+    static func formEncoded(_ value: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 }
