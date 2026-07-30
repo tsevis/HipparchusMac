@@ -13,6 +13,11 @@ let package = Package(
     name: "HipparchusMac",
     platforms: [.macOS(.v15)],
     products: [
+        // The app links all three rather than reaching through HipparchusRender for
+        // the ones below it. A transitive module happens to be importable, but
+        // depending on that is depending on an accident.
+        .library(name: "HipparchusGeometry", targets: ["HipparchusGeometry"]),
+        .library(name: "HipparchusData", targets: ["HipparchusData"]),
         .library(name: "HipparchusRender", targets: ["HipparchusRender"]),
         .executable(name: "hipparchus-cli", targets: ["hipparchus-cli"]),
     ],

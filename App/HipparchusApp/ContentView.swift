@@ -3,273 +3,260 @@ import HipparchusData
 import HipparchusGeometry
 import HipparchusRender
 import SwiftUI
-import UniformTypeIdentifiers
 
-/// Deliberately plain.
+/// The three-column interface from the design.
 ///
-/// The three-column `NavigationSplitView` from the Python's screenshots — the
-/// sources stack, the derived layer list, the style thumbnails, the locator — is
-/// the next slice. Building it now would be a lot of interface standing on one
-/// data path, and this slice exists to prove that path end to end. What is here is
-/// the minimum needed to look at the result of a real fetch and export it.
+/// One spine: **Sources, then Layers, then Style.** Nothing is exclusive, everything
+/// stacks, and the map is the product — so the map gets the room and everything else
+/// is a narrow column beside it.
 struct ContentView: View {
     @State private var model = MapModel()
+    @State private var viewport = ViewportState()
+    @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     var body: some View {
+        // The status bar is a sibling of the split view rather than a
+        // `safeAreaInset` on it: it spans all three columns, so it is a row of the
+        // window rather than an inset of the split view, and a VStack says that
+        // directly.
         VStack(spacing: 0) {
-            controls
-            Divider()
-            MapCanvas(scene: model.scene)
-                .frame(minWidth: 480, minHeight: 360)
-            Divider()
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                FramePanel(model: model)
+                    .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
+            } content: {
+                map
+                    .navigationSplitViewColumnWidth(min: 420, ideal: 720)
+            } detail: {
+                List {
+                    SourcesPanel(model: model)
+                    LayersPanel(model: model)
+                    StylePicker(model: model)
+                }
+                .listStyle(.sidebar)
+                .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 380)
+            }
+            .navigationTitle("Hipparchus")
+            .toolbar { toolbar }
+
             statusBar
         }
-        .frame(minWidth: 760, minHeight: 560)
-        .task { model.fetchIfRequestedOnLaunch() }
+        .frame(minWidth: 960, minHeight: 620)
+        .task { model.startIfRequestedOnLaunch() }
+        .alert(
+            "This will take a while",
+            isPresented: Binding(
+                get: { model.pendingWarning != nil },
+                set: { if !$0 { model.pendingWarning = nil } }
+            )
+        ) {
+            Button("Fetch anyway") { model.fetch() }
+            Button("Cancel", role: .cancel) { model.pendingWarning = nil }
+        } message: {
+            Text(model.pendingWarning ?? "")
+        }
     }
 
-    private var controls: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text("Area").foregroundStyle(.secondary)
-                coordinateField("W", value: $model.west)
-                coordinateField("S", value: $model.south)
-                coordinateField("E", value: $model.east)
-                coordinateField("N", value: $model.north)
+    // MARK: - The map
 
-                Picker("", selection: $model.placeName) {
-                    Text("Saved places").tag("")
-                    Divider()
-                    ForEach(MapModel.places, id: \.name) { place in
-                        Text(place.name).tag(place.name)
+    private var map: some View {
+        ZStack(alignment: .topTrailing) {
+            MapCanvas(
+                scene: model.visibleScene,
+                viewport: viewport,
+                onViewportChange: { viewport = $0 },
+                onAreaDrawn: { model.setArea($0) }
+            )
+
+            zoomControls
+                .padding(10)
+
+            VStack {
+                Spacer()
+                // Direct manipulation needs saying once. It is a pill rather than a
+                // panel because it should read as a caption on the map, not as
+                // another piece of interface competing with it.
+                Text("drag to pan · scroll to zoom · Option-drag to draw a new area")
+                    .font(.caption)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.62), in: Capsule())
+                    .padding(.bottom, 14)
+            }
+            .frame(maxWidth: .infinity)
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var zoomControls: some View {
+        VStack(spacing: 0) {
+            Button { viewport = viewport.zoomed(by: 1.3) } label: {
+                Image(systemName: "plus").frame(width: 22, height: 22)
+            }
+            Divider().frame(width: 22)
+            Button { viewport = viewport.zoomed(by: 1 / 1.3) } label: {
+                Image(systemName: "minus").frame(width: 22, height: 22)
+            }
+            Divider().frame(width: 22)
+            Button { viewport = ViewportState() } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    .frame(width: 22, height: 22)
+            }
+            .help("Fit the map to the window")
+        }
+        .buttonStyle(.borderless)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6).strokeBorder(.separator, lineWidth: 0.5)
+        }
+    }
+
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigation) {
+            Picker("Place", selection: Binding(
+                get: { model.placeName },
+                set: { model.select($0) }
+            )) {
+                if model.placeName.isEmpty {
+                    Text("Custom area").tag("")
+                }
+                ForEach(MapModel.places) { place in
+                    Text(place.name).tag(place.name)
+                }
+            }
+            .labelsHidden()
+            .frame(minWidth: 150)
+        }
+
+        ToolbarItem(placement: .principal) {
+            Button("Update map") { model.update() }
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(model.isFetching || model.bbox == nil)
+        }
+
+        ToolbarItem(placement: .principal) {
+            Text(model.areaDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            Menu("Export") {
+                Button("SVG…") { model.exportSVG() }
+                Button("PDF…") { model.exportPDF() }
+                Button("PNG…") { model.exportPNG() }
+                Divider()
+                Button("Clear cache") { model.clearCache() }
+            }
+            .disabled(model.scene == nil)
+        }
+    }
+
+    // MARK: - Status
+
+    /// Progress is per source, with a way out.
+    ///
+    /// A fetch can take five minutes — Overpass is usually all of it — while a
+    /// single status line says "Idle". Showing each source with its own elapsed time
+    /// makes the slow one obvious, and Cancel means a mistyped area is not a
+    /// five-minute wait.
+    private var statusBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                if model.isFetching {
+                    ProgressView().controlSize(.small)
+                }
+
+                if model.progress.sources.isEmpty {
+                    Text(model.status)
+                        .font(.callout)
+                        .foregroundStyle(model.isError ? .red : .primary)
+                        .textSelection(.enabled)
+                        .lineLimit(2)
+                } else {
+                    ForEach(model.progress.sources) { source in
+                        SourceProgressRow(source: source)
+                    }
+                    if !model.isFetching {
+                        Text(model.status)
+                            .font(.callout)
+                            .foregroundStyle(model.isError ? .red : .secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
                 }
-                .labelsHidden()
-                .frame(width: 160)
-                .onChange(of: model.placeName) { _, name in model.select(name) }
 
-                Spacer()
+                Spacer(minLength: 8)
+
+                if model.isFetching {
+                    Button("Cancel") { model.cancel() }
+                        .controlSize(.small)
+                }
+
+                if let provenance = model.provenance {
+                    // Provenance is on screen for the same reason it is in the file:
+                    // a generated map must not be mistakable for a survey.
+                    Text(provenance)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.quaternary, in: Capsule())
+                }
+
+                if !model.cacheSummary.isEmpty {
+                    Text(model.cacheSummary)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
-
-            HStack(spacing: 8) {
-                Button("Update map") { model.fetch() }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(model.isFetching)
-
-                Button("Cancel") { model.cancel() }
-                    .disabled(!model.isFetching)
-
-                Spacer()
-
-                Button("Export SVG…") { model.exportSVG() }
-                    .disabled(model.scene == nil)
-                Button("Export PDF…") { model.exportPDF() }
-                    .disabled(model.scene == nil)
-            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
         }
-        .padding(12)
-    }
-
-    private func coordinateField(_ label: String, value: Binding<String>) -> some View {
-        HStack(spacing: 3) {
-            Text(label).font(.caption).foregroundStyle(.secondary)
-            TextField(label, text: value)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 78)
-                .labelsHidden()
-        }
-    }
-
-    private var statusBar: some View {
-        HStack(spacing: 10) {
-            if model.isFetching {
-                ProgressView().controlSize(.small)
-            }
-            Text(model.status)
-                .font(.callout)
-                .foregroundStyle(model.isError ? .red : .primary)
-                .textSelection(.enabled)
-            Spacer()
-            if let provenance = model.provenance {
-                // Provenance is on screen for the same reason it is in the file: a
-                // generated map must not be mistakable for a survey.
-                Text(provenance)
-                    .font(.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(.quaternary, in: Capsule())
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .background(.bar)
     }
 }
 
-// MARK: -
+private struct SourceProgressRow: View {
+    let source: SourceProgress
 
-@MainActor
-@Observable
-final class MapModel {
-    struct Place {
-        let name: String
-        let bbox: BoundingBox
-    }
-
-    static let places: [Place] = [
-        Place(name: "Santorini", bbox: BoundingBox(minLon: 25.32, minLat: 36.33, maxLon: 25.50, maxLat: 36.48)),
-        Place(name: "Athens", bbox: BoundingBox(minLon: 23.575, minLat: 37.816, maxLon: 23.895, maxLat: 38.136)),
-        Place(name: "San Francisco", bbox: BoundingBox(minLon: -122.53, minLat: 37.70, maxLon: -122.35, maxLat: 37.84)),
-        Place(name: "Addis Ababa", bbox: BoundingBox(minLon: 38.65, minLat: 8.90, maxLon: 38.88, maxLat: 9.10)),
-        Place(name: "Everest", bbox: BoundingBox(minLon: 86.85, minLat: 27.93, maxLon: 87.05, maxLat: 28.06)),
-        Place(name: "Myrtoan Sea", bbox: BoundingBox(minLon: 23.2, minLat: 36.3, maxLon: 24.2, maxLat: 37.1)),
-    ]
-
-    var west = "25.32"
-    var south = "36.33"
-    var east = "25.50"
-    var north = "36.48"
-    var placeName = "Santorini"
-
-    var scene: RenderScene?
-    var status = "Pick an area and press Update map."
-    var isError = false
-    var isFetching = false
-    var provenance: String?
-
-    private var task: Task<Void, Never>?
-
-    /// Open straight onto an area given on the command line:
-    ///
-    ///     Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48
-    ///
-    /// Useful on its own — it is how you get from a coordinate in a notebook to a
-    /// map without retyping four numbers — and it is the only way to check the
-    /// window's own draw path without a human clicking the button, since driving
-    /// the UI from a script needs accessibility permission this process has not
-    /// been granted.
-    func fetchIfRequestedOnLaunch() {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let flag = arguments.firstIndex(of: "--bbox"), flag + 1 < arguments.count else { return }
-        let parts = arguments[flag + 1]
-            .split(separator: ",")
-            .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
-        guard parts.count == 4 else {
-            status = "--bbox needs four numbers: west,south,east,north"
-            isError = true
-            return
-        }
-        west = String(parts[0])
-        south = String(parts[1])
-        east = String(parts[2])
-        north = String(parts[3])
-        placeName = Self.places.first { place in
-            place.bbox.minLon == parts[0] && place.bbox.minLat == parts[1]
-                && place.bbox.maxLon == parts[2] && place.bbox.maxLat == parts[3]
-        }?.name ?? ""
-        fetch()
-    }
-
-    func select(_ name: String) {
-        guard let place = Self.places.first(where: { $0.name == name }) else { return }
-        west = String(place.bbox.minLon)
-        south = String(place.bbox.minLat)
-        east = String(place.bbox.maxLon)
-        north = String(place.bbox.maxLat)
-    }
-
-    func fetch() {
-        guard let bbox = parsedBBox() else {
-            status = "Those coordinates do not make an area. West must be less than east, south less than north."
-            isError = true
-            return
-        }
-
-        task?.cancel()
-        isFetching = true
-        isError = false
-        status = "Fetching elevation…"
-
-        task = Task { [bbox] in
-            do {
-                let collection = try await TerrainTileProvider().fetch(BBoxQuery(bbox: bbox))
-                let built = try SceneBuilder().build(from: collection)
-                if Task.isCancelled { return }
-
-                scene = built
-                provenance = collection.provenance?.label
-                let low = collection.metadata["elevation_min_metres"]?.doubleValue ?? .nan
-                let high = collection.metadata["elevation_max_metres"]?.doubleValue ?? .nan
-                let interval = collection.metadata["contour_interval_metres"]?.doubleValue ?? .nan
-                status = String(
-                    format: "%@ · %.0f m to %.0f m · %.0f m interval",
-                    built.summary, low, high, interval
-                )
-            } catch is FetchCancelled {
-                // Cancel cannot pull a request out of its socket. It skips sources
-                // that have not started, stops those that check between requests,
-                // and discards the result rather than drawing it. The map already on
-                // screen stays.
-                status = "Cancelled. The map on screen is the previous fetch."
-            } catch {
-                isError = true
-                status = "\(error)"
+    var body: some View {
+        HStack(spacing: 5) {
+            icon
+            Text(Self.label(for: source.sourceID))
+                .font(.caption)
+            if source.state == .done, !source.detail.isEmpty {
+                Text(source.detail)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
-            isFetching = false
         }
+        .help(source.summary())
     }
 
-    func cancel() {
-        task?.cancel()
+    /// The sidebar's own name for a source, so the status bar and the sources
+    /// stack call the same thing by the same name.
+    static func label(for sourceID: String) -> String {
+        SourceStack.defaultDefinitions.first { $0.id == sourceID }?.label ?? sourceID
     }
 
-    func exportSVG() {
-        export(type: .svg, extension: "svg") { scene, url in
-            _ = try SVGExporter().write(scene, to: url)
-        }
-    }
-
-    func exportPDF() {
-        export(type: .pdf, extension: "pdf") { scene, url in
-            try PDFExporter().write(scene, to: url)
-        }
-    }
-
-    // MARK: -
-
-    private func parsedBBox() -> BoundingBox? {
-        guard
-            let west = Double(west.trimmingCharacters(in: .whitespaces)),
-            let south = Double(south.trimmingCharacters(in: .whitespaces)),
-            let east = Double(east.trimmingCharacters(in: .whitespaces)),
-            let north = Double(north.trimmingCharacters(in: .whitespaces)),
-            west < east, south < north,
-            (-180...180).contains(west), (-180...180).contains(east),
-            (-90...90).contains(south), (-90...90).contains(north)
-        else {
-            return nil
-        }
-        return BoundingBox(minLon: west, minLat: south, maxLon: east, maxLat: north)
-    }
-
-    private func export(
-        type: UTType,
-        extension suffix: String,
-        write: (RenderScene, URL) throws -> Void
-    ) {
-        guard let scene else { return }
-
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [type]
-        panel.nameFieldStringValue = "\(placeName.isEmpty ? "map" : placeName.lowercased()).\(suffix)"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
-        do {
-            try write(scene, url)
-            status = "Exported \(url.lastPathComponent)."
-            isError = false
-        } catch {
-            isError = true
-            status = "Export failed: \(error)"
+    @ViewBuilder
+    private var icon: some View {
+        switch source.state {
+        case .waiting:
+            Image(systemName: "circle.dotted").foregroundStyle(.tertiary)
+        case .running:
+            ProgressView().controlSize(.mini)
+        case .done:
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .failed:
+            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+        case .cancelled:
+            Image(systemName: "xmark.circle").foregroundStyle(.tertiary)
         }
     }
 }

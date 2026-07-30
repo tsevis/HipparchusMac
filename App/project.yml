@@ -38,6 +38,10 @@ targets:
     dependencies:
       - package: HipparchusMac
         product: HipparchusRender
+      - package: HipparchusMac
+        product: HipparchusData
+      - package: HipparchusMac
+        product: HipparchusGeometry
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hipparchus.HipparchusMac
