@@ -10,7 +10,7 @@ here that disagrees with it is a bug here.
 
 **Status: the app is built.** Every online source, the composing source stack,
 the sixteen presets, illuminated contours, the three-column interface and the
-exports are in, with 446 tests and the output checked against real ground. See
+exports are in, with 454 tests and the output checked against real ground. See
 `KICKOFF.md` for the brief.
 
 Not built, and understood rather than undecided: reading GeoParquet directly —
@@ -293,6 +293,21 @@ three thousand seeds. Circle packing walks a lattice that is quadratic in the
 area while its step is fixed by the smallest circle, so the lattice is capped and
 the step widens to fit: a 5 km frame at an 8 m step took seven seconds before
 that, and thirty kilometres would have taken four minutes.
+
+## Roads are eight layers
+
+Every one of the sixteen presets styles a road hierarchy — a motorway at five
+units in blue, a primary at four in red, a residential at two in white, a service
+road at one and a half in grey — and the eight layers are named in the draw order
+and labelled in the panel. Until the classifier ran, none of it was used: every
+road landed in the generic `roads` layer and drew at one weight, so a footpath
+looked exactly like a motorway. An Athens fetch is 111 208 roads.
+
+The split happens before anything else touches them, so the rest of the pipeline
+sees the layers the presets are written for. One departure from the Python, which
+caps the *total* across the classes while classifying: here each class meets the
+per-layer cap on its own, which is how every other layer is already treated, and
+means a motorway is never dropped because forty thousand footpaths came first.
 
 ## Where OSM tags land
 

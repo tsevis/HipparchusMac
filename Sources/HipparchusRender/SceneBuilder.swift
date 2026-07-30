@@ -126,8 +126,13 @@ public struct SceneBuilder: Sendable {
         var layers: [RenderLayer] = []
         var illuminatedLayers: [String] = []
 
-        for name in Self.ordered(collection.featuresByLayer.keys) {
-            let features = collection.features(in: name)
+        // Roads arrive as one layer and are drawn as eight. Split before anything
+        // else touches them, so the rest of the pipeline sees the layers the
+        // presets actually style.
+        let featuresByLayer = Self.classifyRoads(collection.featuresByLayer)
+
+        for name in Self.ordered(featuresByLayer.keys) {
+            let features = featuresByLayer[name] ?? []
             let style = styleProfile.style(for: name)
             var layer = RenderLayer(name: name, style: style, rawFeatureCount: features.count)
 
@@ -383,6 +388,60 @@ public struct SceneBuilder: Sendable {
         "roads_motorway", "roads_trunk", "roads_primary", "roads_secondary",
         "roads_tertiary", "roads_residential", "roads_service", "roads_other",
     ]
+
+    /// The `highway` values that make up each class, major to minor.
+    ///
+    /// Ported from `_classify_roads`. Order matters only in that the first match
+    /// wins, and no value appears twice.
+    static let roadClasses: [(layer: String, values: Set<String>)] = [
+        ("roads_motorway", ["motorway", "motorway_link"]),
+        ("roads_trunk", ["trunk", "trunk_link"]),
+        ("roads_primary", ["primary", "primary_link"]),
+        ("roads_secondary", ["secondary", "secondary_link"]),
+        ("roads_tertiary", ["tertiary", "tertiary_link"]),
+        ("roads_residential", ["residential", "living_street", "unclassified"]),
+        ("roads_service", ["service", "track", "path", "footway", "cycleway", "pedestrian"]),
+    ]
+
+    /// Split the road layer into the hierarchy the presets are written for.
+    ///
+    /// Every one of the sixteen presets styles eight road classes with distinct
+    /// weights and colours — a motorway at five units in blue, a primary at four in
+    /// red, a residential at two in white — and until this ran, none of it was ever
+    /// used: everything landed in the generic `roads` layer and drew at one weight.
+    /// An Athens fetch is 111 208 roads, and a map that draws a footpath exactly
+    /// like a motorway is not a map of a road network.
+    ///
+    /// **One departure from the Python.** It caps the *total* across the classes
+    /// while classifying, so in a dense city the 45 000 residential ways can use up
+    /// the budget before the motorways are reached. Here the split happens first and
+    /// each class meets the per-layer cap on its own, which is how every other layer
+    /// in this builder is already treated — and it means a motorway is never dropped
+    /// because forty thousand footpaths came first.
+    static func classifyRoads(_ featuresByLayer: [String: [Feature]]) -> [String: [Feature]] {
+        guard let roads = featuresByLayer["roads"], !roads.isEmpty else { return featuresByLayer }
+
+        var result = featuresByLayer
+        // The generic layer goes: with the hierarchy populated, an always-empty
+        // "Roads" row above eight full ones is noise rather than information.
+        result.removeValue(forKey: "roads")
+
+        for feature in roads {
+            let highway = feature.property("highway")?.stringValue ?? ""
+            let layer = roadClasses.first { $0.values.contains(highway) }?.layer ?? "roads_other"
+            // Rebuilt rather than moved, so the feature's own record of which layer
+            // it is in stays true — the exporter and the diagnostics both read it.
+            result[layer, default: []].append(Feature(
+                id: feature.id,
+                layer: layer,
+                source: feature.source,
+                geometry: feature.geometry,
+                provenance: feature.provenance,
+                properties: feature.properties
+            ))
+        }
+        return result
+    }
 
     /// The part of the frame the map actually occupies.
     ///

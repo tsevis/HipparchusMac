@@ -844,3 +844,140 @@ final class DerivedLayerTests: XCTestCase {
         XCTAssertNil(layer(scene, "voronoi_cells"))
     }
 }
+
+/// Roads arrive as one layer and are drawn as eight.
+///
+/// Every one of the sixteen presets styles a road hierarchy with distinct weights
+/// and colours, and until the split ran none of it was ever used: a footpath drew
+/// exactly like a motorway.
+final class RoadHierarchyTests: XCTestCase {
+
+    private func road(_ highway: String, _ index: Int) -> Feature {
+        Feature(
+            id: "way/\(index)", layer: "roads", source: "overpass",
+            geometry: .lineString(LineString([
+                Coordinate(lon: 23.70 + Double(index) * 0.001, lat: 37.90),
+                Coordinate(lon: 23.70 + Double(index) * 0.001, lat: 37.92),
+            ])),
+            provenance: .measured,
+            properties: ["highway": .string(highway)]
+        )
+    }
+
+    private func scene(_ highways: [String]) throws -> RenderScene {
+        let features = highways.enumerated().map { road($1, $0) }
+        return try SceneBuilder().build(from: FeatureCollection(
+            featuresByLayer: ["roads": features],
+            metadata: ["source": .string("overpass")],
+            bbox: BoundingBox(minLon: 23.5, minLat: 37.8, maxLon: 24.0, maxLat: 38.1),
+            provenance: .measured
+        ))
+    }
+
+    func testEachHighwayValueLandsInItsOwnClass() throws {
+        let scene = try scene([
+            "motorway", "trunk", "primary", "secondary",
+            "tertiary", "residential", "service", "raceway",
+        ])
+
+        func count(_ layer: String) -> Int {
+            scene.layers.first { $0.name == layer }?.geometries.count ?? 0
+        }
+        XCTAssertEqual(count("roads_motorway"), 1)
+        XCTAssertEqual(count("roads_trunk"), 1)
+        XCTAssertEqual(count("roads_primary"), 1)
+        XCTAssertEqual(count("roads_secondary"), 1)
+        XCTAssertEqual(count("roads_tertiary"), 1)
+        XCTAssertEqual(count("roads_residential"), 1)
+        XCTAssertEqual(count("roads_service"), 1)
+        // A value nobody listed is still a road.
+        XCTAssertEqual(count("roads_other"), 1, "raceway went missing rather than to roads_other")
+    }
+
+    /// Link roads belong with the roads they link.
+    func testLinkRoadsJoinTheirParentClass() throws {
+        let scene = try scene(["motorway_link", "primary_link", "living_street", "footway"])
+
+        func count(_ layer: String) -> Int {
+            scene.layers.first { $0.name == layer }?.geometries.count ?? 0
+        }
+        XCTAssertEqual(count("roads_motorway"), 1)
+        XCTAssertEqual(count("roads_primary"), 1)
+        XCTAssertEqual(count("roads_residential"), 1)
+        XCTAssertEqual(count("roads_service"), 1)
+    }
+
+    /// The point of the whole exercise: the classes draw differently.
+    func testTheClassesTakeTheDistinctStylesThePresetDefines() throws {
+        let scene = try scene(["motorway", "primary", "residential", "service"])
+
+        func style(_ layer: String) throws -> LayerStyle {
+            try XCTUnwrap(scene.layers.first { $0.name == layer }?.style)
+        }
+        let motorway = try style("roads_motorway")
+        let primary = try style("roads_primary")
+        let residential = try style("roads_residential")
+        let service = try style("roads_service")
+
+        // Widths descend with importance.
+        XCTAssertGreaterThan(motorway.strokeWidth, primary.strokeWidth)
+        XCTAssertGreaterThan(primary.strokeWidth, residential.strokeWidth)
+        XCTAssertGreaterThan(residential.strokeWidth, service.strokeWidth)
+
+        // And they are not all the same colour, which is what the old single
+        // "roads" layer made them.
+        let colours = [motorway, primary, residential, service].map(\.strokeColor)
+        for outer in 0..<(colours.count - 1) {
+            for inner in (outer + 1)..<colours.count {
+                XCTAssertNotEqual(colours[outer], colours[inner], "two classes share a colour")
+            }
+        }
+    }
+
+    /// Drawn major over minor, so a motorway is not buried under the side streets.
+    func testTheHierarchyIsDrawnMajorOverMinor() throws {
+        let scene = try scene(["service", "motorway", "residential", "primary"])
+        let order = scene.layers.map(\.name)
+
+        let motorway = try XCTUnwrap(order.firstIndex(of: "roads_motorway"))
+        let primary = try XCTUnwrap(order.firstIndex(of: "roads_primary"))
+        let residential = try XCTUnwrap(order.firstIndex(of: "roads_residential"))
+        let service = try XCTUnwrap(order.firstIndex(of: "roads_service"))
+
+        XCTAssertLessThan(motorway, primary)
+        XCTAssertLessThan(primary, residential)
+        XCTAssertLessThan(residential, service)
+    }
+
+    /// With the hierarchy populated, an always-empty "Roads" row is noise.
+    func testTheGenericRoadLayerGoesAway() throws {
+        let scene = try scene(["motorway", "residential"])
+        XCTAssertNil(scene.layers.first { $0.name == "roads" })
+    }
+
+    /// A source that already speaks the hierarchy passes straight through.
+    func testAlreadyClassifiedRoadsAreLeftAlone() {
+        let motorway = Feature(
+            id: "a", layer: "roads_motorway", source: "vector_tiles",
+            geometry: .lineString(LineString([
+                Coordinate(lon: 0, lat: 0), Coordinate(lon: 1, lat: 1),
+            ])),
+            provenance: .measured
+        )
+        let result = SceneBuilder.classifyRoads(["roads_motorway": [motorway]])
+        XCTAssertEqual(result["roads_motorway"]?.count, 1)
+    }
+
+    /// A feature moved between layers must say which layer it is in: the exporter
+    /// and the diagnostics both read it.
+    func testAMovedFeatureRecordsItsNewLayer() throws {
+        let result = SceneBuilder.classifyRoads(["roads": [road("motorway", 0)]])
+        XCTAssertEqual(result["roads_motorway"]?.first?.layer, "roads_motorway")
+        XCTAssertEqual(result["roads_motorway"]?.first?.id, "way/0", "the feature lost its identity")
+    }
+
+    func testAMapWithNoRoadsIsUntouched() {
+        let empty: [String: [Feature]] = ["water": []]
+        XCTAssertEqual(SceneBuilder.classifyRoads(empty).keys.sorted(), ["water"])
+    }
+}
