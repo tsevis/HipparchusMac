@@ -8,10 +8,16 @@ The Python application is the specification. It is finished, it works, and its
 454 tests are an executable description of the behaviour being ported. Anything
 here that disagrees with it is a bug here.
 
-**Status: first slice, in progress.** One vertical path is being built end to
-end — terrain tiles → contours and elevation bands → Core Graphics canvas → SVG
-— before any other source, the source-stack interface or the style presets are
-touched. See `KICKOFF.md` for the brief and the design it is being built to.
+**Status: first slice done.** One vertical path works end to end — terrain tiles
+→ contours and elevation bands → Core Graphics canvas → SVG and PDF — with 164
+tests and the output checked against real ground. See `KICKOFF.md` for the brief
+and the design the rest is being built to.
+
+Not yet built, and all understood rather than undecided: illumination and Tanaka
+stroke weight; smoothing and simplification; Overpass, GIBS, USGS and Celestrak;
+the style presets and their thumbnails; the sources stack; the derived layer
+panel; the MapKit locator; per-source progress; the file-backed providers. The
+window is deliberately plain until the three-column interface arrives with them.
 
 ## Requirements
 
@@ -63,22 +69,61 @@ data layer and its application layer that no test caught, because every test
 reached the application layer first. Separate targets make the same mistake a
 compile error.
 
+## Running it
+
+The app opens on an empty canvas; pick an area, or a saved place, and press
+Update map. It will also open straight onto an area, which is handy from a
+terminal or a script:
+
+```sh
+Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48
+```
+
+The CLI does the same thing headlessly and writes PNG, SVG, PDF and a
+diagnostics JSON:
+
+```sh
+swift run -c release hipparchus-cli santorini
+swift run -c release hipparchus-cli --all --out out
+swift run -c release hipparchus-cli --bbox 23.2,36.3,24.2,37.1
+```
+
+Build it in release. In debug the contour tracer is about thirty times slower,
+which is the difference between a six-second fetch and a three-minute one.
+
 ## Verifying output
 
 Rendering is visual, so the checks are numbers rather than impressions. These
-areas have known answers:
+areas have known answers, and the CLI prints what it measured next to what was
+expected. Every one currently matches:
 
-| Area | Bounding box | Expect |
-|---|---|---|
-| Santorini | `25.32, 36.33 → 25.50, 36.48` | −79 m caldera floor, 525 m rim |
-| Athens | `23.575, 37.816 → 23.895, 38.136` | −4 m to 1091 m |
-| San Francisco | `−122.53, 37.70 → −122.35, 37.84` | tops at 284 m |
-| Addis Ababa | `38.65, 8.90 → 38.88, 9.10` | never below 2,075 m |
-| Everest | `86.85, 27.93 → 87.05, 28.06` | 5,060 m to 8,746 m |
-| Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | reaches −1,310 m |
+| Area | Bounding box | Expected | Measured |
+|---|---|---|---|
+| Santorini | `25.32, 36.33 → 25.50, 36.48` | −79 m floor, 525 m rim | −79 m to 525 m |
+| Athens | `23.575, 37.816 → 23.895, 38.136` | −4 m to 1091 m | −4 m to 1091 m |
+| San Francisco | `−122.53, 37.70 → −122.35, 37.84` | tops at 284 m | −114 m to 284 m |
+| Addis Ababa | `38.65, 8.90 → 38.88, 9.10` | never below 2,075 m | 2075 m to 3127 m |
+| Everest | `86.85, 27.93 → 87.05, 28.06` | 5,060 m to 8,746 m | 5060 m to 8746 m |
+| Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | −1,310 m, ~546 sub-sea contours | −1310 m, 546 |
 
-A coastal strip should yield no bathymetry, and open water should yield no
-summits.
+Athens, Addis Ababa and Everest yield no bathymetry; the Myrtoan Sea yields five
+summits rather than two dozen. Santorini's Illustrator layers come out as 178
+contours, 798 index contours, 7 bathymetry and 24 summit labels — the same counts
+the Python's own screenshot shows — and its longest contour is 8,097 vertices,
+arriving whole.
+
+Beyond that, three fixtures compare this port against the Python directly rather
+than against my reading of it:
+
+- **Contours** — the same field traced by both, matching line for line and vertex
+  for vertex across five levels, 24 lines and 644 vertices.
+- **Elevation bands** — areas matching Shapely to one part in 10⁹, and polygon and
+  hole counts matching exactly, over a cone and a crater.
+- **Terrarium decoding** — a real AWS tile decoded to the same metres by Core
+  Graphics, skia and PIL.
+
+Regenerate them with the scripts in `Scripts/`. A diff there means one of the two
+implementations changed; find out which before accepting it.
 
 ## Things that are not bugs
 
