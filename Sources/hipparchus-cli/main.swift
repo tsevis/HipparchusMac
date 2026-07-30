@@ -1,1 +1,244 @@
-print("hipparchus-cli")
+import CoreGraphics
+import Foundation
+import HipparchusData
+import HipparchusGeometry
+import HipparchusRender
+import ImageIO
+
+/// Headless fetch → render → export.
+///
+/// The point of this is verification against reality. Rendering is visual and a
+/// screenshot cannot be asserted on, but elevation ranges can: Santorini's caldera
+/// floor is −79 m and its rim 525 m whatever the drawing looks like. This fetches a
+/// real area, prints what came back, and writes the files so the output can be
+/// looked at as well as measured.
+///
+/// It is also the only thing that exercises the network path, since no test does.
+
+// MARK: - Named places, for checking output against known ground
+
+struct Place {
+    let name: String
+    let bbox: BoundingBox
+    /// What the elevation range should be, from the Python's own reference values.
+    let expected: String
+}
+
+let places: [String: Place] = [
+    "santorini": Place(
+        name: "Santorini",
+        bbox: BoundingBox(minLon: 25.32, minLat: 36.33, maxLon: 25.50, maxLat: 36.48),
+        expected: "-79 m caldera floor, 525 m rim"
+    ),
+    "athens": Place(
+        name: "Athens",
+        bbox: BoundingBox(minLon: 23.575, minLat: 37.816, maxLon: 23.895, maxLat: 38.136),
+        expected: "-4 m to 1091 m; Hymettus east, Parnitha north-west, Penteli north-east"
+    ),
+    "sanfrancisco": Place(
+        name: "San Francisco",
+        bbox: BoundingBox(minLon: -122.53, minLat: 37.70, maxLon: -122.35, maxLat: 37.84),
+        expected: "tops at 284 m; Twin Peaks is 282 m"
+    ),
+    "addisababa": Place(
+        name: "Addis Ababa",
+        bbox: BoundingBox(minLon: 38.65, minLat: 8.90, maxLon: 38.88, maxLat: 9.10),
+        expected: "never below 2,075 m"
+    ),
+    "everest": Place(
+        name: "Everest",
+        bbox: BoundingBox(minLon: 86.85, minLat: 27.93, maxLon: 87.05, maxLat: 28.06),
+        expected: "5,060 m to 8,746 m"
+    ),
+    "myrtoan": Place(
+        name: "Myrtoan Sea",
+        bbox: BoundingBox(minLon: 23.2, minLat: 36.3, maxLon: 24.2, maxLat: 37.1),
+        expected: "reaches -1,310 m"
+    ),
+]
+
+// MARK: - Arguments
+
+func usage() -> Never {
+    let names = places.keys.sorted().joined(separator: ", ")
+    print("""
+    hipparchus-cli - fetch elevation for an area, render it, and export it.
+
+    Usage:
+      hipparchus-cli <place>            \(names)
+      hipparchus-cli --bbox w,s,e,n     an arbitrary area, in degrees
+      hipparchus-cli --all              every named place above
+
+    Options:
+      --out <dir>        where to write files (default: ./out)
+      --pixels <n>       sampling width to aim for (default: 1200)
+      --no-files         measure only, write nothing
+
+    Writes <name>.png, <name>.svg, <name>.pdf and <name>.diagnostics.json.
+    """)
+    exit(2)
+}
+
+let arguments = Array(CommandLine.arguments.dropFirst())
+guard !arguments.isEmpty else { usage() }
+
+/// Parsed command line. Passed to `run` rather than read from it: top-level
+/// variables in a `main.swift` are main-actor isolated, and `run` is not.
+struct Options {
+    var outputDirectory = URL(fileURLWithPath: "out")
+    var targetPixels = 1200
+    var writeFiles = true
+}
+
+var options = Options()
+var requested: [Place] = []
+
+var argumentIndex = 0
+while argumentIndex < arguments.count {
+    switch arguments[argumentIndex] {
+    case "--out":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        options.outputDirectory = URL(fileURLWithPath: arguments[argumentIndex])
+    case "--pixels":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count, let value = Int(arguments[argumentIndex]) else { usage() }
+        options.targetPixels = value
+    case "--no-files":
+        options.writeFiles = false
+    case "--all":
+        requested = places.keys.sorted().compactMap { places[$0] }
+    case "--bbox":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        let parts = arguments[argumentIndex]
+            .split(separator: ",")
+            .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+        guard parts.count == 4 else {
+            print("error: --bbox needs four numbers: west,south,east,north")
+            exit(2)
+        }
+        requested.append(Place(
+            name: "custom",
+            bbox: BoundingBox(minLon: parts[0], minLat: parts[1], maxLon: parts[2], maxLat: parts[3]),
+            expected: "unknown"
+        ))
+    case "--help", "-h":
+        usage()
+    default:
+        guard let place = places[arguments[argumentIndex].lowercased()] else {
+            print("error: unknown place '\(arguments[argumentIndex])'")
+            usage()
+        }
+        requested.append(place)
+    }
+    argumentIndex += 1
+}
+
+guard !requested.isEmpty else { usage() }
+
+// MARK: - Run
+
+func slug(_ name: String) -> String {
+    name.lowercased().replacingOccurrences(of: " ", with: "-")
+}
+
+func writePNG(_ image: CGImage, to url: URL) throws {
+    guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+        throw CLIError.couldNotWrite(url)
+    }
+    CGImageDestinationAddImage(destination, image, nil)
+    guard CGImageDestinationFinalize(destination) else {
+        throw CLIError.couldNotWrite(url)
+    }
+}
+
+enum CLIError: Error, CustomStringConvertible {
+    case couldNotWrite(URL)
+
+    var description: String {
+        switch self {
+        case .couldNotWrite(let url): return "could not write \(url.path)"
+        }
+    }
+}
+
+func run(_ place: Place, options: Options) async throws {
+    var settings = TerrainTileSettings()
+    settings.targetPixels = options.targetPixels
+
+    print("\(place.name)  \(place.bbox.minLon), \(place.bbox.minLat) -> \(place.bbox.maxLon), \(place.bbox.maxLat)")
+    print("  expected: \(place.expected)")
+
+    let started = ContinuousClock.now
+    let provider = TerrainTileProvider(settings: settings)
+    let collection = try await provider.fetch(BBoxQuery(bbox: place.bbox))
+    let fetched = ContinuousClock.now - started
+
+    let low = collection.metadata["elevation_min_metres"]?.doubleValue ?? .nan
+    let high = collection.metadata["elevation_max_metres"]?.doubleValue ?? .nan
+    let interval = collection.metadata["contour_interval_metres"]?.doubleValue ?? .nan
+    let zoom = collection.metadata["zoom"]?.doubleValue ?? .nan
+    let columns = collection.metadata["grid_columns"]?.doubleValue ?? .nan
+    let rows = collection.metadata["grid_rows"]?.doubleValue ?? .nan
+
+    print(String(
+        format: "  measured: %.0f m to %.0f m   interval %.0f m   zoom %.0f   grid %.0fx%.0f   %@",
+        low, high, interval, zoom, columns, rows, collection.provenance?.rawValue ?? "unknown"
+    ))
+
+    let scene = try SceneBuilder().build(from: collection)
+    print("  \(scene.summary)   fetched in \(fetched.formattedSeconds)")
+    for layer in scene.layers {
+        let count = layer.featureCount
+        print("    \(layer.name.padded(to: 24)) \(count > 0 ? spacedThousands(count) : "none here")")
+    }
+
+    // The longest contour, because kickoff detail 9 is about long paths surviving.
+    let longest = scene.layers
+        .flatMap(\.geometries)
+        .flatMap(\.lineStrings)
+        .map(\.coordinates.count)
+        .max() ?? 0
+    if longest > 0 {
+        print("    longest contour:         \(spacedThousands(longest)) vertices")
+    }
+
+    guard options.writeFiles else { return }
+
+    try FileManager.default.createDirectory(at: options.outputDirectory, withIntermediateDirectories: true)
+    let base = options.outputDirectory.appendingPathComponent(slug(place.name))
+
+    if let image = CoreGraphicsRenderer().image(of: scene, size: CGSize(width: 1600, height: 1200)) {
+        try writePNG(image, to: base.appendingPathExtension("png"))
+    }
+    let diagnostics = try SVGExporter().write(scene, to: base.appendingPathExtension("svg"))
+    try PDFExporter().write(scene, to: base.appendingPathExtension("pdf"))
+    try diagnostics.jsonData().write(to: base.appendingPathExtension("diagnostics.json"))
+
+    print("  wrote \(slug(place.name)).{png,svg,pdf,diagnostics.json} into \(options.outputDirectory.path)")
+}
+
+extension String {
+    func padded(to width: Int) -> String {
+        count >= width ? self : self + String(repeating: " ", count: width - count)
+    }
+}
+
+extension Duration {
+    var formattedSeconds: String {
+        String(format: "%.2f s", Double(components.seconds) + Double(components.attoseconds) / 1e18)
+    }
+}
+
+var failures = 0
+for place in requested {
+    do {
+        try await run(place, options: options)
+    } catch {
+        failures += 1
+        print("  FAILED: \(error)")
+    }
+    print("")
+}
+exit(failures == 0 ? 0 : 1)

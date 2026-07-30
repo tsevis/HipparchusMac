@@ -154,15 +154,29 @@ public struct CoreGraphicsRenderer: Sendable {
             }
             // Text draws in its own upright frame regardless of the canvas flip.
             context.scaleBy(x: 1, y: -1)
-            context.textPosition = CGPoint(x: -bounds.width / 2, y: -bounds.height / 2)
+            let origin = CGPoint(x: -bounds.width / 2, y: -bounds.height / 2)
 
+            // Halo behind, then text on top — two passes, not `fillStroke`.
+            //
+            // `fillStroke` strokes and fills the same glyphs, so half the halo lands
+            // *over* the letters. At 2 pt around 9 pt type that swallowed them
+            // whole: the first real render of Santorini showed the summit heights
+            // as white blobs. Stroking first and filling second puts the halo where
+            // a halo goes, and the width follows the font size rather than being an
+            // absolute that only looks right at one scale.
             if layer.style.labelHaloWidth > 0 {
-                context.setLineWidth(layer.style.labelHaloWidth)
+                context.saveGState()
+                context.textPosition = origin
+                context.setLineWidth(options.labelFontSize * 0.22)
+                context.setLineJoin(.round)
                 context.setStrokeColor(layer.style.labelHaloColor.cgColor)
-                context.setTextDrawingMode(.fillStroke)
-            } else {
-                context.setTextDrawingMode(.fill)
+                context.setTextDrawingMode(.stroke)
+                CTLineDraw(line, context)
+                context.restoreGState()
             }
+
+            context.textPosition = origin
+            context.setTextDrawingMode(.fill)
             CTLineDraw(line, context)
             context.restoreGState()
         }
