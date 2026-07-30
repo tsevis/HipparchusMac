@@ -28,6 +28,17 @@ extension GEOSContext {
         }
     }
 
+    /// Every point of `contained` lies in `container`, boundary included.
+    ///
+    /// The right question for "does this need clipping?". `contains` is stricter
+    /// than that — a line lying exactly along the frame is not *contained* but
+    /// needs no trimming — and using it would report untouched geometry as clipped.
+    public func covers(_ container: Geometry, _ contained: Geometry) throws -> Bool {
+        try withGeometries(container, contained) {
+            try predicate(GEOSCovers_r(handle, $0, $1), "covers")
+        }
+    }
+
     public func intersects(_ lhs: Geometry, _ rhs: Geometry) throws -> Bool {
         try withGeometries(lhs, rhs) {
             try predicate(GEOSIntersects_r(handle, $0, $1), "intersects")
