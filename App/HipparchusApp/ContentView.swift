@@ -42,6 +42,7 @@ struct ContentView: View {
         }
         .frame(minWidth: 960, minHeight: 620)
         .task { model.startIfRequestedOnLaunch() }
+        .onDisappear { model.save() }
         .alert(
             "This will take a while",
             isPresented: Binding(

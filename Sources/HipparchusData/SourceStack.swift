@@ -365,6 +365,17 @@ public struct SourceStack: Sendable, Equatable {
         }
     }
 
+    /// Only what the user actually changed, keyed by the setting's own key.
+    ///
+    /// The sibling of `providerOverrides(for:)`, and the two are not
+    /// interchangeable: that one keys by the provider field a setting *targets*,
+    /// which is what a fetch needs, and this one keys by the setting's own key,
+    /// which is what saving needs — a restored setting is looked up by key, and a
+    /// file written with targets in it comes back matching nothing at all.
+    public func changedSettings(for id: String) -> [String: SourceSetting.Value] {
+        overrides[id] ?? [:]
+    }
+
     /// Only what the user actually changed, keyed by the provider field it targets.
     ///
     /// Deliberately not every setting: a provider's own defaults are the better

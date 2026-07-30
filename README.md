@@ -8,16 +8,17 @@ The Python application is the specification. It is finished, it works, and its
 454 tests are an executable description of the behaviour being ported. Anything
 here that disagrees with it is a bug here.
 
-**Status: first slice done.** One vertical path works end to end — terrain tiles
-→ contours and elevation bands → Core Graphics canvas → SVG and PDF — with 164
-tests and the output checked against real ground. See `KICKOFF.md` for the brief
-and the design the rest is being built to.
+**Status: the app is built.** Every online source, the composing source stack,
+the sixteen presets, illuminated contours, the three-column interface and the
+exports are in, with 328 tests and the output checked against real ground. See
+`KICKOFF.md` for the brief.
 
-Not yet built, and all understood rather than undecided: illumination and Tanaka
-stroke weight; smoothing and simplification; Overpass, GIBS, USGS and Celestrak;
-the style presets and their thumbnails; the sources stack; the derived layer
-panel; the MapKit locator; per-source progress; the file-backed providers. The
-window is deliberately plain until the three-column interface arrives with them.
+Not built, and all understood rather than undecided: the file-backed providers
+(`osmium`, `fiona`, `pyarrow`, PMTiles, MVT), which the brief calls the long
+tail; the derived artistic layers a few presets ask for (Voronoi, Delaunay, hex
+grid, circle packing), which currently render as empty layers rather than wrong
+ones; and assembling OSM relations into multipolygons — see "Things that are not
+bugs" below.
 
 ## Requirements
 
@@ -54,10 +55,10 @@ open HipparchusMac.xcodeproj
 ## Layout
 
 ```
-Sources/HipparchusGeometry   contours, Web Mercator, the sample grid — pure arithmetic
+Sources/HipparchusGeometry   contours, Web Mercator, illumination, smoothing, orbits
 Sources/HipparchusGEOS       the GEOS bridge, and the geometry that needs an engine
-Sources/HipparchusData       provider contracts, terrain tiles, terrarium decoding
-Sources/HipparchusRender     render models, the Core Graphics canvas, SVG and PDF export
+Sources/HipparchusData       the source stack, every provider, the cache, progress
+Sources/HipparchusRender     presets, the scene builder, the canvas, SVG and PDF export
 Sources/hipparchus-cli       headless fetch → render → export, for checking real output
 App/                         project.yml and the SwiftUI views, which hold no logic
 Vendor/geos                  the committed GEOS xcframework — see Docs/GEOS.md
@@ -125,8 +126,37 @@ than against my reading of it:
 Regenerate them with the scripts in `Scripts/`. A diff there means one of the two
 implementations changed; find out which before accepting it.
 
+## Verifying the app itself
+
+Rendering is visual and a window cannot be asserted on, so the app will drive its
+own model headlessly and write the result:
+
+```bash
+Hipparchus.app/Contents/MacOS/Hipparchus --bbox 23.575,37.816,23.895,38.136 --sources terrain_tiles --preset "Contour Study" --render-to athens.png
+```
+
+It prints what it measured and writes the PNG into the app's container
+(`~/Library/Containers/com.hipparchus.HipparchusMac/Data/Documents`), because the
+app is sandboxed and may only write where it has been pointed. With no arguments
+it opens on the session it last saved.
+
+This exercises the path the window uses — the source stack, the manager, the
+scene builder and the renderer. It does **not** check the SwiftUI layout; only a
+person looking at the window can do that.
+
+Santorini through OpenStreetMap alone comes out as 14 layers and 10 772
+features; ticking Elevation on top gives 19 layers, 11 787 features and −79 m to
+525 m. The streets are still there. That is the whole idea of the source stack,
+and it is why the check is worth running.
+
 ## Things that are not bugs
 
+- **OSM relations are not assembled into multipolygons.** Overpass is asked for
+  `out body geom`, and each way comes back as its own geometry, so a large water
+  or coastline *relation* draws as its member ways rather than as one filled
+  shape — most visibly as a wedge of sea off a coast. The Python does the same
+  thing. Fixing it means assembling outer and inner rings from relation members
+  before anything else touches them.
 - **Faint straight diagonals** in elevation output are void-fill seams and
   dataset boundaries in the source mosaic. They are in the raw grid before any
   contouring. Removing them properly would mean blurring real terrain.

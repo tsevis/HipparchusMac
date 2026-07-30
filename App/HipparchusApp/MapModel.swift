@@ -105,6 +105,42 @@ final class MapModel {
 
     private var task: Task<Void, Never>?
     private let cache = DiskCacheStore(directory: DiskCacheStore.defaultDirectory())
+    private let sessionURL = Session.defaultURL()
+
+    // MARK: - Remembering
+
+    /// Restore what the app was doing last time.
+    ///
+    /// Only the choices, never the map: a saved session says which sources were
+    /// ticked and where you were looking, and pressing Update map is left to you.
+    /// Re-fetching on launch would mean opening the app could cost five minutes of
+    /// Overpass time nobody asked for.
+    func restore() {
+        let session = Session.read(from: sessionURL)
+        stack = session.stack()
+        preset = Presets.preset(session.presetName)
+        quality = Quality.profile(session.qualityKey)
+        hiddenLayers = Set(session.hiddenLayers)
+        placeName = session.placeName
+        west = String(session.area.west)
+        south = String(session.area.south)
+        east = String(session.area.east)
+        north = String(session.area.north)
+    }
+
+    /// A failure to save is worth nothing more than the settings: it must never
+    /// interrupt what the user was doing.
+    func save() {
+        guard let bbox else { return }
+        try? Session(
+            stack: stack,
+            area: Session.Area(bbox),
+            placeName: placeName,
+            preset: preset.name,
+            quality: quality.key,
+            hiddenLayers: hiddenLayers.sorted()
+        ).write(to: sessionURL)
+    }
 
     // MARK: - Actions
 
@@ -215,7 +251,12 @@ final class MapModel {
             }
 
             await reporter.finish()
-            await MainActor.run { self?.isFetching = false }
+            await MainActor.run {
+                self?.isFetching = false
+                // Saved on completion rather than on every keystroke: this is the
+                // moment the choices are known to describe a map that exists.
+                self?.save()
+            }
             await self?.refreshCacheSummary()
         }
     }
@@ -319,6 +360,7 @@ final class MapModel {
     /// path without a human clicking the button — driving the UI from a script needs
     /// accessibility permission this process has not been granted.
     func startIfRequestedOnLaunch() {
+        restore()
         Task { await refreshCacheSummary() }
 
         let arguments = ProcessInfo.processInfo.arguments
@@ -333,24 +375,32 @@ final class MapModel {
                 stack.setEnabled(String(id).trimmingCharacters(in: .whitespaces), true)
             }
         }
-        guard let flag = arguments.firstIndex(of: "--bbox"), flag + 1 < arguments.count else { return }
+        if let flag = arguments.firstIndex(of: "--bbox"), flag + 1 < arguments.count {
+            let parts = arguments[flag + 1]
+                .split(separator: ",")
+                .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+            guard parts.count == 4 else {
+                status = "--bbox needs four numbers: west,south,east,north"
+                isError = true
+                return
+            }
+            setArea(BoundingBox(minLon: parts[0], minLat: parts[1], maxLon: parts[2], maxLat: parts[3]))
+            placeName = Self.places.first { $0.bbox == bbox }?.name ?? ""
+        }
 
-        let parts = arguments[flag + 1]
-            .split(separator: ",")
-            .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
-        guard parts.count == 4 else {
-            status = "--bbox needs four numbers: west,south,east,north"
-            isError = true
+        guard let flag = arguments.firstIndex(of: "--render-to"), flag + 1 < arguments.count else {
+            // No area asked for and nothing to render: open on the restored session
+            // and wait to be told what to do.
+            if arguments.contains("--bbox") {
+                // An area on the command line is an explicit instruction, so it
+                // skips the size warning.
+                fetch()
+            }
             return
         }
-        setArea(BoundingBox(minLon: parts[0], minLat: parts[1], maxLon: parts[2], maxLat: parts[3]))
-        placeName = Self.places.first { $0.bbox == bbox }?.name ?? ""
-        // The command line is an explicit instruction, so it skips the size warning.
-        fetch()
 
-        if let flag = arguments.firstIndex(of: "--render-to"), flag + 1 < arguments.count {
-            renderWhenReady(to: URL(fileURLWithPath: arguments[flag + 1]))
-        }
+        fetch()
+        renderWhenReady(to: URL(fileURLWithPath: arguments[flag + 1]))
     }
 
     /// Render the app's own scene to a PNG and quit.

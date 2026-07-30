@@ -1,0 +1,199 @@
+import Foundation
+import HipparchusData
+import HipparchusGeometry
+
+/// What the app was doing, so it can be doing it again next time.
+///
+/// Ported from `core/settings_store.py` and `core/project_state.py`, which the
+/// Python keeps apart — one for preferences, one for a saved project. They hold
+/// the same shape of thing and are saved at the same moments, so they are one type
+/// here, and "the session" and "a saved project" become the same file written to
+/// two places.
+///
+/// Deliberately *not* `UserDefaults`: a project has to be openable from a path and
+/// diffable by a person, and a settings file that can be read in a text editor is
+/// worth more than one that cannot when something goes wrong.
+public struct Session: Codable, Sendable, Equatable {
+
+    /// The area, as four numbers rather than a `BoundingBox`, so a half-typed
+    /// coordinate can be saved and restored the way it was left.
+    public struct Area: Codable, Sendable, Equatable {
+        public var west: Double
+        public var south: Double
+        public var east: Double
+        public var north: Double
+
+        public init(west: Double, south: Double, east: Double, north: Double) {
+            self.west = west
+            self.south = south
+            self.east = east
+            self.north = north
+        }
+
+        public init(_ bbox: BoundingBox) {
+            self.init(west: bbox.minLon, south: bbox.minLat, east: bbox.maxLon, north: bbox.maxLat)
+        }
+
+        /// `nil` rather than a silently corrected box: a saved file with west east of
+        /// east is wrong, and quietly swapping them hides whatever produced it.
+        public var bbox: BoundingBox? {
+            guard west < east, south < north,
+                  (-180...180).contains(west), (-180...180).contains(east),
+                  (-90...90).contains(south), (-90...90).contains(north)
+            else {
+                return nil
+            }
+            return BoundingBox(minLon: west, minLat: south, maxLon: east, maxLat: north)
+        }
+    }
+
+    public var area: Area
+    public var placeName: String
+    /// Ticked sources, by id.
+    public var enabledSources: [String]
+    /// Per-source file paths, for the file-backed sources.
+    public var sourcePaths: [String: String]
+    /// Per-source setting overrides, as `sourceID.settingKey` → value. Flattened
+    /// because a nested dictionary of an enum is a lot of `Codable` for a file whose
+    /// whole job is to be readable.
+    public var sourceSettings: [String: Double]
+    public var sourceChoices: [String: String]
+    public var presetName: String
+    public var qualityKey: String
+    public var hiddenLayers: [String]
+
+    public init(
+        area: Area = Area(west: 25.32, south: 36.33, east: 25.50, north: 36.48),
+        placeName: String = "Santorini",
+        enabledSources: [String] = [SourceID.overpass],
+        sourcePaths: [String: String] = [:],
+        sourceSettings: [String: Double] = [:],
+        sourceChoices: [String: String] = [:],
+        presetName: String = "Hypsometric Relief",
+        qualityKey: String = Quality.default.key,
+        hiddenLayers: [String] = []
+    ) {
+        self.area = area
+        self.placeName = placeName
+        self.enabledSources = enabledSources
+        self.sourcePaths = sourcePaths
+        self.sourceSettings = sourceSettings
+        self.sourceChoices = sourceChoices
+        self.presetName = presetName
+        self.qualityKey = qualityKey
+        self.hiddenLayers = hiddenLayers
+    }
+
+    // MARK: - The source stack
+
+    /// Capture a stack, keeping only what the user actually changed.
+    public init(stack: SourceStack, area: Area, placeName: String, preset: String, quality: String, hiddenLayers: [String]) {
+        var paths: [String: String] = [:]
+        var numbers: [String: Double] = [:]
+        var choices: [String: String] = [:]
+
+        for definition in stack.definitions {
+            let path = stack.path(definition.id)
+            if !path.isEmpty { paths[definition.id] = path }
+
+            // By setting key, not by provider target: this file is read back through
+            // `setSetting`, which speaks keys.
+            for (key, value) in stack.changedSettings(for: definition.id) {
+                let field = "\(definition.id).\(key)"
+                if let text = value.stringValue {
+                    choices[field] = text
+                } else if let number = value.doubleValue {
+                    numbers[field] = number
+                }
+            }
+        }
+
+        self.init(
+            area: area,
+            placeName: placeName,
+            enabledSources: stack.enabledIDs,
+            sourcePaths: paths,
+            sourceSettings: numbers,
+            sourceChoices: choices,
+            presetName: preset,
+            qualityKey: quality,
+            hiddenLayers: hiddenLayers
+        )
+    }
+
+    /// Rebuild a stack from what was saved.
+    ///
+    /// Paths go on before ticks, or a file-backed source would refuse the tick it
+    /// was saved with — the stack will not enable a source whose file it cannot see
+    /// yet, which is the right rule and the wrong order to apply it in.
+    public func stack() -> SourceStack {
+        var stack = SourceStack()
+
+        for (id, path) in sourcePaths { stack.setPath(id, path) }
+
+        for definition in stack.definitions {
+            stack.setEnabled(definition.id, enabledSources.contains(definition.id))
+        }
+
+        for (field, value) in sourceSettings {
+            guard let (id, key) = Self.split(field), let setting = stack.definition(id)?.setting(key) else {
+                continue
+            }
+            // Keep the declared shape: a band count is an integer, a magnitude is not.
+            if case .integer = setting.value {
+                stack.setSetting(id, key, .integer(Int(value)))
+            } else {
+                stack.setSetting(id, key, .number(value))
+            }
+        }
+        for (field, value) in sourceChoices {
+            guard let (id, key) = Self.split(field) else { continue }
+            stack.setSetting(id, key, .text(value))
+        }
+        return stack
+    }
+
+    private static func split(_ field: String) -> (id: String, key: String)? {
+        // Split on the last dot: a source id may not contain one, but this is the
+        // side that must be right if one ever does.
+        guard let dot = field.lastIndex(of: ".") else { return nil }
+        return (String(field[field.startIndex..<dot]), String(field[field.index(after: dot)...]))
+    }
+
+    // MARK: - On disk
+
+    /// Where the session lives between launches.
+    ///
+    /// Application Support, not Caches: this is the user's own state and losing it
+    /// would be a bug, where losing a cached tile is a slow morning.
+    public static func defaultURL(subdirectory: String = "Hipparchus") -> URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory())
+        return base
+            .appendingPathComponent(subdirectory, isDirectory: true)
+            .appendingPathComponent("session.json")
+    }
+
+    public func write(to url: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try encoder.encode(self).write(to: url, options: .atomic)
+    }
+
+    /// Read a session, or the defaults.
+    ///
+    /// A settings file that cannot be read must not stop the app opening — the
+    /// worst it should cost is the settings. The same goes for one written by a
+    /// newer version with fields this one does not know.
+    public static func read(from url: URL) -> Session {
+        guard let data = try? Data(contentsOf: url),
+              let session = try? JSONDecoder().decode(Session.self, from: data)
+        else {
+            return Session()
+        }
+        return session
+    }
+}
