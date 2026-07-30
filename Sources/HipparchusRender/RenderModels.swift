@@ -151,14 +151,28 @@ public struct RenderLayer: Sendable {
     public private(set) var weights: [Double]
     public private(set) var fillColors: [RGBAColor]
     public var labels: [PlaceLabel]
+    /// How many features arrived from the provider, before the pipeline clipped,
+    /// dropped, split or capped any of them.
+    ///
+    /// Worth keeping separate from `featureCount`: illumination turns one contour
+    /// into a dozen runs and clipping can split a band in two, so a layer that says
+    /// "798 features" may have been fetched as 178. The layer panel shows what was
+    /// fetched; the exporter records both.
+    public var rawFeatureCount: Int
 
-    public init(name: String, style: LayerStyle = LayerStyle(), labels: [PlaceLabel] = []) {
+    public init(
+        name: String,
+        style: LayerStyle = LayerStyle(),
+        labels: [PlaceLabel] = [],
+        rawFeatureCount: Int = 0
+    ) {
         self.name = name
         self.style = style
         self.geometries = []
         self.weights = []
         self.fillColors = []
         self.labels = labels
+        self.rawFeatureCount = rawFeatureCount
     }
 
     /// The only way to add geometry. A weight or a fill of `nil` records "use the

@@ -228,6 +228,7 @@ public struct SVGExporter: Sendable {
                 ExportDiagnostics.Layer(
                     name: $0.name,
                     geometries: $0.geometries.count,
+                    rawFeatures: $0.rawFeatureCount,
                     labels: $0.labels.count,
                     visible: $0.style.visible
                 )
@@ -274,6 +275,11 @@ public struct ExportDiagnostics: Codable, Sendable, Equatable {
     public struct Layer: Codable, Sendable, Equatable {
         public let name: String
         public let geometries: Int
+        /// What the provider returned, before clipping, capping and illumination
+        /// changed the count. Both numbers are recorded because neither answers the
+        /// other's question: `geometries` is what was drawn, `rawFeatures` is what
+        /// was found.
+        public let rawFeatures: Int
         public let labels: Int
         public let visible: Bool
     }

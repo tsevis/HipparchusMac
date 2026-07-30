@@ -28,7 +28,7 @@ final class SVGExportTests: XCTestCase {
     func testEveryLayerIsItsOwnNamedGroupInDrawOrder() throws {
         let svg = try self.svg()
         var searchFrom = svg.startIndex
-        for name in SceneBuilder.layerOrder {
+        for name in Sample.layerOrder {
             let marker = "data-layer-name=\"\(name)\""
             guard let range = svg.range(of: marker, range: searchFrom..<svg.endIndex) else {
                 return XCTFail("\(name) is not a named group in the SVG, or is out of order")
@@ -42,7 +42,7 @@ final class SVGExportTests: XCTestCase {
     func testTheGroundIsPaintedSoADarkPresetDoesNotExportBlank() throws {
         let svg = try self.svg()
         XCTAssertTrue(svg.contains("id=\"map_background\""))
-        XCTAssertTrue(svg.contains("fill=\"\(SceneBuilder.TerrainStyle().background.hex)\""))
+        XCTAssertTrue(svg.contains("fill=\"\(Sample.preset.styleProfile.background.hex)\""))
     }
 
     func testAHoleInABandIsExportedAsASeparateEvenOddSubpath() throws {
@@ -56,16 +56,16 @@ final class SVGExportTests: XCTestCase {
     func testBandsCarryTheirOwnFillFromTheRamp() throws {
         let svg = try self.svg()
         let bandGroup = try XCTUnwrap(group(named: TerrainLayer.elevationBands, in: svg))
-        let style = SceneBuilder.TerrainStyle()
-        XCTAssertTrue(bandGroup.contains("fill=\"\(style.bandLowColor.hex)\""))
-        XCTAssertTrue(bandGroup.contains("fill=\"\(style.bandHighColor.hex)\""))
+        let style = Sample.style(TerrainLayer.elevationBands)
+        XCTAssertTrue(bandGroup.contains("fill=\"\(style.fillColor.hex)\""))
+        XCTAssertTrue(bandGroup.contains("fill=\"\(style.fillColorHigh!.hex)\""))
     }
 
     func testContoursAreStrokedNotFilled() throws {
         let svg = try self.svg()
         let contourGroup = try XCTUnwrap(group(named: TerrainLayer.minorContours, in: svg))
         XCTAssertTrue(contourGroup.contains("fill=\"none\""))
-        XCTAssertTrue(contourGroup.contains("stroke=\"\(SceneBuilder.TerrainStyle().contourColor.hex)\""))
+        XCTAssertTrue(contourGroup.contains("stroke=\"\(Sample.style(TerrainLayer.minorContours).strokeColor.hex)\""))
         XCTAssertTrue(contourGroup.contains("vector-effect=\"non-scaling-stroke\""))
     }
 
@@ -183,7 +183,7 @@ final class ExportDiagnosticsTests: XCTestCase {
 
     func testDiagnosticsRecordEveryLayerAndItsCount() throws {
         let diagnostics = SVGExporter().diagnostics(for: try Sample.scene(), format: "svg")
-        XCTAssertEqual(diagnostics.layers.map(\.name), SceneBuilder.layerOrder)
+        XCTAssertEqual(diagnostics.layers.map(\.name), Sample.layerOrder)
         XCTAssertEqual(diagnostics.layers.first { $0.name == TerrainLayer.elevationBands }?.geometries, 2)
         XCTAssertEqual(diagnostics.layers.first { $0.name == TerrainLayer.summits }?.labels, 1)
     }

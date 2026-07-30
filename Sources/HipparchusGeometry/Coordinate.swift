@@ -61,6 +61,12 @@ public struct Bounds: Sendable, Hashable {
     public var height: Double { maxY - minY }
     public var center: Coordinate { Coordinate(x: (minX + maxX) / 2, y: (minY + maxY) / 2) }
 
+    /// Do two boxes overlap? Touching edges count, which is what label thinning
+    /// wants: two labels sharing a boundary are still on top of each other.
+    public func intersects(_ other: Bounds) -> Bool {
+        !(maxX < other.minX || minX > other.maxX || maxY < other.minY || minY > other.maxY)
+    }
+
     public func union(_ other: Bounds) -> Bounds {
         Bounds(
             minX: Swift.min(minX, other.minX),

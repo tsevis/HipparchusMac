@@ -72,6 +72,9 @@ func usage() -> Never {
     Options:
       --out <dir>        where to write files (default: ./out)
       --pixels <n>       sampling width to aim for (default: 1200)
+      --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
+      --quality <key>    \(Quality.keys.joined(separator: ", "))
+      --list-presets     print the preset names and exit
       --no-files         measure only, write nothing
 
     Writes <name>.png, <name>.svg, <name>.pdf and <name>.diagnostics.json.
@@ -88,6 +91,8 @@ struct Options {
     var outputDirectory = URL(fileURLWithPath: "out")
     var targetPixels = 1200
     var writeFiles = true
+    var preset = SceneBuilder.Options().preset
+    var quality = Quality.default
 }
 
 var options = Options()
@@ -106,6 +111,25 @@ while argumentIndex < arguments.count {
         options.targetPixels = value
     case "--no-files":
         options.writeFiles = false
+    case "--list-presets":
+        for name in Presets.names { print(name) }
+        exit(0)
+    case "--preset":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        let requestedName = arguments[argumentIndex]
+        let resolved = Presets.resolveName(requestedName)
+        // Say so rather than silently drawing something else. A preset name that
+        // fell back without a word is how you end up debugging the renderer for a
+        // look the preset never had.
+        if resolved.lowercased() != requestedName.trimmingCharacters(in: .whitespaces).lowercased() {
+            print("warning: no preset '\(requestedName)'; using '\(resolved)'")
+        }
+        options.preset = Presets.preset(resolved)
+    case "--quality":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        options.quality = Quality.profile(arguments[argumentIndex])
     case "--all":
         requested = places.keys.sorted().compactMap { places[$0] }
     case "--bbox":
@@ -187,11 +211,20 @@ func run(_ place: Place, options: Options) async throws {
         low, high, interval, zoom, columns, rows, collection.provenance?.rawValue ?? "unknown"
     ))
 
-    let scene = try SceneBuilder().build(from: collection)
+    let scene = try SceneBuilder(options: SceneBuilder.Options(
+        preset: options.preset, quality: options.quality
+    )).build(from: collection)
     print("  \(scene.summary)   fetched in \(fetched.formattedSeconds)")
+    print("  \(options.preset.name) · \(options.quality.label)")
     for layer in scene.layers {
         let count = layer.featureCount
-        print("    \(layer.name.padded(to: 24)) \(count > 0 ? spacedThousands(count) : "none here")")
+        // Illumination turns one contour into several runs, so the drawn count and
+        // the fetched count are different numbers and both are worth seeing.
+        let drawn = count > 0 ? spacedThousands(count) : "none here"
+        let suffix = count != layer.rawFeatureCount && layer.rawFeatureCount > 0
+            ? "  (from \(spacedThousands(layer.rawFeatureCount)) fetched)"
+            : ""
+        print("    \(layer.name.padded(to: 24)) \(drawn)\(suffix)")
     }
 
     // The longest contour, because kickoff detail 9 is about long paths surviving.

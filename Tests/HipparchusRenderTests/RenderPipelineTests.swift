@@ -81,13 +81,31 @@ enum Sample {
     static func scene() throws -> RenderScene {
         try SceneBuilder().build(from: collection())
     }
+
+    /// The preset the terrain slice is drawn with, and the one the tests measure
+    /// against. Reading the colours from the preset rather than restating them means
+    /// a regenerated `PresetTables.swift` cannot quietly disagree with the tests.
+    static let preset = SceneBuilder.Options().preset
+
+    static func style(_ layer: String) -> LayerStyle {
+        preset.styleProfile.style(for: layer)
+    }
+
+    /// The terrain layers, in the order `SceneBuilder.preferredLayerOrder` puts them.
+    static let layerOrder = [
+        TerrainLayer.elevationBands,
+        TerrainLayer.bathymetry,
+        TerrainLayer.minorContours,
+        TerrainLayer.indexContours,
+        TerrainLayer.summits,
+    ]
 }
 
 final class SceneBuilderTests: XCTestCase {
 
     func testLayersComeOutInDrawOrderWithGroundUnderLinework() throws {
         let scene = try Sample.scene()
-        XCTAssertEqual(scene.layers.map(\.name), SceneBuilder.layerOrder)
+        XCTAssertEqual(scene.layers.map(\.name), Sample.layerOrder)
         // Fills must be under the lines that describe the same ground, or the fill
         // paints over the contour.
         let bands = try XCTUnwrap(scene.layers.firstIndex { $0.name == TerrainLayer.elevationBands })
@@ -113,9 +131,9 @@ final class SceneBuilderTests: XCTestCase {
         XCTAssertEqual(bands.geometries.count, 2)
 
         // Band 0 takes the low end of the ramp, band 1 the high end.
-        let style = SceneBuilder.TerrainStyle()
-        XCTAssertEqual(bands.fillColor(at: 0), style.bandLowColor)
-        XCTAssertEqual(bands.fillColor(at: 1), style.bandHighColor)
+        let style = Sample.style(TerrainLayer.elevationBands)
+        XCTAssertEqual(bands.fillColor(at: 0), style.fillColor)
+        XCTAssertEqual(bands.fillColor(at: 1), style.fillColorHigh)
     }
 
     func testABandWithAHoleKeepsItsHoleThroughTheBuild() throws {
@@ -177,6 +195,134 @@ final class SceneBuilderTests: XCTestCase {
 
     func testTheSceneSummarisesWhatItHolds() throws {
         XCTAssertEqual(try Sample.scene().summary, "5 layers · 6 features")
+    }
+
+    // MARK: - Presets, quality and illumination in the pipeline
+
+    /// The scene must actually be drawn with the chosen preset. A preset picker that
+    /// changes a label and nothing else is exactly the failure the kickoff warns
+    /// about — the interface says one thing while the renderer does another.
+    func testChoosingAPresetChangesTheGroundAndTheLinework() throws {
+        func scene(_ name: String) throws -> RenderScene {
+            try SceneBuilder(options: .init(preset: Presets.preset(name)))
+                .build(from: Sample.collection())
+        }
+
+        let hypsometric = try scene("Hypsometric Relief")
+        let night = try scene("Night")
+
+        XCTAssertEqual(hypsometric.background, Presets.preset("Hypsometric Relief").styleProfile.background)
+        XCTAssertEqual(night.background, Presets.nightGround)
+        XCTAssertNotEqual(hypsometric.background, night.background)
+
+        let hypsometricContours = try XCTUnwrap(hypsometric.layers.first { $0.name == TerrainLayer.minorContours })
+        let nightContours = try XCTUnwrap(night.layers.first { $0.name == TerrainLayer.minorContours })
+        XCTAssertNotEqual(hypsometricContours.style.strokeColor, nightContours.style.strokeColor)
+
+        XCTAssertEqual(night.metadata["preset"]?.stringValue, "Night")
+    }
+
+    /// Tanaka illumination has to reach the scene, not merely exist in the geometry
+    /// target. `Contour Study` lights its contours; `Hypsometric Relief` does not.
+    func testAnIlluminatedPresetSplitsContoursIntoRunsOfVaryingWeight() throws {
+        let plain = try SceneBuilder(options: .init(preset: Presets.preset("Hypsometric Relief")))
+            .build(from: Sample.collection())
+        let lit = try SceneBuilder(options: .init(preset: Presets.preset("Contour Study")))
+            .build(from: Sample.collection())
+
+        let plainContours = try XCTUnwrap(plain.layers.first { $0.name == TerrainLayer.minorContours })
+        let litContours = try XCTUnwrap(lit.layers.first { $0.name == TerrainLayer.minorContours })
+
+        XCTAssertEqual(plainContours.geometries.count, 1, "unlit, one contour stays one path")
+        XCTAssertEqual(Set(plainContours.weights), [1.0])
+
+        // The sample contour is a closed rectangle, so its four sides face the light
+        // four different ways and cannot all come out at one weight.
+        XCTAssertGreaterThan(litContours.geometries.count, 1, "the contour was never split into runs")
+        XCTAssertGreaterThan(Set(litContours.weights).count, 1, "every run came out at the same weight")
+        XCTAssertEqual(litContours.geometries.count, litContours.weights.count)
+
+        XCTAssertTrue(
+            lit.diagnostics["illuminated_layers"]?.stringValue?.contains(TerrainLayer.minorContours) == true,
+            "the scene does not record which layers it lit"
+        )
+    }
+
+    /// Illumination multiplies the geometry count, so the count of what was *fetched*
+    /// has to be kept separately or the layer panel reports runs as contours.
+    func testTheRawFeatureCountSurvivesIllumination() throws {
+        let lit = try SceneBuilder(options: .init(preset: Presets.preset("Contour Study")))
+            .build(from: Sample.collection())
+        let contours = try XCTUnwrap(lit.layers.first { $0.name == TerrainLayer.minorContours })
+        XCTAssertEqual(contours.rawFeatureCount, 1, "one contour was fetched, however many runs it became")
+        XCTAssertGreaterThan(contours.geometries.count, contours.rawFeatureCount)
+    }
+
+    /// A quality profile says how much work to spend, and export spends more.
+    func testExportQualityUsesALocalProjectionAndATighterTolerance() throws {
+        let preview = try SceneBuilder(options: .init(quality: Quality.profile("preview_fast")))
+            .build(from: Sample.collection())
+        let export = try SceneBuilder(options: .init(quality: Quality.profile("export_print")))
+            .build(from: Sample.collection())
+
+        // A printed sheet should not carry a visible Mercator stretch across it.
+        XCTAssertEqual(preview.projection.renderCRS, "EPSG:3857")
+        XCTAssertNotEqual(export.projection.renderCRS, "EPSG:3857")
+
+        let previewTolerance = try XCTUnwrap(preview.diagnostics["simplify_tolerance"]?.doubleValue)
+        let exportTolerance = try XCTUnwrap(export.diagnostics["simplify_tolerance"]?.doubleValue)
+        XCTAssertGreaterThan(previewTolerance, exportTolerance)
+        XCTAssertEqual(export.diagnostics["quality_profile"]?.stringValue, "export_print")
+    }
+
+    /// Fast preview switches smoothing off entirely; that is what makes it fast.
+    ///
+    /// Measured on the contours, because those are a line-smoothing layer. Elevation
+    /// bands are deliberately left alone in both codebases — rounding a measured
+    /// band edge is fabrication, not smoothing.
+    func testSmoothingRunsForExportAndIsSkippedForFastPreview() throws {
+        func contourVertices(quality: QualityProfile) throws -> Int {
+            let scene = try SceneBuilder(options: .init(quality: quality)).build(from: Sample.collection())
+            let contours = try XCTUnwrap(scene.layers.first { $0.name == TerrainLayer.minorContours })
+            return contours.geometries.reduce(0) { count, geometry in
+                count + geometry.lineStrings.reduce(0) { $0 + $1.coordinates.count }
+            }
+        }
+
+        // Corner-cutting replaces each corner with two points, so a smoothed line
+        // carries more vertices than the one it came from.
+        let fast = try contourVertices(quality: Quality.profile("preview_fast"))
+        let clean = try contourVertices(quality: Quality.profile("export_clean"))
+        XCTAssertGreaterThan(clean, fast, "the smoothing pass never ran")
+        XCTAssertEqual(
+            try SceneBuilder(options: .init(quality: Quality.profile("preview_fast")))
+                .build(from: Sample.collection())
+                .diagnostics["smoothed_geometries"]?.doubleValue,
+            0,
+            "fast preview must not spend time smoothing"
+        )
+    }
+
+    /// Bands are measured edges. A preset that smooths contours must not round these.
+    func testMeasuredBandEdgesAreNeverSmoothed() throws {
+        func bandVertices(quality: QualityProfile) throws -> Int {
+            let scene = try SceneBuilder(options: .init(quality: quality)).build(from: Sample.collection())
+            let bands = try XCTUnwrap(scene.layers.first { $0.name == TerrainLayer.elevationBands })
+            return bands.geometries.reduce(0) { count, geometry in
+                count + geometry.polygons.reduce(0) { $0 + $1.exterior.coordinates.count }
+            }
+        }
+        XCTAssertEqual(
+            try bandVertices(quality: Quality.profile("export_clean")),
+            try bandVertices(quality: Quality.profile("preview_fast"))
+        )
+    }
+
+    func testAnUnknownLayerIsDrawnAfterEverythingItCouldSitUnder() {
+        let ordered = SceneBuilder.ordered([
+            "terrain_contours", "zebra_crossings", "elevation_bands", "aardvarks",
+        ])
+        XCTAssertEqual(ordered, ["elevation_bands", "terrain_contours", "aardvarks", "zebra_crossings"])
     }
 
     func testSpacedThousandsReadsAsTheInterfaceShowsIt() {
