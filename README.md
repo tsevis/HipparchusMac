@@ -68,12 +68,22 @@ compile error.
 
 ## Running it
 
-The app opens on an empty canvas; pick an area, or a saved place, and press
-Update map. It will also open straight onto an area, which is handy from a
+The app opens on an empty canvas. Type a place into the search box — "Santorini",
+"Twin Peaks San Francisco" — pick from what comes back, and press Update map. The
+results show the frame each one would give before you commit to it, and the
+coordinate boxes are still there, one disclosure away, for saying exactly which
+frame you want.
+
+Searching uses MapKit, so there is no key and no account. It reports a
+placemark's own extent where there is one, and the extent of the whole response
+where there is not — which is the difference between framing Everest and framing
+a 141-metre patch of rock, that being what MapKit answers for the mountain
+itself. It will also open straight onto an area, which is handy from a
 terminal or a script:
 
 ```sh
 Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48
+Hipparchus.app/Contents/MacOS/Hipparchus --search "Twin Peaks San Francisco"
 ```
 
 The CLI does the same thing headlessly and writes PNG, SVG, PDF and a

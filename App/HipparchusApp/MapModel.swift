@@ -102,6 +102,71 @@ final class MapModel {
     /// Shown before a fetch that will take minutes rather than seconds.
     var pendingWarning: String?
 
+    // MARK: - Searching for a place
+
+    var searchQuery = ""
+    private(set) var searchResults: [PlaceSearch.Result] = []
+    private(set) var isSearching = false
+    private(set) var searchMessage: String?
+
+    private var searchTask: Task<Void, Never>?
+
+    /// Look up whatever is in the box.
+    ///
+    /// On submit rather than on every keystroke: MapKit's search is a network call,
+    /// and firing one per character is rude to a shared service and useless to
+    /// someone half-way through typing "Thessaloniki".
+    func searchForPlace() {
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchTask?.cancel()
+        searchMessage = nil
+
+        guard query.count >= 2 else {
+            searchResults = []
+            return
+        }
+
+        isSearching = true
+        searchTask = Task { [weak self] in
+            do {
+                let found = try await PlaceSearch().search(query)
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self?.searchResults = found
+                    self?.isSearching = false
+                    self?.searchMessage = found.isEmpty ? "Nothing found for “\(query)”." : nil
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self?.searchResults = []
+                    self?.isSearching = false
+                    // Said plainly: a search that failed is not a place that does
+                    // not exist, and the difference matters when the wifi is off.
+                    self?.searchMessage = "Could not search: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+
+    /// Take a found place as the area. Does not fetch — pressing Update map is
+    /// still the user's decision, and a search that framed the wrong Springfield
+    /// should not have cost a minute of Overpass time.
+    func adopt(_ result: PlaceSearch.Result) {
+        setArea(result.bbox)
+        placeName = result.name
+        searchQuery = result.name
+        searchResults = []
+        searchMessage = nil
+    }
+
+    func clearSearch() {
+        searchTask?.cancel()
+        searchResults = []
+        searchMessage = nil
+        isSearching = false
+    }
+
     var layerRows: [(group: String, rows: [LayerInventory.Entry])] {
         scene.map { LayerInventory.grouped(for: $0) } ?? []
     }
@@ -431,6 +496,14 @@ final class MapModel {
             placeName = Self.places.first { $0.bbox == bbox }?.name ?? ""
         }
 
+        // `--search "Santorini"` — the search is a network call into MapKit, and a
+        // window nobody can screenshot is a poor place to find out it does not work.
+        if let flag = arguments.firstIndex(of: "--search"), flag + 1 < arguments.count {
+            searchAndReport(arguments[flag + 1], thenRenderTo: arguments.firstIndex(of: "--render-to")
+                .flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil })
+            return
+        }
+
         guard let flag = arguments.firstIndex(of: "--render-to"), flag + 1 < arguments.count else {
             // No area asked for and nothing to render: open on the restored session
             // and wait to be told what to do.
@@ -444,6 +517,47 @@ final class MapModel {
 
         fetch()
         renderWhenReady(to: URL(fileURLWithPath: arguments[flag + 1]))
+    }
+
+    /// Search for a place, print what came back, and optionally draw the first hit.
+    ///
+    ///     Hipparchus.app/Contents/MacOS/Hipparchus --search "Santorini" --render-to s.png
+    ///
+    /// Exists for the same reason `--render-to` does: this path goes out to the
+    /// network from inside a sandbox, and a text field nobody can screenshot is a
+    /// poor place to discover it was never entitled to.
+    private func searchAndReport(_ query: String, thenRenderTo output: String?) {
+        Task { [weak self] in
+            let results: [PlaceSearch.Result]
+            do {
+                results = try await PlaceSearch().search(query)
+            } catch {
+                FileHandle.standardError.write(Data("search failed: \(error)\n".utf8))
+                exit(1)
+            }
+            guard let first = results.first else {
+                FileHandle.standardError.write(Data("nothing found for \(query)\n".utf8))
+                exit(1)
+            }
+
+            for result in results {
+                let bbox = result.bbox
+                print(String(
+                    format: "%@%@  %.4f,%.4f → %.4f,%.4f  (%.3f° × %.3f°)",
+                    result.name,
+                    result.detail.isEmpty ? "" : " — \(result.detail)",
+                    bbox.minLon, bbox.minLat, bbox.maxLon, bbox.maxLat,
+                    abs(bbox.lonSpan), abs(bbox.latSpan)
+                ))
+            }
+
+            guard let output else { exit(0) }
+            await MainActor.run {
+                self?.adopt(first)
+                self?.fetch()
+            }
+            self?.renderWhenReady(to: URL(fileURLWithPath: output))
+        }
     }
 
     /// Render the app's own scene to a PNG and quit.

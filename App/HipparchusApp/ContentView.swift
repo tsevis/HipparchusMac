@@ -118,19 +118,7 @@ struct ContentView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
-            Picker("Place", selection: Binding(
-                get: { model.placeName },
-                set: { model.select($0) }
-            )) {
-                if model.placeName.isEmpty {
-                    Text("Custom area").tag("")
-                }
-                ForEach(MapModel.places) { place in
-                    Text(place.name).tag(place.name)
-                }
-            }
-            .labelsHidden()
-            .frame(minWidth: 150)
+            PlaceSearchField(model: model)
         }
 
         ToolbarItem(placement: .principal) {
