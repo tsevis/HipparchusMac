@@ -52,7 +52,11 @@ let package = Package(
             dependencies: ["HipparchusGEOS"],
             resources: [.process("Fixtures")]
         ),
-        .testTarget(name: "HipparchusDataTests", dependencies: ["HipparchusData"]),
+        .testTarget(
+            name: "HipparchusDataTests",
+            dependencies: ["HipparchusData"],
+            resources: [.process("Fixtures")]
+        ),
         .testTarget(name: "HipparchusRenderTests", dependencies: ["HipparchusRender"]),
     ]
 )
