@@ -135,6 +135,10 @@ public enum OverpassDecode {
             return .point(Coordinate(lon: lon, lat: lat))
         }
 
+        if element["type"] as? String == "relation" {
+            return relationGeometry(element, tags: tags)
+        }
+
         // `out geom` attaches the resolved vertices to each way; without it a way is
         // only a list of node ids and nothing here could draw it.
         let nodes = (element["geometry"] as? [[String: Any]]) ?? (element["nodes"] as? [[String: Any]])
@@ -152,6 +156,63 @@ public enum OverpassDecode {
             return .polygon(Polygon(exterior: coordinates))
         }
         return .lineString(LineString(coordinates))
+    }
+
+    /// Assemble a relation's member ways into a polygon.
+    ///
+    /// A relation is a *list of ways*, in arbitrary order and arbitrary direction,
+    /// and `out geom` resolves each member's vertices without joining any of them
+    /// up. Until they are stitched there is no ring, and until there is a ring there
+    /// is no area — which is why relations used to be dropped outright, taking 1 097
+    /// features out of an Athens fetch, most of them buildings with courtyards.
+    ///
+    /// Members with no role count as outer. That is what the OSM data model says,
+    /// and a relation whose roles were never filled in is common enough that
+    /// treating a blank as "not outer" would lose real shapes.
+    static func relationGeometry(_ element: [String: Any], tags: [String: Any]) -> Geometry? {
+        guard let members = element["members"] as? [[String: Any]] else { return nil }
+
+        var outerFragments: [[Coordinate]] = []
+        var innerFragments: [[Coordinate]] = []
+
+        for member in members {
+            guard member["type"] as? String == "way",
+                  let nodes = member["geometry"] as? [[String: Any]]
+            else {
+                continue
+            }
+            let coordinates = nodes.compactMap { node -> Coordinate? in
+                guard let lon = node["lon"] as? Double, let lat = node["lat"] as? Double else {
+                    return nil
+                }
+                return Coordinate(lon: lon, lat: lat)
+            }
+            guard coordinates.count >= 2 else { continue }
+
+            switch member["role"] as? String ?? "" {
+            case "inner": innerFragments.append(coordinates)
+            case "outer", "": outerFragments.append(coordinates)
+            default: continue
+            }
+        }
+
+        let outer = RingAssembly.rings(from: outerFragments)
+        let inner = RingAssembly.rings(from: innerFragments)
+        let polygons = RingAssembly.polygons(outer: outer.rings, inner: inner.rings)
+
+        if !polygons.isEmpty {
+            return Geometry.polygons(polygons)
+        }
+
+        // Nothing closed. Rather than drop the feature, keep what the relation
+        // does describe — a set of lines — so a broken multipolygon still draws
+        // its edges instead of vanishing. Only an area style would have filled it,
+        // and an open line is never filled.
+        let lines = (outer.unclosed + inner.unclosed)
+            .filter { $0.count >= 2 }
+            .map { LineString($0) }
+        guard !lines.isEmpty else { return nil }
+        return lines.count == 1 ? .lineString(lines[0]) : .multiLineString(lines)
     }
 
     static func isClosedRing(_ coordinates: [Coordinate]) -> Bool {

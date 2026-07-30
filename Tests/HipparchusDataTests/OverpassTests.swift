@@ -324,3 +324,141 @@ final class CacheStoreTests: XCTestCase {
         XCTAssertNil(stale, "a stale entry must read as absent")
     }
 }
+
+/// Relations are 1 097 of the elements in an Athens fetch — mostly buildings with
+/// courtyards, plus the Aegean Sea. They used to be dropped outright, because
+/// `out geom` resolves each member way's vertices without joining any of them up.
+final class OverpassRelationTests: XCTestCase {
+
+    private func payload(_ elements: String) throws -> [String: Any] {
+        try XCTUnwrap(
+            JSONSerialization.jsonObject(with: Data(#"{"elements": [\#(elements)]}"#.utf8))
+                as? [String: Any]
+        )
+    }
+
+    private func node(_ lon: Double, _ lat: Double) -> String {
+        #"{"lat": \#(lat), "lon": \#(lon)}"#
+    }
+
+    /// One outer way, already closed — 838 of the 1 097 arrive this way.
+    func testARelationWithOneClosedOuterWayBecomesAPolygon() throws {
+        let collection = OverpassDecode.featureCollection(from: try payload("""
+            {"type": "relation", "id": 1, "tags": {"building": "yes", "type": "multipolygon"},
+             "members": [{"type": "way", "ref": 10, "role": "outer", "geometry": [
+               \(node(0, 0)), \(node(4, 0)), \(node(4, 4)), \(node(0, 4)), \(node(0, 0))]}]}
+            """))
+
+        let buildings = collection.features(in: "buildings")
+        XCTAssertEqual(buildings.count, 1, "the relation was dropped")
+        guard case .polygon(let polygon) = buildings.first?.geometry else {
+            return XCTFail("a multipolygon relation must be an area")
+        }
+        XCTAssertTrue(polygon.holes.isEmpty)
+    }
+
+    /// The courtyard case, which is most of what these relations are for.
+    func testInnerMembersBecomeHoles() throws {
+        let collection = OverpassDecode.featureCollection(from: try payload("""
+            {"type": "relation", "id": 2, "tags": {"building": "museum", "type": "multipolygon"},
+             "members": [
+               {"type": "way", "ref": 10, "role": "outer", "geometry": [
+                 \(node(0, 0)), \(node(10, 0)), \(node(10, 10)), \(node(0, 10)), \(node(0, 0))]},
+               {"type": "way", "ref": 11, "role": "inner", "geometry": [
+                 \(node(2, 2)), \(node(4, 2)), \(node(4, 4)), \(node(2, 4)), \(node(2, 2))]}
+             ]}
+            """))
+
+        guard case .polygon(let polygon) = collection.features(in: "buildings").first?.geometry else {
+            return XCTFail("not a polygon")
+        }
+        XCTAssertEqual(polygon.holes.count, 1, "the courtyard was filled in")
+    }
+
+    /// 259 of the 1 097 arrive as fragments that have to be stitched.
+    func testFragmentedOuterWaysAreStitchedIntoOneRing() throws {
+        let collection = OverpassDecode.featureCollection(from: try payload("""
+            {"type": "relation", "id": 3, "tags": {"natural": "water", "type": "multipolygon"},
+             "members": [
+               {"type": "way", "ref": 10, "role": "outer", "geometry": [\(node(0, 0)), \(node(4, 0))]},
+               {"type": "way", "ref": 11, "role": "outer", "geometry": [\(node(4, 4)), \(node(4, 0))]},
+               {"type": "way", "ref": 12, "role": "outer", "geometry": [\(node(4, 4)), \(node(0, 4))]},
+               {"type": "way", "ref": 13, "role": "outer", "geometry": [\(node(0, 4)), \(node(0, 0))]}
+             ]}
+            """))
+
+        guard case .polygon(let polygon) = collection.features(in: "water").first?.geometry else {
+            return XCTFail("the fragments were never joined")
+        }
+        XCTAssertEqual(abs(polygon.exterior.signedDoubleArea) / 2, 16, accuracy: 1e-9)
+    }
+
+    /// A relation may enclose more than one shape — an archipelago, or the Aegean.
+    func testSeveralOuterRingsBecomeAMultiPolygon() throws {
+        let collection = OverpassDecode.featureCollection(from: try payload("""
+            {"type": "relation", "id": 4, "tags": {"place": "sea", "type": "multipolygon"},
+             "members": [
+               {"type": "way", "ref": 10, "role": "outer", "geometry": [
+                 \(node(0, 0)), \(node(1, 0)), \(node(1, 1)), \(node(0, 1)), \(node(0, 0))]},
+               {"type": "way", "ref": 11, "role": "outer", "geometry": [
+                 \(node(5, 5)), \(node(6, 5)), \(node(6, 6)), \(node(5, 6)), \(node(5, 5))]}
+             ]}
+            """))
+
+        guard case .multiPolygon(let polygons) = collection.features(in: "coastline").first?.geometry else {
+            return XCTFail("two rings must be a multipolygon")
+        }
+        XCTAssertEqual(polygons.count, 2)
+    }
+
+    /// The OSM data model says a member with no role is outer, and relations with
+    /// the role left blank are common enough to matter.
+    func testAMemberWithNoRoleCountsAsOuter() throws {
+        let collection = OverpassDecode.featureCollection(from: try payload("""
+            {"type": "relation", "id": 5, "tags": {"landuse": "forest", "type": "multipolygon"},
+             "members": [{"type": "way", "ref": 10, "role": "", "geometry": [
+               \(node(0, 0)), \(node(2, 0)), \(node(2, 2)), \(node(0, 2)), \(node(0, 0))]}]}
+            """))
+        XCTAssertEqual(collection.features(in: "forests").count, 1)
+    }
+
+    /// Broken relations exist. Losing the edges as well as the area is worse.
+    func testARelationThatNeverClosesStillDrawsItsEdges() throws {
+        let collection = OverpassDecode.featureCollection(from: try payload("""
+            {"type": "relation", "id": 6, "tags": {"natural": "water", "type": "multipolygon"},
+             "members": [
+               {"type": "way", "ref": 10, "role": "outer", "geometry": [\(node(0, 0)), \(node(4, 0))]},
+               {"type": "way", "ref": 11, "role": "outer", "geometry": [\(node(4, 0)), \(node(4, 4))]}
+             ]}
+            """))
+
+        let water = collection.features(in: "water")
+        XCTAssertEqual(water.count, 1, "a broken relation should not vanish")
+        guard case .lineString = water.first?.geometry else {
+            return XCTFail("an unclosed relation must not claim to be an area")
+        }
+    }
+
+    func testARelationWithNoUsableMembersIsSkipped() throws {
+        let collection = OverpassDecode.featureCollection(from: try payload("""
+            {"type": "relation", "id": 7, "tags": {"building": "yes"}, "members": [
+              {"type": "node", "ref": 99, "role": "label"}]}
+            """))
+        XCTAssertTrue(collection.features(in: "buildings").isEmpty)
+    }
+
+    /// Node members carry no geometry and must not be mistaken for a ring.
+    func testNodeMembersAreIgnoredRatherThanBreakingTheRing() throws {
+        let collection = OverpassDecode.featureCollection(from: try payload("""
+            {"type": "relation", "id": 8, "tags": {"building": "yes", "type": "multipolygon"},
+             "members": [
+               {"type": "node", "ref": 99, "role": "label"},
+               {"type": "way", "ref": 10, "role": "outer", "geometry": [
+                 \(node(0, 0)), \(node(4, 0)), \(node(4, 4)), \(node(0, 4)), \(node(0, 0))]}
+             ]}
+            """))
+        guard case .polygon = collection.features(in: "buildings").first?.geometry else {
+            return XCTFail("a label node broke the assembly")
+        }
+    }
+}

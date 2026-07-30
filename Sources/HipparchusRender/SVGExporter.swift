@@ -106,11 +106,14 @@ public struct SVGExporter: Sendable {
             // Per-path width and fill, read from the arrays that were built in
             // lockstep with the geometry.
             let width = style.strokeWidth * layer.weight(at: index)
-            let fill = style.fillEnabled ? layer.fillColor(at: index).hex : "none"
+            // `hasArea`, not just the style: a layer that fills may still hold open
+            // lines, and an editor filling one closes it with an invisible chord.
+            let isFilled = style.fillEnabled && geometry.hasArea
+            let fill = isFilled ? layer.fillColor(at: index).hex : "none"
 
             for data in pathData(for: geometry, transform: transform) {
                 out += "      <path d=\"\(data)\" fill=\"\(fill)\""
-                if style.fillEnabled {
+                if isFilled {
                     // Even-odd, so a hole in an elevation band stays a hole.
                     out += " fill-rule=\"evenodd\""
                 }

@@ -561,3 +561,91 @@ final class CoreGraphicsRendererTests: XCTestCase {
         return count
     }
 }
+
+/// An open line must never be filled.
+///
+/// A layer style says `fillEnabled`, but a style describes a *layer* and a layer can
+/// hold both areas and open lines. Ninety-eight of the 140 coastline ways in an
+/// Athens fetch are unclosed polylines, and filling one closes it with an invisible
+/// chord and paints the wedge behind it — a pale triangle straight across the sea.
+final class OpenLineFillTests: XCTestCase {
+
+    private func layer(_ geometry: Geometry) -> RenderLayer {
+        var layer = RenderLayer(name: "coastline")
+        layer.style.fillEnabled = true
+        layer.style.fillColor = RGBAColor(0, 0, 255)
+        layer.style.strokeWidth = 0
+        layer.style.strokeColor = RGBAColor(0, 0, 0, 0)
+        layer.append(geometry)
+        return layer
+    }
+
+    private let coast = [
+        Coordinate(x: 0, y: 0), Coordinate(x: 100, y: 40),
+        Coordinate(x: 40, y: 100),
+    ]
+
+    func testAnOpenCoastlineDoesNotPaintAWedge() throws {
+        let scene = RenderScene(
+            layers: [layer(.lineString(LineString(coast)))],
+            background: RGBAColor(255, 255, 255)
+        )
+        let image = try XCTUnwrap(CoreGraphicsRenderer().image(
+            of: scene, size: CGSize(width: 200, height: 200)
+        ))
+        XCTAssertEqual(try filledPixels(image), 0, "the open line was filled")
+    }
+
+    func testAClosedShapeInTheSameLayerIsStillFilled() throws {
+        let scene = RenderScene(
+            layers: [layer(.polygon(Polygon(exterior: coast)))],
+            background: RGBAColor(255, 255, 255)
+        )
+        let image = try XCTUnwrap(CoreGraphicsRenderer().image(
+            of: scene, size: CGSize(width: 200, height: 200)
+        ))
+        XCTAssertGreaterThan(try filledPixels(image), 500, "a real area stopped being filled")
+    }
+
+    func testTheExportedSVGDoesNotFillAnOpenLineEither() throws {
+        let scene = RenderScene(
+            layers: [layer(.lineString(LineString(coast)))],
+            background: RGBAColor(255, 255, 255)
+        )
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("open-line-\(UUID().uuidString).svg")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        _ = try SVGExporter().write(scene, to: url)
+        let svg = try String(contentsOf: url, encoding: .utf8)
+        // An editor filling an open path closes it the same way the canvas does.
+        XCTAssertTrue(svg.contains("fill=\"none\""))
+        XCTAssertFalse(svg.contains("fill=\"#0000ff\""), "the SVG fills a path that has no area")
+    }
+
+    func testGeometryKnowsWhetherItEnclosesAnything() {
+        XCTAssertFalse(Geometry.lineString(LineString(coast)).hasArea)
+        XCTAssertFalse(Geometry.point(Coordinate(x: 0, y: 0)).hasArea)
+        XCTAssertTrue(Geometry.polygon(Polygon(exterior: coast)).hasArea)
+        XCTAssertTrue(Geometry.multiPolygon([Polygon(exterior: coast)]).hasArea)
+    }
+
+    private func filledPixels(_ image: CGImage) throws -> Int {
+        var pixels = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB) else { throw XCTSkip("no sRGB") }
+        try pixels.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(
+                data: buffer.baseAddress, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4, space: space,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { throw XCTSkip("no bitmap context") }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        }
+        var count = 0
+        for index in stride(from: 0, to: pixels.count, by: 4) where pixels[index + 2] > 200
+            && pixels[index] < 60 {
+            count += 1
+        }
+        return count
+    }
+}

@@ -10,15 +10,14 @@ here that disagrees with it is a bug here.
 
 **Status: the app is built.** Every online source, the composing source stack,
 the sixteen presets, illuminated contours, the three-column interface and the
-exports are in, with 328 tests and the output checked against real ground. See
+exports are in, with 355 tests and the output checked against real ground. See
 `KICKOFF.md` for the brief.
 
 Not built, and all understood rather than undecided: the file-backed providers
 (`osmium`, `fiona`, `pyarrow`, PMTiles, MVT), which the brief calls the long
-tail; the derived artistic layers a few presets ask for (Voronoi, Delaunay, hex
-grid, circle packing), which currently render as empty layers rather than wrong
-ones; and assembling OSM relations into multipolygons — see "Things that are not
-bugs" below.
+tail; and the derived artistic layers a few presets ask for (Voronoi, Delaunay,
+hex grid, circle packing), which currently render as empty layers rather than
+wrong ones.
 
 ## Requirements
 
@@ -151,12 +150,12 @@ and it is why the check is worth running.
 
 ## Things that are not bugs
 
-- **OSM relations are not assembled into multipolygons.** Overpass is asked for
-  `out body geom`, and each way comes back as its own geometry, so a large water
-  or coastline *relation* draws as its member ways rather than as one filled
-  shape — most visibly as a wedge of sea off a coast. The Python does the same
-  thing. Fixing it means assembling outer and inner rings from relation members
-  before anything else touches them.
+- **A ferry route is drawn in the water layer.** OSM tags the Piraeus–Serifos
+  service `waterway=seaway`, and the layer classifier — ported from the Python,
+  which reads the same tag the same way — sends anything tagged `waterway` to
+  `water`. So a ferry route draws as a long straight line across the Saronic
+  Gulf. It is stroked rather than filled, so it reads as a line rather than as a
+  shape, but it is still a shipping lane in the water layer.
 - **Faint straight diagonals** in elevation output are void-fill seams and
   dataset boundaries in the source mosaic. They are in the raw grid before any
   contouring. Removing them properly would mean blurring real terrain.
@@ -165,6 +164,30 @@ and it is why the check is worth running.
 - **Cancel cannot abort a request already in flight.** It skips sources that have
   not started, stops those that check between requests, and discards the result
   rather than drawing it. An HTTP request already sent runs to completion.
+
+## Relations, and why they need assembling
+
+An OSM multipolygon is a **relation**: a list of member ways, in arbitrary order
+and arbitrary direction, with each member marked `outer` or `inner`. `out geom`
+resolves each member's vertices but joins none of them up, so until the
+fragments are stitched there is no ring, and until there is a ring there is no
+area to fill. Relations used to be dropped outright — 1 097 of them in an Athens
+fetch, mostly buildings with courtyards.
+
+`RingAssembly` stitches fragments end to end through a map from endpoint to
+fragment, reversing any that join the wrong way round, and puts each hole inside
+the *smallest* outer ring containing it — rings nest, and an island in a lake in
+an island must not hand its lake to the outermost coastline. It is linear in
+total vertices rather than quadratic in fragments, which matters: the Aegean Sea
+relation in an Athens fetch is 2 055 outer ways and 1 768 inner ones, and it
+assembles into one ring of 237 145 vertices carrying 333 islands as holes.
+
+Two ways joined in OSM share a *node*, so their endpoints are equal to the last
+bit and the assembly compares them exactly. A tolerance would risk joining ways
+that merely pass close.
+
+A relation that never closes keeps its edges as lines rather than vanishing, and
+never claims to be an area.
 
 ## Provenance
 

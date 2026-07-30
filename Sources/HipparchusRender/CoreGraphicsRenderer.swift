@@ -108,7 +108,10 @@ public struct CoreGraphicsRenderer: Sendable {
         for (index, geometry) in layer.geometries.enumerated() {
             guard let path = path(for: geometry, transform: transform) else { continue }
 
-            if style.fillEnabled {
+            // `hasArea`, not just the style: a layer that fills may still hold open
+            // lines, and filling one closes it with an invisible chord and paints
+            // the wedge behind it.
+            if style.fillEnabled, geometry.hasArea {
                 context.setFillColor(layer.fillColor(at: index).cgColor)
                 context.addPath(path)
                 // Even-odd, so a hole in a band stays a hole.

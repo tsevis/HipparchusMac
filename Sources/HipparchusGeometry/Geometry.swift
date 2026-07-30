@@ -180,6 +180,14 @@ public enum Geometry: Sendable, Equatable {
         }
     }
 
+    /// Does this enclose area?
+    ///
+    /// A layer style can say `fillEnabled`, but a style is a statement about a
+    /// *layer* and a layer can hold both. Filling an open line closes it with an
+    /// invisible chord and paints the wedge behind it — which is what an unclosed
+    /// coastline did, drawing a pale triangle across the sea.
+    public var hasArea: Bool { !polygons.isEmpty }
+
     /// Every line in the geometry, flattened the same way.
     public var lineStrings: [LineString] {
         switch self {
