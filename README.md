@@ -10,12 +10,11 @@ here that disagrees with it is a bug here.
 
 **Status: the app is built.** Every online source, the composing source stack,
 the sixteen presets, illuminated contours, the three-column interface and the
-exports are in, with 416 tests and the output checked against real ground. See
+exports are in, with 446 tests and the output checked against real ground. See
 `KICKOFF.md` for the brief.
 
-Not built, and all understood rather than undecided: the file-backed providers
-(`osmium`, `fiona`, `pyarrow`, PMTiles, MVT), which the brief calls the long
-tail.
+Not built, and understood rather than undecided: reading GeoParquet directly —
+see "File sources" below for why, and for the one command that gets past it.
 
 ## Requirements
 
@@ -185,6 +184,53 @@ that merely pass close.
 
 A relation that never closes keeps its edges as lines rather than vanishing, and
 never claims to be an area.
+
+## File sources
+
+Four sources read a file rather than the network, and one provider serves all of
+them, dispatching on what the file turns out to be. That is how the Python does
+it, and the reason is **GeoJSON**: every file-backed source accepts it, so a
+format this app cannot read natively is still reachable by converting it once.
+
+The Python reaches for `osmium`, `fiona`, `pyarrow`, `mapbox_vector_tile` and
+`pmtiles`, and reports a missing one as an unavailable source. Swift has none of
+those, so the readers are written here:
+
+| Format | Source | Read by |
+|---|---|---|
+| GeoJSON, GeoJSONL, or a folder of either | all four | `GeoJSONReader` |
+| Shapefile (`.shp` + `.dbf`) | Natural Earth | `ShapefileReader` |
+| MBTiles, PMTiles → Mapbox Vector Tiles | Vector tiles | `VectorTileReader`, `MVT` |
+| OSM PBF extract | Local OSM extract | `OSMPBFReader` |
+| GeoParquet | Overture | not directly — see below |
+
+Each is written to its published layout, and each test builds a real file byte by
+byte rather than checking a recorded blob, so a failure points at the reader
+rather than at something nobody can inspect.
+
+Three details cost the most to get right, and all three are silent when wrong:
+
+- **MBTiles rows are TMS**, counting from the *south*, where every other tile
+  scheme here counts from the north. Reading a row unflipped finds a tile from
+  the wrong hemisphere.
+- **A vector tile is a command stream**, not a list of points, and its deltas
+  accumulate across commands rather than resetting per ring.
+- **OSM PBF needs two passes.** Ways reference nodes by id, so a way cannot be
+  drawn until its nodes are known, and holding a continent in memory to avoid
+  the second pass is not a trade worth making.
+
+**GeoParquet is not read directly**, and the obstacle is compression rather than
+structure. Overture writes ZSTD, Parquet commonly writes Snappy, and macOS ships
+neither — Apple's Compression framework offers Brotli, LZ4, LZFSE and LZMA, none
+of which Parquet uses. Reading it here would mean writing a ZSTD decoder from
+scratch, with no real archive to check it against, for one source that converts
+in one command:
+
+```bash
+duckdb -c "COPY (SELECT * FROM 'in.parquet') TO 'out.geojson' WITH (FORMAT GDAL, DRIVER 'GeoJSON')"
+```
+
+The app says exactly that when handed one, rather than returning an empty map.
 
 ## The one source that needs nothing
 

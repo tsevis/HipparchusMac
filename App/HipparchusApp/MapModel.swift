@@ -342,6 +342,18 @@ final class MapModel {
                 if let seed = overrides["seed"]?.intValue { settings.seed = seed }
                 providers.append(SimulatedFieldProvider(settings: settings))
 
+            case SourceID.localOSMPBF, SourceID.vectorTiles,
+                 SourceID.naturalEarth, SourceID.overture:
+                // The stack refuses to tick one of these without a path, so by the
+                // time it is enabled there is a file to read.
+                let file = stack.path(id)
+                guard !file.isEmpty else { continue }
+                providers.append(FileSourceProvider(
+                    providerID: id,
+                    label: stack.definition(id)?.label ?? id,
+                    path: URL(fileURLWithPath: file)
+                ))
+
             default:
                 // A source with no provider yet is reported by the manager as "not
                 // registered" rather than silently doing nothing.
