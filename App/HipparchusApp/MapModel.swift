@@ -73,6 +73,18 @@ final class MapModel {
     var preset = Presets.preset("Hypsometric Relief")
     var quality = Quality.default
 
+    /// Which derived layers to invent on top of the map.
+    ///
+    /// Held apart from the preset because no preset enables one — all sixteen style
+    /// the four derived layers and three tune their sizes, but every switch is off,
+    /// here and in the Python. This is the switch.
+    var derivations = GeometryPipelineProfile()
+
+    var derivesAnything: Bool {
+        derivations.deriveVoronoi || derivations.deriveDelaunay
+            || derivations.deriveHexGrid || derivations.deriveCirclePacking
+    }
+
     /// Layers the user has hidden by hand. Kept separately from the scene so a
     /// re-fetch does not silently turn hidden layers back on.
     var hiddenLayers: Set<String> = []
@@ -210,6 +222,7 @@ final class MapModel {
         let reporter = FetchReporter()
         let preset = self.preset
         let quality = self.quality
+        let derivations = derivesAnything ? self.derivations : nil
 
         task = Task { [weak self] in
             // Watch the reporter so the status bar fills in as each source answers,
@@ -224,7 +237,7 @@ final class MapModel {
             do {
                 let collection = try await manager.fetch(BBoxQuery(bbox: bbox), plan: plan, reporter: reporter)
                 let built = try SceneBuilder(options: SceneBuilder.Options(
-                    preset: preset, quality: quality
+                    preset: preset, quality: quality, derivations: derivations
                 )).build(from: collection)
 
                 await MainActor.run {
@@ -373,6 +386,19 @@ final class MapModel {
         if let flag = arguments.firstIndex(of: "--sources"), flag + 1 < arguments.count {
             for id in arguments[flag + 1].split(separator: ",") {
                 stack.setEnabled(String(id).trimmingCharacters(in: .whitespaces), true)
+            }
+        }
+        // `--derive voronoi,hex` — the derived layers are off in every preset, so
+        // without a switch there would be no way to look at one.
+        if let flag = arguments.firstIndex(of: "--derive"), flag + 1 < arguments.count {
+            for name in arguments[flag + 1].split(separator: ",") {
+                switch name.trimmingCharacters(in: .whitespaces).lowercased() {
+                case "voronoi": derivations.deriveVoronoi = true
+                case "delaunay": derivations.deriveDelaunay = true
+                case "hex", "hexgrid": derivations.deriveHexGrid = true
+                case "circles", "packing": derivations.deriveCirclePacking = true
+                default: continue
+                }
             }
         }
         if let flag = arguments.firstIndex(of: "--bbox"), flag + 1 < arguments.count {

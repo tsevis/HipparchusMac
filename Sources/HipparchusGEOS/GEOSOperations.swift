@@ -126,6 +126,15 @@ extension GEOSContext {
 
     /// `buffer(0)`, the repair Shapely leans on throughout the Python. Kept as a
     /// named call because "buffer by nothing" reads like a mistake otherwise.
+    /// The smallest convex shape holding everything.
+    ///
+    /// What the derived layers are built inside: a union of every building, road
+    /// and park is a shape full of holes and inlets, and a Voronoi diagram clipped
+    /// to it would be lace. The hull is "the part of the frame the map occupies".
+    public func convexHull(_ geometry: Geometry) throws -> Geometry {
+        try withGeometry(geometry) { try consuming(GEOSConvexHull_r(handle, $0), "convexHull") }
+    }
+
     public func repaired(_ geometry: Geometry) throws -> Geometry {
         try buffer(geometry, distance: 0)
     }

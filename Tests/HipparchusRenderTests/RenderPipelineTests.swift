@@ -649,3 +649,198 @@ final class OpenLineFillTests: XCTestCase {
         return count
     }
 }
+
+/// The derived artistic layers: structure invented from the map rather than
+/// fetched with it.
+///
+/// None of the sixteen presets turns one on — not here and not in the Python — so
+/// these all drive them through `Options.derivations`, which is the only switch.
+final class DerivedLayerTests: XCTestCase {
+
+    /// A handful of buildings and a road grid: enough to seed all four derivations.
+    private func townCollection() -> FeatureCollection {
+        let bbox = BoundingBox(minLon: 0, minLat: 0, maxLon: 0.02, maxLat: 0.02)
+        var buildings: [Feature] = []
+        for row in 0..<4 {
+            for column in 0..<4 {
+                let x = 0.003 + Double(column) * 0.004
+                let y = 0.003 + Double(row) * 0.004
+                buildings.append(Feature(
+                    id: "b/\(row)/\(column)", layer: "buildings", source: "test",
+                    geometry: .polygon(Polygon(exterior: [
+                        Coordinate(lon: x, lat: y), Coordinate(lon: x + 0.001, lat: y),
+                        Coordinate(lon: x + 0.001, lat: y + 0.001), Coordinate(lon: x, lat: y + 0.001),
+                    ])),
+                    provenance: .measured
+                ))
+            }
+        }
+
+        var roads: [Feature] = []
+        for step in 0..<5 {
+            let position = 0.002 + Double(step) * 0.004
+            roads.append(Feature(
+                id: "r/h/\(step)", layer: "roads", source: "test",
+                geometry: .lineString(LineString([
+                    Coordinate(lon: 0.001, lat: position), Coordinate(lon: 0.019, lat: position),
+                ])),
+                provenance: .measured
+            ))
+            roads.append(Feature(
+                id: "r/v/\(step)", layer: "roads", source: "test",
+                geometry: .lineString(LineString([
+                    Coordinate(lon: position, lat: 0.001), Coordinate(lon: position, lat: 0.019),
+                ])),
+                provenance: .measured
+            ))
+        }
+
+        return FeatureCollection(
+            featuresByLayer: ["buildings": buildings, "roads": roads],
+            metadata: ["source": .string("test")],
+            bbox: bbox,
+            provenance: .measured
+        )
+    }
+
+    private func scene(_ configure: (inout GeometryPipelineProfile) -> Void) throws -> RenderScene {
+        var profile = GeometryPipelineProfile()
+        configure(&profile)
+        return try SceneBuilder(options: SceneBuilder.Options(
+            // Export quality, because a preview of a busy frame declines to derive.
+            quality: Quality.profile("export_clean"),
+            derivations: profile
+        )).build(from: townCollection())
+    }
+
+    private func layer(_ scene: RenderScene, _ name: String) -> RenderLayer? {
+        scene.layers.first { $0.name == name }
+    }
+
+    /// The default is off, and staying off is what keeps existing maps identical.
+    func testNoDerivationRunsUnlessAsked() throws {
+        let scene = try SceneBuilder(options: SceneBuilder.Options(
+            quality: Quality.profile("export_clean")
+        )).build(from: townCollection())
+
+        for name in ["voronoi_cells", "delaunay_mesh", "hex_grid", "circle_packing"] {
+            XCTAssertNil(layer(scene, name), "\(name) appeared without being asked for")
+        }
+    }
+
+    func testVoronoiCellsAreDerivedFromTheBuildings() throws {
+        let scene = try scene { $0.deriveVoronoi = true }
+        let cells = try XCTUnwrap(layer(scene, "voronoi_cells"))
+
+        // Sixteen buildings, so sixteen cells — one per site.
+        XCTAssertEqual(cells.geometries.count, 16)
+        XCTAssertTrue(cells.geometries.allSatisfy(\.hasArea))
+    }
+
+    func testTheDelaunayMeshIsSeededByRoadCrossings() throws {
+        let scene = try scene { $0.deriveDelaunay = true }
+        let mesh = try XCTUnwrap(layer(scene, "delaunay_mesh"))
+        XCTAssertGreaterThan(mesh.geometries.count, 8, "a 5x5 road grid has 25 crossings to triangulate")
+        XCTAssertTrue(mesh.geometries.allSatisfy(\.hasArea))
+    }
+
+    func testTheHexGridCoversTheMap() throws {
+        let scene = try scene {
+            $0.deriveHexGrid = true
+            // Projected units are metres, and this frame is about 2 km across.
+            $0.hexRadius = 120
+        }
+        let grid = try XCTUnwrap(layer(scene, "hex_grid"))
+        XCTAssertGreaterThan(grid.geometries.count, 10)
+        XCTAssertTrue(grid.geometries.allSatisfy(\.hasArea))
+    }
+
+    func testCirclesArePacked() throws {
+        let scene = try scene {
+            $0.deriveCirclePacking = true
+            $0.circleMinRadius = 60
+            $0.circleMaxRadius = 200
+        }
+        let packing = try XCTUnwrap(layer(scene, "circle_packing"))
+        XCTAssertGreaterThan(packing.geometries.count, 2)
+        XCTAssertTrue(packing.geometries.allSatisfy(\.hasArea))
+    }
+
+    /// A derived layer is drawn, not just built.
+    func testADerivedLayerReachesTheCanvasAndTheLayerPanel() throws {
+        let scene = try scene {
+            $0.deriveHexGrid = true
+            $0.hexRadius = 120
+        }
+        let rows = LayerInventory.entries(for: scene)
+        let hexRow = try XCTUnwrap(rows.first { $0.layerID == "hex_grid" })
+        XCTAssertEqual(hexRow.label, "Hex grid")
+        XCTAssertEqual(hexRow.group, "Derived")
+        XCTAssertTrue(hexRow.hasData)
+
+        // And it puts ink on the canvas.
+        let image = try XCTUnwrap(CoreGraphicsRenderer().image(
+            of: scene, size: CGSize(width: 300, height: 300)
+        ))
+        XCTAssertEqual(image.width, 300)
+    }
+
+    /// Derived layers are artistic overlays, so they sit above the base map.
+    func testDerivedLayersDrawOverTheMapTheyCameFrom() throws {
+        let scene = try scene {
+            $0.deriveHexGrid = true
+            $0.hexRadius = 120
+        }
+        let buildings = try XCTUnwrap(scene.layers.firstIndex { $0.name == "buildings" })
+        let grid = try XCTUnwrap(scene.layers.firstIndex { $0.name == "hex_grid" })
+        XCTAssertLessThan(buildings, grid, "a derived overlay must not be painted under the map")
+    }
+
+    /// Deriving a second structure on top of a hundred thousand shapes is not what
+    /// "fast preview" means.
+    func testAFastPreviewOfADenseMapDeclinesToDerive() throws {
+        var collection = townCollection()
+        var crowd: [Feature] = []
+        // 320 x 320 = 102 400, and every one has to survive the clip to count —
+        // laying them out past the frame would leave the total short of the
+        // threshold and quietly test nothing.
+        for index in 0..<102_400 {
+            let x = 0.0005 + Double(index % 320) * 0.00006
+            let y = 0.0005 + Double(index / 320) * 0.00006
+            crowd.append(Feature(
+                id: "w/\(index)", layer: "water", source: "test",
+                geometry: .lineString(LineString([
+                    Coordinate(lon: x, lat: y), Coordinate(lon: x + 0.00002, lat: y),
+                ])),
+                provenance: .measured
+            ))
+        }
+        collection.featuresByLayer["water"] = crowd
+
+        var profile = GeometryPipelineProfile()
+        profile.deriveHexGrid = true
+        profile.hexRadius = 200
+        let scene = try SceneBuilder(options: SceneBuilder.Options(
+            quality: Quality.profile("preview_fast"), derivations: profile
+        )).build(from: collection)
+
+        XCTAssertNil(layer(scene, "hex_grid"), "a fast preview should not have derived anything")
+    }
+
+    /// With nothing to bound them, there is nothing to derive inside.
+    func testAnEmptyMapDerivesNothing() throws {
+        var profile = GeometryPipelineProfile()
+        profile.deriveHexGrid = true
+        profile.deriveVoronoi = true
+
+        let scene = try SceneBuilder(options: SceneBuilder.Options(
+            quality: Quality.profile("export_clean"), derivations: profile
+        )).build(from: FeatureCollection(
+            featuresByLayer: ["buildings": []],
+            bbox: BoundingBox(minLon: 0, minLat: 0, maxLon: 1, maxLat: 1)
+        ))
+
+        XCTAssertNil(layer(scene, "hex_grid"))
+        XCTAssertNil(layer(scene, "voronoi_cells"))
+    }
+}

@@ -10,14 +10,12 @@ here that disagrees with it is a bug here.
 
 **Status: the app is built.** Every online source, the composing source stack,
 the sixteen presets, illuminated contours, the three-column interface and the
-exports are in, with 364 tests and the output checked against real ground. See
+exports are in, with 397 tests and the output checked against real ground. See
 `KICKOFF.md` for the brief.
 
 Not built, and all understood rather than undecided: the file-backed providers
 (`osmium`, `fiona`, `pyarrow`, PMTiles, MVT), which the brief calls the long
-tail; and the derived artistic layers a few presets ask for (Voronoi, Delaunay,
-hex grid, circle packing), which currently render as empty layers rather than
-wrong ones.
+tail, and the simulated-terrain source that stands in for them offline.
 
 ## Requirements
 
@@ -187,6 +185,40 @@ that merely pass close.
 
 A relation that never closes keeps its edges as lines rather than vanishing, and
 never claims to be an area.
+
+## Derived layers
+
+Four layers are **invented from the map rather than fetched with it**: Voronoi
+cells around the buildings, a Delaunay mesh between road junctions, a hex grid,
+and packed circles. Each is clipped to the convex hull of what the map actually
+holds — a union of every building, road and park is full of holes and inlets, and
+a grid clipped to *that* would be lace.
+
+Voronoi and Delaunay come from GEOS, which the brief settled: `GEOSVoronoiDiagram`
+and `GEOSDelaunayTriangulation` replace the SciPy usage, and with them go two
+hundred lines of the Python — a hand-rolled reconstruction of finite Voronoi
+polygons from Qhull's infinite ridges, a fallback for when SciPy will not import
+against the local NumPy ABI, and a second fallback that draws squares around each
+site and calls them cells.
+
+**No preset turns any of them on.** All sixteen style the four layers and three
+tune the hex radius and circle sizes, but every switch is off — in this port and
+in the Python, where nothing outside a test ever sets one. So they are switched
+from the Derived section of the style column, or on launch:
+
+```bash
+Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.40,36.39,25.46,36.44 --derive voronoi,hex
+```
+
+Everything they produce is **synthetic**: a pattern read out of the data, not a
+measurement of anything, and the panel says so.
+
+Two costs are bounded rather than left to grow. Road junctions are found through
+a grid index rather than by comparing every line with every other, and capped at
+three thousand seeds. Circle packing walks a lattice that is quadratic in the
+area while its step is fixed by the smallest circle, so the lattice is capped and
+the step widens to fit: a 5 km frame at an 8 m step took seven seconds before
+that, and thirty kilometres would have taken four minutes.
 
 ## Where OSM tags land
 
