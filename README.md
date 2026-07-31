@@ -61,9 +61,22 @@ in release and puts it in `/Applications`:
 Scripts/install-app.sh
 ```
 
-The signature is **ad-hoc**: enough to run on the machine that built it, not
-enough to hand to anyone else. Giving it to someone would need a Developer ID
-and notarisation, which is a different job from building it.
+And for a disk image, named for the version and the commit it came from:
+
+```sh
+Scripts/make-dmg.sh          # → dist/Hipparchus-0.1.0-<sha>.dmg
+```
+
+The signature is **ad-hoc**, and that matters more for the image than for the
+app. It is enough to run on the machine that built it. It is not enough to hand
+to anyone else: a downloaded image carries a quarantine flag, and with no
+Developer ID and no notarisation behind it macOS refuses to open the app at all
+until the reader right-clicks it and chooses Open, or clears the flag by hand.
+
+That is a reasonable thing to ask of yourself and an unreasonable thing to ask
+of anyone else. Real distribution needs an Apple Developer account, a Developer
+ID certificate and `notarytool`; this builds something that looks distributable
+and is not, so it says so rather than letting the disk image imply otherwise.
 
 ## Layout
 
