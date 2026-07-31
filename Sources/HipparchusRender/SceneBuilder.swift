@@ -322,10 +322,18 @@ public struct SceneBuilder: Sendable {
         }
 
         if tolerance > 0 {
-            let simplified = try geos.simplify(geometry, tolerance: tolerance, preserveTopology: true)
-            // A simplification that empties a feature is worse than no
-            // simplification: keep the original rather than lose the line.
-            if !simplified.isEmpty { geometry = simplified }
+            // On the polygon layers each feature caps its own tolerance by a
+            // fraction of its smallest dimension, so a preset tuned for sweeping
+            // coastlines cannot flatten a house into a sliver on the way.
+            // Ported from `_polygon_tolerance_cap`; nil means uncapped.
+            let effective = Self.toleranceCap(for: geometry, layer: layer)
+                .map { Swift.min(tolerance, $0) } ?? tolerance
+            if effective > 0 {
+                let simplified = try geos.simplify(geometry, tolerance: effective, preserveTopology: true)
+                // A simplification that empties a feature is worse than no
+                // simplification: keep the original rather than lose the line.
+                if !simplified.isEmpty { geometry = simplified }
+            }
         }
 
         if smoothingIterations > 0 {
@@ -337,6 +345,33 @@ public struct SceneBuilder: Sendable {
         }
 
         return geometry
+    }
+
+    /// The layers whose features are areas a reader recognises by shape.
+    static let polygonToleranceCapLayers: Set<String> = [
+        "buildings", "water", "parks", "natural", "forests", "fields",
+        "landuse", "coastline",
+    ]
+
+    /// How far simplification may go on one feature of a polygon layer.
+    ///
+    /// Ported from `_polygon_tolerance_cap`: a fraction of the feature's own
+    /// smallest dimension — 0.08 for buildings, whose right angles read as
+    /// meaning, 0.2 for land cover. Zero for a line that landed in a polygon
+    /// layer (left alone, as the Python leaves it); `nil` — uncapped — for
+    /// every other layer.
+    static func toleranceCap(for geometry: Geometry, layer: String) -> Double? {
+        guard polygonToleranceCapLayers.contains(layer) else { return nil }
+        switch geometry {
+        case .polygon, .multiPolygon:
+            break
+        default:
+            return 0
+        }
+        guard let bounds = geometry.bounds else { return 0 }
+        let minDimension = Swift.min(bounds.width, bounds.height)
+        guard minDimension > 0 else { return 0 }
+        return minDimension * (layer == "buildings" ? 0.08 : 0.2)
     }
 
     // MARK: - Derived layers
