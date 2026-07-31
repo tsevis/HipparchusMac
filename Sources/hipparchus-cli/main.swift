@@ -253,6 +253,7 @@ func run(_ place: Place, options: Options) async throws {
         try writePNG(image, to: base.appendingPathExtension("png"))
     }
     var svgOptions = SVGExporter.Options()
+    svgOptions.precision = options.quality.svgPrecision
     if options.furniture {
         svgOptions.composition.title = place.name == "custom" ? "Hipparchus" : place.name.capitalized
         svgOptions.composition.subtitle = String(

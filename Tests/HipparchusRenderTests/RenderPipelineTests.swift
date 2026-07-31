@@ -292,8 +292,8 @@ final class SceneBuilderTests: XCTestCase {
         XCTAssertEqual(preview.projection.renderCRS, "EPSG:3857")
         XCTAssertNotEqual(export.projection.renderCRS, "EPSG:3857")
 
-        let previewTolerance = try XCTUnwrap(preview.diagnostics["simplify_tolerance"]?.doubleValue)
-        let exportTolerance = try XCTUnwrap(export.diagnostics["simplify_tolerance"]?.doubleValue)
+        let previewTolerance = try XCTUnwrap(preview.diagnostics["simplified_tolerance"]?.doubleValue)
+        let exportTolerance = try XCTUnwrap(export.diagnostics["simplified_tolerance"]?.doubleValue)
         XCTAssertGreaterThan(previewTolerance, exportTolerance)
         XCTAssertEqual(export.diagnostics["quality_profile"]?.stringValue, "export_print")
     }

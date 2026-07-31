@@ -287,7 +287,10 @@ public struct SceneBuilder: Sendable {
                 "dropped_geometries": .int(counts.dropped),
                 "smoothed_geometries": .int(counts.smoothed),
                 "invalid_geometries": .int(counts.invalid),
-                "simplify_tolerance": .double(tolerance),
+                // The Python's spelling. This is a published key in the exported
+                // diagnostics, so tooling written against that output must find
+                // it here too.
+                "simplified_tolerance": .double(tolerance),
                 "quality_profile": .string(quality.key),
                 "preset": .string(options.preset.name),
                 "illuminated_layers": .string(illuminatedLayers.sorted().joined(separator: ", ")),

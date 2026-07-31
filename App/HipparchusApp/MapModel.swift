@@ -73,6 +73,12 @@ final class MapModel {
     var preset = Presets.preset("Hypsometric Relief") {
         didSet {
             guard oldValue.name != preset.name else { return }
+            // A preset's tuned derivation sizes come with it — Fragmented Urban
+            // means 45-metre hexes, Technical Blueprint 70 — while the switches
+            // stay where the user put them. Without this the tables carried
+            // sizes nothing could ever read: `derivations` starts at the struct
+            // defaults and replaces the preset's profile wholesale.
+            adoptDerivationSizes(from: preset)
             record(action: "Change Preset")
         }
     }
@@ -253,6 +259,17 @@ final class MapModel {
         ) {
             registerBoundary(named: name)
         }
+    }
+
+    /// Take the preset's derivation sizes without making a second undo entry:
+    /// changing preset is one action, and the sizes it brings are part of it.
+    private func adoptDerivationSizes(from preset: ArtisticPreset) {
+        let wasRestoring = isRestoringState
+        isRestoringState = true
+        defer { isRestoringState = wasRestoring }
+        derivations.hexRadius = preset.geometryProfile.hexRadius
+        derivations.circleMinRadius = preset.geometryProfile.circleMinRadius
+        derivations.circleMaxRadius = preset.geometryProfile.circleMaxRadius
     }
 
     private func recordAreaChange() {
@@ -851,15 +868,33 @@ final class MapModel {
         var options = SVGExporter.Options()
         options.composition = svgComposition
         options.includeBackground = svgIncludeBackground
+        // The quality profile decides coordinate fidelity: Print Export writes
+        // six decimals, Clean Export four. Until this was wired the profile made
+        // no difference to the file at all.
+        options.precision = quality.svgPrecision
         let size = svgComposition.exportSize(
             canvasWidth: options.width, canvasHeight: options.height
         )
         options.width = size.width
         options.height = size.height
-        export(type: .svg, extension: "svg") { scene, url in
-            _ = try SVGExporter(options: options).write(scene, to: url)
+        export(type: .svg, extension: "svg") { [weak self] scene, url in
+            let diagnostics = try SVGExporter(options: options).write(scene, to: url)
+            // The diagnostics belong beside the file, as the Python writes them:
+            // a map separated from this conversation should still be able to say
+            // what it counted. The sandbox grants access to the file the user
+            // named, and a sibling write may be refused — so a failed sidecar
+            // must never fail the export that succeeded.
+            let sidecar = url.appendingPathExtension("diagnostics.json")
+            do {
+                try diagnostics.jsonData().write(to: sidecar, options: .atomic)
+            } catch {
+                self?.sidecarNote = " (diagnostics could not be written beside it)"
+            }
         }
     }
+
+    /// Appended to the export message when the sidecar could not be written.
+    private var sidecarNote = ""
 
     func exportPDF() {
         export(type: .pdf, extension: "pdf") { scene, url in
@@ -901,8 +936,9 @@ final class MapModel {
         guard panel.runModal() == .OK, let url = panel.url else { return }
 
         do {
+            sidecarNote = ""
             try write(scene, url)
-            status = "Exported \(url.lastPathComponent)."
+            status = "Exported \(url.lastPathComponent).\(sidecarNote)"
             isError = false
         } catch {
             isError = true
