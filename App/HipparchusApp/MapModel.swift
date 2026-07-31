@@ -35,11 +35,11 @@ final class MapModel {
         Place(name: "Myrtoan Sea", bbox: BoundingBox(minLon: 23.2, minLat: 36.3, maxLon: 24.2, maxLat: 37.1)),
     ]
 
-    var west = "25.32"
-    var south = "36.33"
-    var east = "25.50"
-    var north = "36.48"
-    var placeName = "Santorini"
+    var west = "25.32" { didSet { recordAreaChange() } }
+    var south = "36.33" { didSet { recordAreaChange() } }
+    var east = "25.50" { didSet { recordAreaChange() } }
+    var north = "36.48" { didSet { recordAreaChange() } }
+    var placeName = "Santorini" { didSet { recordAreaChange() } }
 
     /// The area currently drawn, which is not the area in the boxes until Update map
     /// is pressed. Keeping them apart is what lets the boxes be edited without the
@@ -69,16 +69,26 @@ final class MapModel {
 
     // MARK: - What the map is made of
 
-    var stack = SourceStack()
-    var preset = Presets.preset("Hypsometric Relief")
-    var quality = Quality.default
+    var stack = SourceStack() { didSet { recordStackChange(from: oldValue) } }
+    var preset = Presets.preset("Hypsometric Relief") {
+        didSet {
+            guard oldValue.name != preset.name else { return }
+            record(action: "Change Preset")
+        }
+    }
+    var quality = Quality.default {
+        didSet {
+            guard oldValue.key != quality.key else { return }
+            record(action: "Change Quality")
+        }
+    }
 
     /// Which derived layers to invent on top of the map.
     ///
     /// Held apart from the preset because no preset enables one — all sixteen style
     /// the four derived layers and three tune their sizes, but every switch is off,
     /// here and in the Python. This is the switch.
-    var derivations = GeometryPipelineProfile()
+    var derivations = GeometryPipelineProfile() { didSet { recordDerivedChange(from: oldValue) } }
 
     var derivesAnything: Bool {
         derivations.deriveVoronoi || derivations.deriveDelaunay
@@ -87,7 +97,7 @@ final class MapModel {
 
     /// Layers the user has hidden by hand. Kept separately from the scene so a
     /// re-fetch does not silently turn hidden layers back on.
-    var hiddenLayers: Set<String> = []
+    var hiddenLayers: Set<String> = [] { didSet { recordVisibilityChange(from: oldValue) } }
 
     // MARK: - The result
 
@@ -153,6 +163,7 @@ final class MapModel {
     /// still the user's decision, and a search that framed the wrong Springfield
     /// should not have cost a minute of Overpass time.
     func adopt(_ result: PlaceSearch.Result) {
+        pendingAction = ("Choose Place", "area")
         setArea(result.bbox)
         placeName = result.name
         searchQuery = result.name
@@ -184,6 +195,184 @@ final class MapModel {
     private let cache = DiskCacheStore(directory: DiskCacheStore.defaultDirectory())
     private let sessionURL = Session.defaultURL()
 
+    // MARK: - Undo
+
+    /// The window's undo manager, handed in by the view. ⌘Z and the Edit menu
+    /// come through it, but the truth lives in `history` — an `UndoManager`
+    /// cannot be inspected or tested, and a value type can.
+    weak var undoManager: UndoManager?
+
+    private var history = SessionHistory(initial: Session())
+
+    /// True while a snapshot is being applied, so restoring a state is never
+    /// recorded as a fresh action.
+    private var isRestoringState = false
+
+    /// Set by an action method to name the boundary its mutations make, consumed
+    /// by the first record. "Choose Place" is one intention; without this it
+    /// would record as five separate "Change Area"s.
+    private var pendingAction: (name: String, key: String?)?
+
+    /// The choices as they stand, or nil while the coordinate boxes hold
+    /// something that is not an area yet — a half-typed number is not a state
+    /// worth returning to, and coalescing folds it into the keystrokes around it.
+    private func currentSession() -> Session? {
+        guard let bbox else { return nil }
+        return Session(
+            stack: stack,
+            area: Session.Area(bbox),
+            placeName: placeName,
+            preset: preset.name,
+            quality: quality.key,
+            hiddenLayers: hiddenLayers.sorted(),
+            derived: Session.Derived(derivations)
+        )
+    }
+
+    private func record(action: String, coalescing key: String? = nil) {
+        guard !isRestoringState else {
+            pendingAction = nil
+            return
+        }
+        let (name, coalescingKey) = pendingAction ?? (action, key)
+        pendingAction = nil
+        guard let session = currentSession() else { return }
+        if history.record(
+            session, action: name, coalescing: coalescingKey,
+            at: Date().timeIntervalSinceReferenceDate
+        ) {
+            registerBoundary(named: name)
+        }
+    }
+
+    private func recordAreaChange() {
+        record(action: "Change Area", coalescing: "area")
+    }
+
+    /// Name the one thing that changed between two stacks. One user gesture
+    /// changes one thing, so the first difference found is the action.
+    private func recordStackChange(from old: SourceStack) {
+        guard !isRestoringState, old != stack else { return }
+        for definition in stack.definitions {
+            let id = definition.id
+            if old.isEnabled(id) != stack.isEnabled(id) {
+                return record(action: stack.isEnabled(id)
+                    ? "Enable \(definition.label)" : "Disable \(definition.label)")
+            }
+            if old.path(id) != stack.path(id) {
+                return record(action: "Choose File for \(definition.label)")
+            }
+            let before = old.changedSettings(for: id)
+            let after = stack.changedSettings(for: id)
+            if before != after {
+                let changed = Set(before.keys).union(after.keys).sorted()
+                    .first { before[$0] != after[$0] }
+                let label = changed.flatMap { definition.setting($0)?.label } ?? "Setting"
+                return record(
+                    action: "Change \(label)",
+                    coalescing: changed.map { "stack.\(id).\($0)" }
+                )
+            }
+        }
+        record(action: "Change Sources")
+    }
+
+    private func recordDerivedChange(from old: GeometryPipelineProfile) {
+        guard !isRestoringState else { return }
+        func switched(_ on: Bool, _ layer: String) -> String {
+            on ? "Turn On \(layer)" : "Turn Off \(layer)"
+        }
+        if old.deriveVoronoi != derivations.deriveVoronoi {
+            record(action: switched(derivations.deriveVoronoi, "Voronoi Cells"))
+        } else if old.deriveDelaunay != derivations.deriveDelaunay {
+            record(action: switched(derivations.deriveDelaunay, "Delaunay Mesh"))
+        } else if old.deriveHexGrid != derivations.deriveHexGrid {
+            record(action: switched(derivations.deriveHexGrid, "Hex Grid"))
+        } else if old.deriveCirclePacking != derivations.deriveCirclePacking {
+            record(action: switched(derivations.deriveCirclePacking, "Circle Packing"))
+        } else if old.hexRadius != derivations.hexRadius {
+            record(action: "Change Hex Size", coalescing: "derived.hexRadius")
+        } else if old.circleMinRadius != derivations.circleMinRadius {
+            record(action: "Change Circle Size", coalescing: "derived.circleMinRadius")
+        } else if old.circleMaxRadius != derivations.circleMaxRadius {
+            record(action: "Change Circle Size", coalescing: "derived.circleMaxRadius")
+        }
+        // Any other field of the profile is not a choice the panel offers, and
+        // not one the session records; nothing to undo.
+    }
+
+    private func recordVisibilityChange(from old: Set<String>) {
+        guard !isRestoringState else { return }
+        if let hidden = hiddenLayers.subtracting(old).first {
+            record(action: "Hide \(LayerInventory.label(for: hidden))")
+        } else if let shown = old.subtracting(hiddenLayers).first {
+            record(action: "Show \(LayerInventory.label(for: shown))")
+        }
+    }
+
+    /// One `UndoManager` registration per history boundary, so ⌘Z steps map one
+    /// to one onto intentions.
+    private func registerBoundary(named name: String) {
+        guard let undoManager else { return }
+        undoManager.registerUndo(withTarget: self) { model in
+            MainActor.assumeIsolated { model.performUndo() }
+        }
+        undoManager.setActionName(name)
+    }
+
+    func performUndo() {
+        // The name of what is being taken back becomes the redo title.
+        let name = history.undoActionName
+        guard let snapshot = history.undo() else { return }
+        apply(snapshot)
+        if let undoManager {
+            undoManager.registerUndo(withTarget: self) { model in
+                MainActor.assumeIsolated { model.performRedo() }
+            }
+            if let name { undoManager.setActionName(name) }
+        }
+    }
+
+    func performRedo() {
+        let name = history.redoActionName
+        guard let snapshot = history.redo() else { return }
+        apply(snapshot)
+        if let undoManager {
+            undoManager.registerUndo(withTarget: self) { model in
+                MainActor.assumeIsolated { model.performUndo() }
+            }
+            if let name { undoManager.setActionName(name) }
+        }
+    }
+
+    /// Put a snapshot on screen: the choices, and the scene that was drawn under
+    /// them. Never fetches — that is the whole point.
+    private func apply(_ snapshot: SessionHistory.Snapshot) {
+        isRestoringState = true
+        defer { isRestoringState = false }
+
+        let session = snapshot.session
+        stack = session.stack()
+        preset = Presets.preset(session.presetName)
+        quality = Quality.profile(session.qualityKey)
+        hiddenLayers = Set(session.hiddenLayers)
+        session.derived.apply(to: &derivations)
+        placeName = session.placeName
+        west = String(session.area.west)
+        south = String(session.area.south)
+        east = String(session.area.east)
+        north = String(session.area.north)
+
+        scene = history.scene(for: snapshot.sceneToken)
+        drawnBBox = scene?.bbox
+        if snapshot.sceneToken != nil, scene == nil {
+            // The honest case: the history keeps every choice but only the newest
+            // few maps. Saying so beats quietly spending minutes re-fetching.
+            status = "That map was let go to save memory. Press Update map to redraw it."
+            isError = false
+        }
+    }
+
     // MARK: - Remembering
 
     /// Restore what the app was doing last time.
@@ -193,36 +382,37 @@ final class MapModel {
     /// Re-fetching on launch would mean opening the app could cost five minutes of
     /// Overpass time nobody asked for.
     func restore() {
+        isRestoringState = true
+        defer { isRestoringState = false }
+
         let session = Session.read(from: sessionURL)
         stack = session.stack()
         preset = Presets.preset(session.presetName)
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
+        session.derived.apply(to: &derivations)
         placeName = session.placeName
         west = String(session.area.west)
         south = String(session.area.south)
         east = String(session.area.east)
         north = String(session.area.north)
+
+        // History begins here: opening the app is not an action to undo.
+        history = SessionHistory(initial: session)
     }
 
     /// A failure to save is worth nothing more than the settings: it must never
     /// interrupt what the user was doing.
     func save() {
-        guard let bbox else { return }
-        try? Session(
-            stack: stack,
-            area: Session.Area(bbox),
-            placeName: placeName,
-            preset: preset.name,
-            quality: quality.key,
-            hiddenLayers: hiddenLayers.sorted()
-        ).write(to: sessionURL)
+        guard let session = currentSession() else { return }
+        try? session.write(to: sessionURL)
     }
 
     // MARK: - Actions
 
     func select(_ name: String) {
         guard let place = Self.places.first(where: { $0.name == name }) else { return }
+        pendingAction = ("Choose Place", "area")
         placeName = name
         west = String(place.bbox.minLon)
         south = String(place.bbox.minLat)
@@ -232,6 +422,8 @@ final class MapModel {
 
     /// Set the area from a rectangle drawn on the canvas.
     func setArea(_ bbox: BoundingBox) {
+        // Adopted searches route through here already carrying their own name.
+        if pendingAction == nil { pendingAction = ("Draw Area", "area") }
         west = String(format: "%.5f", bbox.minLon)
         south = String(format: "%.5f", bbox.minLat)
         east = String(format: "%.5f", bbox.maxLon)
@@ -312,6 +504,15 @@ final class MapModel {
                     self.provenance = collection.provenance?.label
                     self.status = self.describe(built, collection: collection)
                     self.isError = false
+                    // A fetch is an action: undo restores the previous scene from
+                    // the history's store, and never re-fetches — undo must not
+                    // cost minutes to take back something that cost minutes.
+                    if let session = self.currentSession() {
+                        self.history.recordFetch(
+                            session, scene: built, at: Date().timeIntervalSinceReferenceDate
+                        )
+                        self.registerBoundary(named: "Fetch Map")
+                    }
                 }
             } catch is FetchCancelled {
                 // Cancel cannot pull a request out of its socket. It skips sources
@@ -458,6 +659,11 @@ final class MapModel {
         restore()
         Task { await refreshCacheSummary() }
 
+        // Launch flags are setup, not actions: nothing done here should land in
+        // the undo history, so the flag-driven mutations happen restoring-style
+        // and the history is reseeded when they are done.
+        isRestoringState = true
+
         let arguments = ProcessInfo.processInfo.arguments
         if let flag = arguments.firstIndex(of: "--preset"), flag + 1 < arguments.count {
             preset = Presets.preset(Presets.resolveName(arguments[flag + 1]))
@@ -490,10 +696,19 @@ final class MapModel {
             guard parts.count == 4 else {
                 status = "--bbox needs four numbers: west,south,east,north"
                 isError = true
+                isRestoringState = false
                 return
             }
             setArea(BoundingBox(minLon: parts[0], minLat: parts[1], maxLon: parts[2], maxLat: parts[3]))
             placeName = Self.places.first { $0.bbox == bbox }?.name ?? ""
+        }
+
+        // Setup is done; from here every change — including a launch fetch when
+        // it completes — is the user's history.
+        isRestoringState = false
+        pendingAction = nil
+        if let session = currentSession() {
+            history = SessionHistory(initial: session)
         }
 
         // `--search "Santorini"` — the search is a network call into MapKit, and a

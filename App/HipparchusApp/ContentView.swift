@@ -13,6 +13,9 @@ struct ContentView: View {
     @State private var model = MapModel()
     @State private var viewport = ViewportState()
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    /// The window's own undo manager, which puts ⌘Z and the Edit menu in charge
+    /// of the model's history rather than inventing a parallel mechanism.
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         // The status bar is a sibling of the split view rather than a
@@ -42,7 +45,11 @@ struct ContentView: View {
             statusBar
         }
         .frame(minWidth: 960, minHeight: 620)
-        .task { model.startIfRequestedOnLaunch() }
+        .task {
+            model.undoManager = undoManager
+            model.startIfRequestedOnLaunch()
+        }
+        .onAppear { model.undoManager = undoManager }
         .onDisappear { model.save() }
         .alert(
             "This will take a while",
@@ -122,9 +129,17 @@ struct ContentView: View {
         }
 
         ToolbarItem(placement: .principal) {
-            Button("Update map") { model.update() }
-                .keyboardShortcut(.return, modifiers: .command)
-                .disabled(model.isFetching || model.bbox == nil)
+            // Cancel appears beside Update map while a fetch runs — where the eye
+            // already is — as well as in the status bar next to the progress.
+            HStack(spacing: 8) {
+                Button("Update map") { model.update() }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .disabled(model.isFetching || model.bbox == nil)
+                if model.isFetching {
+                    Button("Cancel") { model.cancel() }
+                        .help("Skips sources not yet started and discards the result. A request already in flight runs to completion.")
+                }
+            }
         }
 
         ToolbarItem(placement: .principal) {

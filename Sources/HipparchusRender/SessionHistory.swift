@@ -176,9 +176,9 @@ public struct SessionHistory: Sendable {
     /// Drop scenes no entry can reach any more.
     private mutating func releaseUnreferencedScenes() {
         var referenced = Set<Int>()
-        for entry in past { entry.snapshot.sceneToken.map { referenced.insert($0) } }
-        present.snapshot.sceneToken.map { referenced.insert($0) }
-        for entry in future { entry.snapshot.sceneToken.map { referenced.insert($0) } }
+        for entry in past + [present] + future {
+            if let token = entry.snapshot.sceneToken { referenced.insert(token) }
+        }
         scenes = scenes.filter { referenced.contains($0.key) }
     }
 
