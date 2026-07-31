@@ -214,7 +214,13 @@ public enum FileFormat: String, Sendable, Equatable {
 /// The layers a file source may produce.
 ///
 /// The Overpass set plus the ones only a file can carry — administrative
-/// boundaries, and the terrain layers a DEM or a converted contour set brings.
+/// boundaries, the terrain layers a DEM or a converted contour set brings, and
+/// the layers whose online source has an offline file counterpart: a saved
+/// earthquake catalogue, an exported ground track, a polygonised hillshade.
+///
+/// The list is `ALL_OPTIONAL_LAYERS` from the Python's `optional_providers.py`,
+/// and `terrain_hillshade` earns its place in the draw order here: no provider
+/// computes one, so a file naming it is the one way the layer ever fills.
 public enum FileLayer {
     public static let adminBoundaries = "admin_boundaries"
 
@@ -222,10 +228,16 @@ public enum FileLayer {
         adminBoundaries,
         TerrainLayer.minorContours,
         TerrainLayer.indexContours,
+        TerrainLayer.hillshade,
         TerrainLayer.elevationBands,
         TerrainLayer.bathymetry,
         TerrainLayer.summits,
         NightLightsLayer.name,
+        EarthquakeLayer.shallow,
+        EarthquakeLayer.intermediate,
+        EarthquakeLayer.deep,
+        SatelliteLayer.tracks,
+        SatelliteLayer.footprints,
     ]
 
     static let known = Set(all)

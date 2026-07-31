@@ -32,6 +32,9 @@ public enum TerrainLayer {
     public static let bathymetry = "bathymetry"
     public static let summits = "summits"
     public static let elevationBands = "elevation_bands"
+    /// No provider computes a hillshade; the layer exists for file sources — a
+    /// hillshade polygonised elsewhere and converted lands here by naming it.
+    public static let hillshade = "terrain_hillshade"
 
     public static let all = [elevationBands, bathymetry, minorContours, indexContours, summits]
 }

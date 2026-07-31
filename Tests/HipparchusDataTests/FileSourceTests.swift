@@ -145,6 +145,37 @@ final class FileSourceTests: XCTestCase {
         XCTAssertEqual(collection.features(in: FileLayer.adminBoundaries).count, 1)
     }
 
+    /// Every layer the Python's optional providers accept by name is accepted
+    /// here — the list is `EXTRA_LAYERS` from `optional_providers.py`, verbatim.
+    /// This is what makes a converted hillshade, an earthquake catalogue or a
+    /// saved ground track loadable from a file: the layer only has to say what
+    /// it is. `terrain_hillshade` in particular is styled and ordered by the
+    /// scene, and a file is the one way anything ever lands in it.
+    func testEveryExtraLayerThePythonAcceptsIsAcceptedHere() {
+        let extraLayers = [
+            "admin_boundaries",
+            "terrain_contours", "terrain_index_contours", "terrain_hillshade",
+            "elevation_bands", "night_lights",
+            "earthquakes_shallow", "earthquakes_intermediate", "earthquakes_deep",
+            "satellite_tracks", "satellite_footprints",
+            "bathymetry", "summits",
+        ]
+        let line = Geometry.lineString(
+            LineString([Coordinate(lon: 23.7, lat: 37.9), Coordinate(lon: 23.8, lat: 38.0)])
+        )
+        for layer in extraLayers {
+            XCTAssertEqual(
+                FileLayer.forProperties(
+                    ["hipparchus_layer": .string(layer)],
+                    providerID: SourceID.naturalEarth,
+                    geometry: line
+                ),
+                layer,
+                "'\(layer)' is named after the Python's EXTRA_LAYERS and was rejected"
+            )
+        }
+    }
+
     /// A converted extract usually arrives as one file per layer in a folder.
     func testADirectoryOfGeoJSONIsReadAsOneSource() async throws {
         let folder = directory.appendingPathComponent("layers")
