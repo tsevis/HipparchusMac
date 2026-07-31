@@ -27,12 +27,14 @@ final class SessionTests: XCTestCase {
             placeName: "Myrtoan Sea",
             preset: "Contour Study",
             quality: "export_print",
-            hiddenLayers: ["buildings"]
+            hiddenLayers: ["buildings"],
+            derived: Session.Derived(voronoi: true, hexRadius: 45)
         )
         try session.write(to: url)
 
         let restored = Session.read(from: url)
         XCTAssertEqual(restored, session)
+        XCTAssertTrue(restored.derived.voronoi, "the capturing init dropped the derived block")
         XCTAssertEqual(restored.placeName, "Myrtoan Sea")
         XCTAssertEqual(restored.presetName, "Contour Study")
         XCTAssertEqual(restored.hiddenLayers, ["buildings"])
@@ -119,6 +121,72 @@ final class SessionTests: XCTestCase {
         XCTAssertNil(Session.Area(west: 0, south: 5, east: 1, north: 0).bbox)
         XCTAssertNil(Session.Area(west: -200, south: 0, east: 5, north: 1).bbox)
         XCTAssertNotNil(Session.Area(west: 0, south: 0, east: 1, north: 1).bbox)
+    }
+
+    /// The derived-layer switches are choices the app holds, so the session holds
+    /// them too — they are what the Derived panel sets, and no preset ever does.
+    func testTheDerivedChoicesSurviveTheRoundTrip() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        var session = Session()
+        session.derived.hexGrid = true
+        session.derived.circlePacking = true
+        session.derived.hexRadius = 42
+        session.derived.circleMinRadius = 5
+        session.derived.circleMaxRadius = 21
+        try session.write(to: url)
+
+        let restored = Session.read(from: url)
+        XCTAssertEqual(restored, session)
+        XCTAssertTrue(restored.derived.hexGrid)
+        XCTAssertEqual(restored.derived.hexRadius, 42)
+    }
+
+    /// A session written before the derived block existed still reads — losing
+    /// every other choice because one new field is absent would make an update
+    /// cost the user their settings.
+    func testASessionFromBeforeTheDerivedBlockStillReads() throws {
+        let url = temporaryURL()
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        try Data("""
+            {
+              "area": {"west": 23.2, "south": 36.3, "east": 24.2, "north": 37.1},
+              "placeName": "Myrtoan Sea",
+              "enabledSources": ["terrain_tiles"],
+              "sourcePaths": {},
+              "sourceSettings": {},
+              "sourceChoices": {},
+              "presetName": "Contour Study",
+              "qualityKey": "screen_default",
+              "hiddenLayers": []
+            }
+            """.utf8).write(to: url)
+
+        let restored = Session.read(from: url)
+        XCTAssertEqual(restored.placeName, "Myrtoan Sea", "the old file was thrown away")
+        XCTAssertEqual(restored.derived, Session.Derived(), "absent means the defaults, all off")
+    }
+
+    /// The derived block speaks the same shape the scene builder takes.
+    func testTheDerivedBlockRoundTripsThroughTheGeometryProfile() {
+        var derived = Session.Derived()
+        derived.voronoi = true
+        derived.delaunay = true
+        derived.hexRadius = 80
+
+        var profile = GeometryPipelineProfile()
+        derived.apply(to: &profile)
+        XCTAssertTrue(profile.deriveVoronoi)
+        XCTAssertTrue(profile.deriveDelaunay)
+        XCTAssertFalse(profile.deriveHexGrid)
+        XCTAssertEqual(profile.hexRadius, 80)
+
+        XCTAssertEqual(Session.Derived(profile), derived)
     }
 
     /// The defaults have to be a map that works, not a blank.

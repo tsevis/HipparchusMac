@@ -47,6 +47,71 @@ public struct Session: Codable, Sendable, Equatable {
         }
     }
 
+    /// The derived-layer switches and their sizes.
+    ///
+    /// These are choices the app holds that nothing else records: no preset turns a
+    /// derived layer on — all sixteen style the four layers, and every switch is
+    /// off, here and in the Python — so the Derived panel is the only writer, and a
+    /// session that forgot them would silently turn a chosen layer off on relaunch.
+    ///
+    /// A small named struct rather than seven loose fields, because it is one idea:
+    /// what the map invents on top of what was fetched.
+    public struct Derived: Codable, Sendable, Equatable {
+        public var voronoi: Bool
+        public var delaunay: Bool
+        public var hexGrid: Bool
+        public var circlePacking: Bool
+        public var hexRadius: Double
+        public var circleMinRadius: Double
+        public var circleMaxRadius: Double
+
+        public init(
+            voronoi: Bool = false,
+            delaunay: Bool = false,
+            hexGrid: Bool = false,
+            circlePacking: Bool = false,
+            hexRadius: Double = 60.0,
+            circleMinRadius: Double = 8.0,
+            circleMaxRadius: Double = 30.0
+        ) {
+            self.voronoi = voronoi
+            self.delaunay = delaunay
+            self.hexGrid = hexGrid
+            self.circlePacking = circlePacking
+            self.hexRadius = hexRadius
+            self.circleMinRadius = circleMinRadius
+            self.circleMaxRadius = circleMaxRadius
+        }
+
+        /// Read the switches out of a geometry profile.
+        public init(_ profile: GeometryPipelineProfile) {
+            self.init(
+                voronoi: profile.deriveVoronoi,
+                delaunay: profile.deriveDelaunay,
+                hexGrid: profile.deriveHexGrid,
+                circlePacking: profile.deriveCirclePacking,
+                hexRadius: profile.hexRadius,
+                circleMinRadius: profile.circleMinRadius,
+                circleMaxRadius: profile.circleMaxRadius
+            )
+        }
+
+        /// Put the switches onto a geometry profile, leaving the rest of it alone.
+        public func apply(to profile: inout GeometryPipelineProfile) {
+            profile.deriveVoronoi = voronoi
+            profile.deriveDelaunay = delaunay
+            profile.deriveHexGrid = hexGrid
+            profile.deriveCirclePacking = circlePacking
+            profile.hexRadius = hexRadius
+            profile.circleMinRadius = circleMinRadius
+            profile.circleMaxRadius = circleMaxRadius
+        }
+
+        public var derivesAnything: Bool {
+            voronoi || delaunay || hexGrid || circlePacking
+        }
+    }
+
     public var area: Area
     public var placeName: String
     /// Ticked sources, by id.
@@ -61,6 +126,25 @@ public struct Session: Codable, Sendable, Equatable {
     public var presetName: String
     public var qualityKey: String
     public var hiddenLayers: [String]
+    public var derived: Derived
+
+    /// Decoded field by field with a default for anything absent, so a file from
+    /// an older version — one written before a field existed — costs nothing but
+    /// that field. The synthesised decoder would throw the whole session away.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Session()
+        self.area = try container.decodeIfPresent(Area.self, forKey: .area) ?? defaults.area
+        self.placeName = try container.decodeIfPresent(String.self, forKey: .placeName) ?? defaults.placeName
+        self.enabledSources = try container.decodeIfPresent([String].self, forKey: .enabledSources) ?? defaults.enabledSources
+        self.sourcePaths = try container.decodeIfPresent([String: String].self, forKey: .sourcePaths) ?? [:]
+        self.sourceSettings = try container.decodeIfPresent([String: Double].self, forKey: .sourceSettings) ?? [:]
+        self.sourceChoices = try container.decodeIfPresent([String: String].self, forKey: .sourceChoices) ?? [:]
+        self.presetName = try container.decodeIfPresent(String.self, forKey: .presetName) ?? defaults.presetName
+        self.qualityKey = try container.decodeIfPresent(String.self, forKey: .qualityKey) ?? defaults.qualityKey
+        self.hiddenLayers = try container.decodeIfPresent([String].self, forKey: .hiddenLayers) ?? []
+        self.derived = try container.decodeIfPresent(Derived.self, forKey: .derived) ?? Derived()
+    }
 
     public init(
         area: Area = Area(west: 25.32, south: 36.33, east: 25.50, north: 36.48),
@@ -71,7 +155,8 @@ public struct Session: Codable, Sendable, Equatable {
         sourceChoices: [String: String] = [:],
         presetName: String = "Hypsometric Relief",
         qualityKey: String = Quality.default.key,
-        hiddenLayers: [String] = []
+        hiddenLayers: [String] = [],
+        derived: Derived = Derived()
     ) {
         self.area = area
         self.placeName = placeName
@@ -82,12 +167,16 @@ public struct Session: Codable, Sendable, Equatable {
         self.presetName = presetName
         self.qualityKey = qualityKey
         self.hiddenLayers = hiddenLayers
+        self.derived = derived
     }
 
     // MARK: - The source stack
 
     /// Capture a stack, keeping only what the user actually changed.
-    public init(stack: SourceStack, area: Area, placeName: String, preset: String, quality: String, hiddenLayers: [String]) {
+    public init(
+        stack: SourceStack, area: Area, placeName: String, preset: String,
+        quality: String, hiddenLayers: [String], derived: Derived = Derived()
+    ) {
         var paths: [String: String] = [:]
         var numbers: [String: Double] = [:]
         var choices: [String: String] = [:]
@@ -117,7 +206,8 @@ public struct Session: Codable, Sendable, Equatable {
             sourceChoices: choices,
             presetName: preset,
             qualityKey: quality,
-            hiddenLayers: hiddenLayers
+            hiddenLayers: hiddenLayers,
+            derived: derived
         )
     }
 
