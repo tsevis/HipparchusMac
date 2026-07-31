@@ -15,6 +15,7 @@ public enum LayerInventory {
 
     /// Display names for layers whose id is not presentable.
     public static let labels: [String: String] = [
+        "admin_boundaries": "Admin boundaries",
         "elevation_bands": "Elevation bands",
         "terrain_contours": "Contours",
         "terrain_index_contours": "Index contours",
@@ -61,6 +62,9 @@ public enum LayerInventory {
         "summits": "Terrain",
         "night_lights": "Terrain",
         "coastline": "Water & land",
+        // A border partitions land; it is measured geography, not invented
+        // geometry, and must not fall into the "Derived" fallback.
+        "admin_boundaries": "Water & land",
         "water": "Water & land",
         "parks": "Water & land",
         "forests": "Water & land",

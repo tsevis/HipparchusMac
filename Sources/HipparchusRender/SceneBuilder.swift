@@ -70,15 +70,20 @@ public struct SceneBuilder: Sendable {
     public static let preferredLayerOrder = [
         // Ground cover.
         "coastline", "water", "fields", "forests", "natural", "landuse", "parks",
-        // Relief.
+        // Relief. Night lights are iso-lines of brightness and sit with the
+        // relief they resemble — the panel already groups them under Terrain.
+        // (The Python's `_ordered_layers` omits them, so they painted over every
+        // label; ranking them is a deliberate divergence in the port's favour.)
         "elevation_bands", "terrain_hillshade", "bathymetry",
-        "terrain_contours", "terrain_index_contours",
+        "terrain_contours", "terrain_index_contours", "night_lights",
         // The built environment.
         "buildings", "barriers", "power",
         // Roads, major to minor.
         "roads_motorway", "roads_trunk", "roads_primary", "roads_secondary",
         "roads_tertiary", "roads_residential", "roads_service", "roads_other", "roads",
         "railways", "ferry_routes",
+        // A border draws above the network it usually follows, below every label.
+        "admin_boundaries",
         // Orbital geometry floats above the ground it passes over.
         "satellite_footprints", "satellite_tracks",
         // Measured point phenomena sit above the base map.

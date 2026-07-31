@@ -103,6 +103,29 @@ enum Sample {
 
 final class SceneBuilderTests: XCTestCase {
 
+    /// Every layer a source can produce has a place in the draw order.
+    ///
+    /// A name missing from the order sorts after everything named — so night
+    /// lights painted over every label and derived layer, while the panel filed
+    /// them under Terrain, and admin boundaries floated wherever the alphabet
+    /// put them. The Python has the same omission in `_ordered_layers`; ranking
+    /// them is a deliberate divergence in the port's favour. Iso-lines of light
+    /// sit with the relief they resemble; a border draws above the movement
+    /// network it usually follows and below every label.
+    func testEveryProducibleLayerHasAPlaceInTheDrawOrder() {
+        func rank(_ name: String) -> Int { SceneBuilder.rank(name) }
+        let unranked = SceneBuilder.preferredLayerOrder.count
+
+        XCTAssertLessThan(rank("night_lights"), unranked, "night_lights is not ranked")
+        XCTAssertLessThan(rank("admin_boundaries"), unranked, "admin_boundaries is not ranked")
+
+        XCTAssertGreaterThan(rank("night_lights"), rank("terrain_index_contours"))
+        XCTAssertLessThan(rank("night_lights"), rank("buildings"))
+
+        XCTAssertGreaterThan(rank("admin_boundaries"), rank("ferry_routes"))
+        XCTAssertLessThan(rank("admin_boundaries"), rank("summits"))
+    }
+
     func testLayersComeOutInDrawOrderWithGroundUnderLinework() throws {
         let scene = try Sample.scene()
         XCTAssertEqual(scene.layers.map(\.name), Sample.layerOrder)

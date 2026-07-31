@@ -77,6 +77,14 @@ final class LayerInventoryTests: XCTestCase {
 
     /// A ferry route is transport, and reads beside the railways rather than in
     /// with the lakes.
+    /// A national border is measured geography, not invented geometry. The
+    /// "Derived" fallback exists for layers nobody anticipated; a layer the file
+    /// sources produce by name is anticipated.
+    func testAdminBoundariesAreNotFiledUnderDerived() {
+        XCTAssertNotEqual(LayerInventory.group(for: "admin_boundaries"), "Derived")
+        XCTAssertEqual(LayerInventory.label(for: "admin_boundaries"), "Admin boundaries")
+    }
+
     func testFerryRoutesReadAsMovementRatherThanWater() {
         XCTAssertEqual(LayerInventory.label(for: "ferry_routes"), "Ferry routes")
         XCTAssertEqual(LayerInventory.group(for: "ferry_routes"), "Movement")
