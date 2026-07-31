@@ -131,17 +131,28 @@ final class MapModel {
     // MARK: - Searching for a place
 
     var searchQuery = ""
-    private(set) var searchResults: [PlaceSearch.Result] = []
+    private(set) var searchResults: [GeocodedPlace] = []
     private(set) var isSearching = false
     private(set) var searchMessage: String?
 
     private var searchTask: Task<Void, Never>?
+    /// Held for the app's lifetime rather than made fresh per search: its rate
+    /// limiter only enforces Nominatim's one-request-a-second policy if it
+    /// persists across calls.
+    private let nominatim = NominatimGeocoder()
 
     /// Look up whatever is in the box.
     ///
-    /// On submit rather than on every keystroke: MapKit's search is a network call,
-    /// and firing one per character is rude to a shared service and useless to
-    /// someone half-way through typing "Thessaloniki".
+    /// On submit rather than on every keystroke: both searches below are network
+    /// calls, and firing one per character is rude to a shared service and
+    /// useless to someone half-way through typing "Thessaloniki".
+    ///
+    /// Two geocoders, not one. MapKit is good at landmarks and addresses and
+    /// unreliable at named geographic areas — asked for "Lesvos" it can answer
+    /// with a taverna in Athens and never mention the island. Nominatim indexes
+    /// OpenStreetMap's own boundaries, so it answers the island reliably but
+    /// would miss a specific café. Queried together and merged, a real place
+    /// reads first and neither gap shows.
     func searchForPlace() {
         let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         searchTask?.cancel()
@@ -153,32 +164,47 @@ final class MapModel {
         }
 
         isSearching = true
-        searchTask = Task { [weak self] in
-            do {
-                let found = try await PlaceSearch().search(query)
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    self?.searchResults = found
-                    self?.isSearching = false
-                    self?.searchMessage = found.isEmpty ? "Nothing found for “\(query)”." : nil
+        searchTask = Task { [weak self, nominatim] in
+            // Neither search's failure should hide the other's answer: a
+            // Nominatim timeout must not erase a MapKit result that arrived
+            // fine, and the reverse. Only when *both* fail is this reported as a
+            // failure — said plainly, because a search that failed is not a
+            // place that does not exist, and the difference matters when the
+            // wifi is off.
+            async let mapKit = Self.attempt { try await PlaceSearch().search(query) }
+            async let osm = Self.attempt { try await nominatim.search(query) }
+            let (mapKitResult, osmResult) = await (mapKit, osm)
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self else { return }
+                self.isSearching = false
+                if case .failure(let error) = mapKitResult, case .failure = osmResult {
+                    self.searchResults = []
+                    self.searchMessage = "Could not search: \(error.localizedDescription)"
+                    return
                 }
-            } catch {
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    self?.searchResults = []
-                    self?.isSearching = false
-                    // Said plainly: a search that failed is not a place that does
-                    // not exist, and the difference matters when the wifi is off.
-                    self?.searchMessage = "Could not search: \(error.localizedDescription)"
-                }
+                let found = PlaceSearchMerge.merge(
+                    nominatim: (try? osmResult.get()) ?? [],
+                    mapKit: (try? mapKitResult.get()) ?? []
+                )
+                self.searchResults = found
+                self.searchMessage = found.isEmpty ? "Nothing found for “\(query)”." : nil
             }
         }
+    }
+
+    /// Run one search, keeping its failure to report rather than throwing it
+    /// away — so two geocoders can be tried together without either's error
+    /// silently winning over the other's success.
+    private static func attempt<T>(_ body: () async throws -> T) async -> Swift.Result<T, Error> {
+        do { return .success(try await body()) } catch { return .failure(error) }
     }
 
     /// Take a found place as the area. Does not fetch — pressing Update map is
     /// still the user's decision, and a search that framed the wrong Springfield
     /// should not have cost a minute of Overpass time.
-    func adopt(_ result: PlaceSearch.Result) {
+    func adopt(_ result: GeocodedPlace) {
         pendingAction = ("Choose Place", "area")
         setArea(result.bbox)
         placeName = result.name
@@ -758,14 +784,20 @@ final class MapModel {
     /// network from inside a sandbox, and a text field nobody can screenshot is a
     /// poor place to discover it was never entitled to.
     private func searchAndReport(_ query: String, thenRenderTo output: String?) {
-        Task { [weak self] in
-            let results: [PlaceSearch.Result]
-            do {
-                results = try await PlaceSearch().search(query)
-            } catch {
+        Task { [weak self, nominatim] in
+            async let mapKit = Self.attempt { try await PlaceSearch().search(query) }
+            async let osm = Self.attempt { try await nominatim.search(query) }
+            let (mapKitResult, osmResult) = await (mapKit, osm)
+
+            if case .failure(let error) = mapKitResult, case .failure = osmResult {
                 FileHandle.standardError.write(Data("search failed: \(error)\n".utf8))
                 exit(1)
             }
+            let results = PlaceSearchMerge.merge(
+                nominatim: (try? osmResult.get()) ?? [],
+                mapKit: (try? mapKitResult.get()) ?? []
+            )
+
             guard let first = results.first else {
                 FileHandle.standardError.write(Data("nothing found for \(query)\n".utf8))
                 exit(1)

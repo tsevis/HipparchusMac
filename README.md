@@ -125,12 +125,23 @@ results show the frame each one would give before you commit to it, and the
 coordinate boxes are still there, one disclosure away, for saying exactly which
 frame you want.
 
-Searching uses MapKit, so there is no key and no account. It reports a
-placemark's own extent where there is one, and the extent of the whole response
-where there is not — which is the difference between framing Everest and framing
-a 141-metre patch of rock, that being what MapKit answers for the mountain
-itself. It will also open straight onto an area, which is handy from a
-terminal or a script:
+Searching queries two geocoders and merges what they answer, still with no key
+and no account. MapKit is good at landmarks and addresses and unreliable at
+named geographic areas: asked for "Lesvos" it can answer with a taverna in
+Athens called "Ouzeri Lesvos" and never mention the island. Nominatim —
+OpenStreetMap's own geocoder, the same data the map layers already come from —
+indexes real boundary polygons, so it answers both "Lesvos" and "Limnos"
+correctly and unambiguously where MapKit alone conflated them with same-named
+decoys. A real boundary reads first; MapKit's results, better at the specific
+address or landmark Nominatim would miss, follow. Nominatim asks in return for
+at most one request a second, which `NominatimGeocoder` holds to for the same
+reason `OverpassProvider` already does.
+
+MapKit still supplies the placemark's own extent where it has one, and the
+extent of the whole response where it does not — the difference between
+framing Everest and framing a 141-metre patch of rock, that being what MapKit
+answers for the mountain itself. It will also open straight onto an area, which
+is handy from a terminal or a script:
 
 ```sh
 Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48

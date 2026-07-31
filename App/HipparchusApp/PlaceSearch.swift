@@ -1,3 +1,4 @@
+import HipparchusData
 import HipparchusGeometry
 import MapKit
 
@@ -8,20 +9,12 @@ import MapKit
 /// to begin, and the design puts them one disclosure away for that reason.
 ///
 /// Uses MapKit's own search rather than a geocoding API: no key, no account, and it
-/// is already linked for the locator.
+/// is already linked for the locator. It is good at landmarks and addresses and
+/// unreliable at named geographic areas — asked for "Lesvos" it can answer with a
+/// taverna in Athens named "Ouzeri Lesvos" and never mention the island at all — so
+/// `MapModel` also queries `NominatimGeocoder` and merges the two. Both speak the
+/// same `GeocodedPlace` for exactly that reason.
 struct PlaceSearch: Sendable {
-
-    /// One place the search found, with the frame it suggests.
-    struct Result: Identifiable, Sendable, Equatable {
-        let id = UUID()
-        let name: String
-        /// Where it is, spelled out — "Santorini, Greece" rather than "Santorini",
-        /// because a list of five identical names is not a choice.
-        let detail: String
-        let bbox: BoundingBox
-
-        static func == (lhs: Result, rhs: Result) -> Bool { lhs.id == rhs.id }
-    }
 
     /// A place with no stated extent. Big enough to hold a town, which is the
     /// commonest thing to search for and the size a map of one wants.
@@ -36,7 +29,7 @@ struct PlaceSearch: Sendable {
     /// not ask Overpass for a continent.
     static let maximumRadiusMetres = 120_000.0
 
-    func search(_ query: String) async throws -> [Result] {
+    func search(_ query: String) async throws -> [GeocodedPlace] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return [] }
 
@@ -52,16 +45,21 @@ struct PlaceSearch: Sendable {
         }
     }
 
-    static func result(for item: MKMapItem, within response: MKCoordinateRegion?) -> Result? {
+    static func result(for item: MKMapItem, within response: MKCoordinateRegion?) -> GeocodedPlace? {
         let placemark = item.placemark
         let centre = placemark.coordinate
         guard CLLocationCoordinate2DIsValid(centre) else { return nil }
 
         let name = item.name ?? placemark.name ?? "Unnamed place"
-        return Result(
+        return GeocodedPlace(
             name: name,
             detail: Self.detail(for: placemark, excluding: name),
-            bbox: Self.bbox(centre: centre, radiusMetres: Self.radius(for: placemark, within: response))
+            bbox: Self.bbox(centre: centre, radiusMetres: Self.radius(for: placemark, within: response)),
+            // A category means MapKit itself thinks this is a business or
+            // landmark rather than a place name — the sole signal it offers for
+            // telling the two apart, and a weak one, which is the whole reason
+            // Nominatim's real boundary categories are worth merging in.
+            isBoundary: item.pointOfInterestCategory == nil
         )
     }
 
