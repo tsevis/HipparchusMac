@@ -8,13 +8,19 @@ The Python application is the specification. It is finished, it works, and its
 454 tests are an executable description of the behaviour being ported. Anything
 here that disagrees with it is a bug here.
 
-**Status: the app is built.** Every online source, the composing source stack,
-the sixteen presets, illuminated contours, the three-column interface and the
-exports are in, with 454 tests and the output checked against real ground. See
-`KICKOFF.md` for the brief.
+**Status: the app is built, and the window has never been looked at.** Every
+online source, the composing source stack, the sixteen presets, illuminated
+contours, the three-column interface and the exports are in, with 572 tests and
+the output checked against real ground. See `KICKOFF.md` for the brief.
 
-Not built, and understood rather than undecided: reading GeoParquet directly —
-see "File sources" below for why, and for the one command that gets past it.
+Every claim here is backed by a test or by a render someone can open. **None of
+them is a claim about the interface**, because this environment has no Screen
+Recording permission and no window of any application can be captured. The model
+behind the window is verified; the layout is not, and "Verifying the app itself"
+below is as close as anything headless gets.
+
+What this port deliberately does not have is listed under "What is not here",
+which distinguishes decided-against from overlooked.
 
 ## Requirements
 
@@ -28,7 +34,7 @@ see "File sources" below for why, and for the one command that gets past it.
 
 ```sh
 swift build                 # the libraries and the CLI
-swift test -c release       # every test, about a second
+swift test -c release       # every test, about two seconds
 swift test                  # the same tests, about thirty seconds
 ```
 
@@ -56,7 +62,7 @@ Sources/HipparchusGEOS       the GEOS bridge, and the geometry that needs an eng
 Sources/HipparchusData       the source stack, every provider, the cache, progress
 Sources/HipparchusRender     presets, the scene builder, the canvas, SVG and PDF export
 Sources/hipparchus-cli       headless fetch → render → export, for checking real output
-App/                         project.yml and the SwiftUI views, which hold no logic
+App/                         project.yml, the SwiftUI views, and MapModel
 Vendor/geos                  the committed GEOS xcframework — see Docs/GEOS.md
 ```
 
@@ -65,6 +71,15 @@ HipparchusData ← HipparchusRender`. The Python had an import cycle between its
 data layer and its application layer that no test caught, because every test
 reached the application layer first. Separate targets make the same mistake a
 compile error.
+
+**`App/` is the one target with no tests, and it no longer holds no logic.** The
+views are still declarative, but `MapModel` decides what a change is worth
+naming in the undo menu, when a run of edits is one action, which settings reach
+which provider, and what the status bar says. Every rule underneath it lives in
+the package and is tested there — `SessionHistory` is a value type precisely so
+the undo rules could be — but the wiring that reads those rules is not, and it
+is the layer this project has least evidence about. Logic that grows here should
+move down rather than settle.
 
 ## Running it
 
@@ -263,6 +278,77 @@ know the water was reasoned rather than measured.
 - **Cancel cannot abort a request already in flight.** It skips sources that have
   not started, stops those that check between requests, and discards the result
   rather than drawing it. An HTTP request already sent runs to completion.
+
+## What is not here
+
+The Python is the specification, and a port that quietly drops things is worse
+than one that says which. Everything below exists there and not here **on
+purpose**; anything not listed is either ported or a bug. This list was
+assembled by auditing the Python module by module, because until that audit
+three layers were styled by every preset and populated by nothing, and nobody
+had noticed.
+
+**Whole features, not ported.**
+
+- **Saved presets.** `application/preset_store.py` lets a user name and keep
+  their own preset. Here `Session` stores the name of a built-in and nothing
+  else. The sixteen are a designed set; a seventeenth is a different feature —
+  a preset editor — and half of it (a save button with no way to edit what it
+  saves) would be worse than none.
+- **A settings store.** `core/settings_store.py` and the Settings tab it feeds:
+  theme, label font family and size, device scale, cache size limit, preview
+  tolerance. The two knobs from it that actually change a fetch — Overpass
+  timeout and rate — are inline settings on the OpenStreetMap source instead,
+  where the rest of a source's settings live. The remainder are appearance
+  preferences that macOS mostly answers already.
+- **Plugins.** `plugins/loader.py` and `plugins/interfaces.py` load extra
+  providers from `~/.hipparchus/plugins` at start-up. A Swift equivalent means
+  either dynamic loading into a sandboxed, signed app or an XPC service; both
+  are real projects, and neither is cartography.
+- **The AOI cache index.** `cache/index.py` keeps an `index.json` of endpoint,
+  area hash, layer-set hash and schema version beside the cache. Here the cache
+  key is a hash of the same things, so a changed query simply misses. What the
+  index buys that hashing does not is a cache a person can read and a size cap
+  to enforce; the size cap is the part worth adding first.
+- **An in-app diagnostics panel.** The Python's "Explain This Map" shows the
+  CRS, the quality profile and the invalid-geometry count in a window. The same
+  numbers are written beside every export as `<file>.diagnostics.json`, and the
+  status bar carries the summary — but nothing in the window explains itself
+  the way that panel does.
+- **Reading GeoParquet directly.** See "File sources" for the reason and for the
+  one `duckdb` command that gets past it.
+
+**Smaller divergences, each deliberate.**
+
+- **`supersample` is declared and unread.** `Quality.swift` carries it because
+  the profiles were ported whole, and "High Preview" advertises 1.5× where
+  nothing oversamples. Core Graphics antialiases where skia did not, so the
+  Python's reason for the knob does not survive the port. **It should be
+  implemented or deleted** — an advertised behaviour that does not happen is the
+  exact defect this file spends so long warning about, and listing it here is
+  not the same as fixing it.
+- **Simplification does not collapse collinear runs.** `simplification.py` walks
+  the vertex list removing redundant nodes; here GEOS `simplify` does the work
+  and nothing counts removed nodes afterwards.
+- **An unstyled layer draws as a hairline, not as a filled grey shape.** The
+  Python falls back to a default `LayerStyle` — a 1.0 dark stroke *with* a grey
+  fill enabled — so an unstyled polygon layer arrives filled. Here the fallback
+  is a 0.5 grey hairline with fill off, which shows that a new layer exists
+  without asserting a colour for it.
+- **The SVG has no per-path `id`.** Groups are named and carry
+  `data-layer-name`, which is what Illustrator reads; numbering every path
+  inflates the file for nothing.
+- **Launch configuration is flags, not environment variables.** `core/config.py`
+  reads start area, preset, sources, and the cache, plugin and preset
+  directories from the environment. The first three are command-line flags here;
+  the last three belong to features that are not ported.
+
+**Where this port goes further than the Python**, also on purpose: the road
+hierarchy caps each class separately, `ferry_routes` is its own layer, the
+Delaunay derivation and the derived-layer boundary both read the road hierarchy
+rather than a layer classification has already deleted, footprints are divided
+at the date line, `night_lights` and `admin_boundaries` have places in the draw
+order, and PDF and PNG export are real rather than stubs.
 
 ## Relations, and why they need assembling
 
