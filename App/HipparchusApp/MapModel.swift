@@ -801,6 +801,19 @@ final class MapModel {
             return
         }
 
+        // Exists for the same reason --search does: nobody can zoom out and
+        // click Update map in a screenshot-less environment, so this drives
+        // the real button code — the actual MapCanvasView, a real draw pass,
+        // the same syncAreaToVisibleView and fetch the click calls — end to
+        // end against a live fetch, rather than asking anyone to trust that
+        // the pieces work together.
+        if let flag = arguments.firstIndex(of: "--verify-zoom-then-update"), flag + 1 < arguments.count {
+            let factor = Double(arguments[flag + 1]) ?? 0.5
+            fetch()
+            verifyZoomThenUpdate(zoomFactor: factor)
+            return
+        }
+
         guard let flag = arguments.firstIndex(of: "--render-to"), flag + 1 < arguments.count else {
             // No area asked for and nothing to render: open on the restored session
             // and wait to be told what to do.
@@ -814,6 +827,95 @@ final class MapModel {
 
         fetch()
         renderWhenReady(to: URL(fileURLWithPath: arguments[flag + 1]))
+    }
+
+    /// Prove, against a real fetch, that zooming out and pressing Update map
+    /// fetches more than was there before — the exact claim nobody can watch
+    /// someone click. Runs the production code, not a re-implementation of it:
+    /// a real `MapCanvasView`, pushed through a real `draw(_:)` into an
+    /// offscreen bitmap context so its transform is the same one the window
+    /// would build, then the same `visibleArea()` and `syncAreaToVisibleView`
+    /// the button calls.
+    private func verifyZoomThenUpdate(zoomFactor: Double) {
+        Task { [weak self] in
+            for _ in 0..<3000 {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard let self else { return }
+                if !self.isFetching, self.scene != nil { break }
+            }
+            guard let self, let scene = self.scene, let before = self.bbox else {
+                FileHandle.standardError.write(Data("nothing fetched to test against\n".utf8))
+                exit(1)
+            }
+            let beforeFeatures = scene.layers.reduce(0) { $0 + $1.geometries.count }
+
+            let size = CGSize(width: 1600, height: 1200)
+
+            func visibleArea(atZoom zoom: Double) -> BoundingBox? {
+                let view = MapCanvasView()
+                view.frame = CGRect(origin: .zero, size: size)
+                view.scene = scene
+                view.viewport = ViewportState(zoom: zoom)
+
+                guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+                      let context = CGContext(
+                          data: nil, width: Int(size.width), height: Int(size.height),
+                          bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                      )
+                else { return nil }
+                // The same graphics-context dance CoreGraphicsRenderer.image(of:)
+                // uses to draw off screen — draw(_:) needs a current context to
+                // populate its transform at all.
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+                view.draw(view.bounds)
+                NSGraphicsContext.restoreGraphicsState()
+                return view.visibleArea()
+            }
+
+            func describe(_ box: BoundingBox) -> String {
+                String(
+                    format: "%.4f,%.4f -> %.4f,%.4f  (%.3f° × %.3f°)",
+                    box.minLon, box.minLat, box.maxLon, box.maxLat,
+                    abs(box.lonSpan), abs(box.latSpan)
+                )
+            }
+
+            // The true baseline is what the canvas shows at zoom 1 — not the
+            // bare requested bbox, which already differs from it by the fit
+            // margin and by however the content's own aspect ratio letterboxes
+            // against the canvas's. Comparing the zoomed-out view against the
+            // *requested* bbox instead would blame this feature for an effect
+            // that has nothing to do with it.
+            guard let atZoomOne = visibleArea(atZoom: 1), let visible = visibleArea(atZoom: zoomFactor) else {
+                FileHandle.standardError.write(Data("visibleArea() returned nil\n".utf8))
+                exit(1)
+            }
+
+            print("requested area:           \(describe(before))  ·  \(beforeFeatures) geometries")
+            print("on screen at zoom 1:      \(describe(atZoomOne))")
+            print("on screen at zoom \(zoomFactor):    \(describe(visible))")
+
+            let widenedByLon = visible.lonSpan / atZoomOne.lonSpan
+            let widenedByLat = visible.latSpan / atZoomOne.latSpan
+            let expected = 1.0 / zoomFactor
+            print(String(
+                format: "extent ratio vs. zoom 1: %.3f× lon, %.3f× lat  (expected %.3f×)",
+                widenedByLon, widenedByLat, expected
+            ))
+
+            self.syncAreaToVisibleView(visible)
+            self.fetch()
+            for _ in 0..<3000 {
+                try? await Task.sleep(for: .milliseconds(100))
+                if !self.isFetching { break }
+            }
+            let afterFeatures = self.scene?.layers.reduce(0) { $0 + $1.geometries.count } ?? 0
+            print("after re-fetch:           \(self.bbox.map(describe) ?? "nil")  ·  \(afterFeatures) geometries")
+            print(self.status)
+            exit(0)
+        }
     }
 
     /// Search for a place, print what came back, and optionally draw the first hit.

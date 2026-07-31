@@ -330,8 +330,36 @@ Update map re-fetched the same area as before while the screen still showed the
 wider view, and looked exactly like nothing had happened. `CanvasTransform` does
 the measuring — reading all four corners of the canvas rather than two opposite
 ones, since a turned viewport's visible ground is a turned rectangle and only
-the full corner set gives its true bounds — and it is tested there; the button
-itself is a few lines of wiring this environment cannot watch someone click.
+the full corner set gives its true bounds — and it is tested there.
+
+The button itself is a few lines of wiring this environment cannot watch
+someone click, so it is verified a different way: `--verify-zoom-then-update`
+builds the real `MapCanvasView`, pushes it through a real `draw(_:)` into an
+offscreen bitmap context so its transform is the one the window would build,
+then calls the exact `visibleArea()` and `syncAreaToVisibleView` the button
+does, against a live fetch.
+
+```bash
+Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48 --sources simulated_terrain --verify-zoom-then-update 0.5
+```
+
+```
+requested area:           25.3200,36.3300 -> 25.5000,36.4800  (0.180° × 0.150°)  ·  14355 geometries
+on screen at zoom 1:      25.2688,36.3198 -> 25.5512,36.4902  (0.282° × 0.170°)
+on screen at zoom 0.5:    25.1276,36.2344 -> 25.6924,36.5753  (0.565° × 0.341°)
+extent ratio vs. zoom 1: 2.000× lon, 2.000× lat  (expected 2.000×)
+after re-fetch:           25.1276,36.2344 -> 25.6924,36.5753  (0.565° × 0.341°)  ·  16212 geometries
+```
+
+The first version of this check compared the zoomed-out view against the
+*requested* bbox and got 3.14× instead of 2×. That was a bug in the check, not
+the feature: the requested bbox and what is actually on screen at zoom 1
+already differ, by the fit margin and by whatever the content's own aspect
+ratio letterboxes against the canvas's — comparing against the wrong baseline
+blamed this feature for an effect that had nothing to do with it. Against the
+right baseline — what zoom 1 actually shows — the ratio lands exactly on 2.000×
+in both directions, and the same check at zoom 2.0 and zoom 0.2 lands exactly
+on 0.500× and 5.000×.
 
 ## Undo
 
