@@ -83,14 +83,19 @@ data layer and its application layer that no test caught, because every test
 reached the application layer first. Separate targets make the same mistake a
 compile error.
 
-**`App/` is the one target with no tests, and it no longer holds no logic.** The
-views are still declarative, but `MapModel` decides what a change is worth
-naming in the undo menu, when a run of edits is one action, which settings reach
-which provider, and what the status bar says. Every rule underneath it lives in
-the package and is tested there — `SessionHistory` is a value type precisely so
-the undo rules could be — but the wiring that reads those rules is not, and it
-is the layer this project has least evidence about. Logic that grows here should
-move down rather than settle.
+**`App/` is the one target with no tests**, so what lives there is kept to
+wiring. The rules a change has to obey are values in the package, where they can
+be checked: `SessionHistory` decides what undo restores and when a run of edits
+is one action, and `SessionEdit` decides what the Edit menu calls it — naming
+that once lived in the window as three observers diffing model properties, where
+no rule could be checked without a person opening the menu and reading it. Every
+property observer now does the same thing: take a `Session`, hand it to those
+two, act on the answer.
+
+That leaves `MapModel` holding the parts that genuinely need the window — which
+provider a ticked source builds, what the status bar says, when to warn before
+an expensive fetch. It is still the layer this project has least evidence about.
+Logic that grows here should move down rather than settle.
 
 ## Running it
 

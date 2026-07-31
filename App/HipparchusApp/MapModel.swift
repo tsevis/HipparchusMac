@@ -35,11 +35,11 @@ final class MapModel {
         Place(name: "Myrtoan Sea", bbox: BoundingBox(minLon: 23.2, minLat: 36.3, maxLon: 24.2, maxLat: 37.1)),
     ]
 
-    var west = "25.32" { didSet { recordAreaChange() } }
-    var south = "36.33" { didSet { recordAreaChange() } }
-    var east = "25.50" { didSet { recordAreaChange() } }
-    var north = "36.48" { didSet { recordAreaChange() } }
-    var placeName = "Santorini" { didSet { recordAreaChange() } }
+    var west = "25.32" { didSet { record() } }
+    var south = "36.33" { didSet { record() } }
+    var east = "25.50" { didSet { record() } }
+    var north = "36.48" { didSet { record() } }
+    var placeName = "Santorini" { didSet { record() } }
 
     /// The area currently drawn, which is not the area in the boxes until Update map
     /// is pressed. Keeping them apart is what lets the boxes be edited without the
@@ -69,7 +69,7 @@ final class MapModel {
 
     // MARK: - What the map is made of
 
-    var stack = SourceStack() { didSet { recordStackChange(from: oldValue) } }
+    var stack = SourceStack() { didSet { record() } }
     var preset = Presets.preset("Hypsometric Relief") {
         didSet {
             guard oldValue.name != preset.name else { return }
@@ -79,13 +79,13 @@ final class MapModel {
             // sizes nothing could ever read: `derivations` starts at the struct
             // defaults and replaces the preset's profile wholesale.
             adoptDerivationSizes(from: preset)
-            record(action: "Change Preset")
+            record()
         }
     }
     var quality = Quality.default {
         didSet {
             guard oldValue.key != quality.key else { return }
-            record(action: "Change Quality")
+            record()
         }
     }
 
@@ -94,7 +94,7 @@ final class MapModel {
     /// Held apart from the preset because no preset enables one — all sixteen style
     /// the four derived layers and three tune their sizes, but every switch is off,
     /// here and in the Python. This is the switch.
-    var derivations = GeometryPipelineProfile() { didSet { recordDerivedChange(from: oldValue) } }
+    var derivations = GeometryPipelineProfile() { didSet { record() } }
 
     var derivesAnything: Bool {
         derivations.deriveVoronoi || derivations.deriveDelaunay
@@ -103,7 +103,7 @@ final class MapModel {
 
     /// Layers the user has hidden by hand. Kept separately from the scene so a
     /// re-fetch does not silently turn hidden layers back on.
-    var hiddenLayers: Set<String> = [] { didSet { recordVisibilityChange(from: oldValue) } }
+    var hiddenLayers: Set<String> = [] { didSet { record() } }
 
     // MARK: - The result
 
@@ -245,19 +245,28 @@ final class MapModel {
         )
     }
 
-    private func record(action: String, coalescing key: String? = nil) {
+    /// Record whatever just changed, named by diffing the session against the
+    /// one the history already holds.
+    ///
+    /// Every property observer calls this and none of them decides anything:
+    /// the naming rules are `SessionEdit`, in the package, where they are tested.
+    private func record() {
         guard !isRestoringState else {
             pendingAction = nil
             return
         }
-        let (name, coalescingKey) = pendingAction ?? (action, key)
-        pendingAction = nil
         guard let session = currentSession() else { return }
+
+        let named = pendingAction.map { SessionEdit.Description(action: $0.name, coalescingKey: $0.key) }
+            ?? SessionEdit.describe(from: history.current.session, to: session)
+        pendingAction = nil
+        guard let named else { return }
+
         if history.record(
-            session, action: name, coalescing: coalescingKey,
+            session, action: named.action, coalescing: named.coalescingKey,
             at: Date().timeIntervalSinceReferenceDate
         ) {
-            registerBoundary(named: name)
+            registerBoundary(named: named.action)
         }
     }
 
@@ -272,70 +281,6 @@ final class MapModel {
         derivations.circleMaxRadius = preset.geometryProfile.circleMaxRadius
     }
 
-    private func recordAreaChange() {
-        record(action: "Change Area", coalescing: "area")
-    }
-
-    /// Name the one thing that changed between two stacks. One user gesture
-    /// changes one thing, so the first difference found is the action.
-    private func recordStackChange(from old: SourceStack) {
-        guard !isRestoringState, old != stack else { return }
-        for definition in stack.definitions {
-            let id = definition.id
-            if old.isEnabled(id) != stack.isEnabled(id) {
-                return record(action: stack.isEnabled(id)
-                    ? "Enable \(definition.label)" : "Disable \(definition.label)")
-            }
-            if old.path(id) != stack.path(id) {
-                return record(action: "Choose File for \(definition.label)")
-            }
-            let before = old.changedSettings(for: id)
-            let after = stack.changedSettings(for: id)
-            if before != after {
-                let changed = Set(before.keys).union(after.keys).sorted()
-                    .first { before[$0] != after[$0] }
-                let label = changed.flatMap { definition.setting($0)?.label } ?? "Setting"
-                return record(
-                    action: "Change \(label)",
-                    coalescing: changed.map { "stack.\(id).\($0)" }
-                )
-            }
-        }
-        record(action: "Change Sources")
-    }
-
-    private func recordDerivedChange(from old: GeometryPipelineProfile) {
-        guard !isRestoringState else { return }
-        func switched(_ on: Bool, _ layer: String) -> String {
-            on ? "Turn On \(layer)" : "Turn Off \(layer)"
-        }
-        if old.deriveVoronoi != derivations.deriveVoronoi {
-            record(action: switched(derivations.deriveVoronoi, "Voronoi Cells"))
-        } else if old.deriveDelaunay != derivations.deriveDelaunay {
-            record(action: switched(derivations.deriveDelaunay, "Delaunay Mesh"))
-        } else if old.deriveHexGrid != derivations.deriveHexGrid {
-            record(action: switched(derivations.deriveHexGrid, "Hex Grid"))
-        } else if old.deriveCirclePacking != derivations.deriveCirclePacking {
-            record(action: switched(derivations.deriveCirclePacking, "Circle Packing"))
-        } else if old.hexRadius != derivations.hexRadius {
-            record(action: "Change Hex Size", coalescing: "derived.hexRadius")
-        } else if old.circleMinRadius != derivations.circleMinRadius {
-            record(action: "Change Circle Size", coalescing: "derived.circleMinRadius")
-        } else if old.circleMaxRadius != derivations.circleMaxRadius {
-            record(action: "Change Circle Size", coalescing: "derived.circleMaxRadius")
-        }
-        // Any other field of the profile is not a choice the panel offers, and
-        // not one the session records; nothing to undo.
-    }
-
-    private func recordVisibilityChange(from old: Set<String>) {
-        guard !isRestoringState else { return }
-        if let hidden = hiddenLayers.subtracting(old).first {
-            record(action: "Hide \(LayerInventory.label(for: hidden))")
-        } else if let shown = old.subtracting(hiddenLayers).first {
-            record(action: "Show \(LayerInventory.label(for: shown))")
-        }
-    }
 
     /// One `UndoManager` registration per history boundary, so ⌘Z steps map one
     /// to one onto intentions.
