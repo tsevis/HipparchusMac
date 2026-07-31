@@ -96,6 +96,24 @@ public struct BoundingBox: Sendable, Hashable {
         self.maxLat = maxLat
     }
 
+    /// From a centre point and a span, in degrees — the shape a live locator
+    /// map reports after every pan and zoom, and MapKit's own region carries
+    /// as `center`/`span`. Expressed in plain numbers rather than against
+    /// MapKit's type, so this is testable without importing MapKit here, and
+    /// so a locator is not the only thing that could ever produce one.
+    ///
+    /// Clamped to real coordinates rather than left to overflow: a locator
+    /// that starts at world scale, or is zoomed out past it, can report a
+    /// span wider than the world itself.
+    public init(centerLat: Double, centerLon: Double, latSpan: Double, lonSpan: Double) {
+        let halfLat = Swift.min(Swift.abs(latSpan), 180) / 2
+        let halfLon = Swift.min(Swift.abs(lonSpan), 360) / 2
+        self.minLat = Swift.max(centerLat - halfLat, -90)
+        self.maxLat = Swift.min(centerLat + halfLat, 90)
+        self.minLon = Swift.max(centerLon - halfLon, -180)
+        self.maxLon = Swift.min(centerLon + halfLon, 180)
+    }
+
     public var lonSpan: Double { maxLon - minLon }
     public var latSpan: Double { maxLat - minLat }
     public var bounds: Bounds {

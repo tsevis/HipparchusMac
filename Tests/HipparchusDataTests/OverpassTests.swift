@@ -275,6 +275,31 @@ final class OverpassProviderTests: XCTestCase {
             "most of that measured wait was layers nobody asked for"
         )
     }
+
+    // MARK: - Refused outright, not merely warned about
+
+    /// A locator that can be panned to the whole world makes it an easy
+    /// accident to ask Overpass for the entire planet. Above this size there
+    /// is no legitimate single query, and the shared public service should
+    /// not be asked to try — a warning that can be clicked through is not
+    /// enough here.
+    func testAnAbsurdlyLargeAreaIsRefusedOutright() {
+        let planet = BoundingBox(minLon: -180, minLat: -85, maxLon: 180, maxLat: 85)
+        XCTAssertTrue(FetchCost.isTooLargeToFetch(bbox: planet))
+        XCTAssertTrue(FetchCost.refusalMessage(bbox: planet).lowercased().contains("too large"))
+    }
+
+    func testACountrySizedAreaIsNotRefusedOnlyWarned() {
+        // Roughly metropolitan France — large, and a legitimate (if slow)
+        // single query, not something to refuse outright.
+        let france = BoundingBox(minLon: -5.0, minLat: 42.3, maxLon: 8.3, maxLat: 51.1)
+        XCTAssertFalse(FetchCost.isTooLargeToFetch(bbox: france))
+        XCTAssertTrue(FetchCost.shouldWarn(bbox: france, layers: []), "still large enough to warn about")
+    }
+
+    func testTheRefusalThresholdIsWellAboveTheWarningThreshold() {
+        XCTAssertGreaterThan(FetchCost.refuseAboveSquareDegrees, FetchCost.warnAboveSquareDegrees * 100)
+    }
 }
 
 final class CacheStoreTests: XCTestCase {

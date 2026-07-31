@@ -501,6 +501,15 @@ final class MapModel {
             status = "Those coordinates do not make an area. West must be less than east, south less than north."
             return
         }
+        if stack.isEnabled(SourceID.overpass), FetchCost.isTooLargeToFetch(bbox: bbox) {
+            // Refused, not warned about: a locator that can be panned to the
+            // whole world makes it an easy accident to ask for the entire
+            // planet, and a warning that can be clicked through is not enough
+            // for that.
+            isError = true
+            status = FetchCost.refusalMessage(bbox: bbox)
+            return
+        }
         if stack.isEnabled(SourceID.overpass),
            FetchCost.shouldWarn(bbox: bbox, layers: []),
            pendingWarning == nil {

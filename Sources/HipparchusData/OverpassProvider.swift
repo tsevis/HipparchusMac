@@ -213,4 +213,26 @@ public enum FetchCost {
         will be much faster.
         """
     }
+
+    /// Beyond this, OpenStreetMap is refused outright rather than merely warned
+    /// about. A locator that can be panned to the whole world makes it an easy
+    /// accident to ask for the entire planet, and past a few hundred square
+    /// degrees — comfortably more than a large country — there is no
+    /// legitimate single query left, only one the shared public service
+    /// should not be asked to try. `warning(bbox:)`'s own linear estimate
+    /// would otherwise answer with something like "3,366,000 minutes," which
+    /// reads as broken rather than as the plain "no" this is instead.
+    public static let refuseAboveSquareDegrees = 300.0
+
+    public static func isTooLargeToFetch(bbox: BoundingBox) -> Bool {
+        let area = abs(bbox.maxLon - bbox.minLon) * abs(bbox.maxLat - bbox.minLat)
+        return area > refuseAboveSquareDegrees
+    }
+
+    public static func refusalMessage(bbox: BoundingBox) -> String {
+        "This area is too large for OpenStreetMap to answer. Choose something "
+            + "no bigger than roughly \(Int(refuseAboveSquareDegrees.squareRoot()))° × "
+            + "\(Int(refuseAboveSquareDegrees.squareRoot()))°, or turn OpenStreetMap off "
+            + "and use Elevation or another source instead."
+    }
 }
