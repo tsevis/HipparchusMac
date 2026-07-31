@@ -134,6 +134,150 @@ final class USGSProviderTests: XCTestCase {
         XCTAssertEqual(items["orderby"], "magnitude")
     }
 
+    // MARK: - What a live catalogue actually sends
+
+    /// A depth class boundary belongs to the deeper class, as seismology has it:
+    /// 70 km is intermediate, not shallow, and 300 km is deep.
+    func testDepthClassBoundariesFallOnTheDeeperSide() {
+        XCTAssertEqual(EarthquakeLayer.forDepth(69.9), EarthquakeLayer.shallow)
+        XCTAssertEqual(EarthquakeLayer.forDepth(70), EarthquakeLayer.intermediate)
+        XCTAssertEqual(EarthquakeLayer.forDepth(299.9), EarthquakeLayer.intermediate)
+        XCTAssertEqual(EarthquakeLayer.forDepth(300), EarthquakeLayer.deep)
+    }
+
+    /// USGS carries depth as a third ordinate, and sometimes omits it. An event
+    /// at an unknown depth is a shallow event rather than a dropped one.
+    func testAnEventWithoutADepthIsTreatedAsShallow() async throws {
+        let collection = try await provider(StubGET("""
+            {"features": [
+              {"id": "flat", "geometry": {"type": "Point", "coordinates": [23.5, 36.7]},
+               "properties": {"mag": 5.0, "time": 1750000000000}}
+            ]}
+            """)).fetch(query)
+
+        XCTAssertEqual(collection.features(in: EarthquakeLayer.shallow).count, 1)
+        XCTAssertEqual(
+            collection.features(in: EarthquakeLayer.shallow).first?.property("depth_km")?.doubleValue, 0
+        )
+    }
+
+    /// The catalogue carries events still being reviewed, whose magnitude is
+    /// null. A circle scaled by nothing is not a measurement.
+    func testEventsWithoutAMagnitudeAreSkipped() async throws {
+        let collection = try await provider(StubGET("""
+            {"features": [
+              {"id": "pending", "geometry": {"type": "Point", "coordinates": [23.5, 36.7, 10]},
+               "properties": {"mag": null, "time": 1750000000000}},
+              {"id": "good", "geometry": {"type": "Point", "coordinates": [23.6, 36.8, 10]},
+               "properties": {"mag": 4.2, "time": 1750000000000}}
+            ]}
+            """)).fetch(query)
+
+        XCTAssertEqual(collection.features(in: EarthquakeLayer.shallow).map(\.id), ["good"])
+        XCTAssertEqual(collection.metadata["event_count"]?.doubleValue, 1)
+    }
+
+    func testEventsWithoutCoordinatesAreSkipped() async throws {
+        let collection = try await provider(StubGET("""
+            {"features": [
+              {"id": "nowhere", "geometry": {"type": "Point", "coordinates": []},
+               "properties": {"mag": 6.0, "time": 1750000000000}}
+            ]}
+            """)).fetch(query)
+
+        XCTAssertEqual(collection.metadata["event_count"]?.doubleValue, 0)
+        XCTAssertEqual(collection.features(in: EarthquakeLayer.shallow), [])
+    }
+
+    /// A quiet fortnight is a fact about the ground, not a failure. Every layer
+    /// is still present, so the panel says "none here" rather than vanishing.
+    func testAnEmptyCatalogueIsNotAnError() async throws {
+        let collection = try await provider(StubGET(#"{"features": []}"#)).fetch(query)
+
+        XCTAssertEqual(collection.metadata["event_count"]?.doubleValue, 0)
+        XCTAssertEqual(collection.metadata["strongest_magnitude"]?.doubleValue, 0)
+        for layer in EarthquakeLayer.all {
+            XCTAssertNotNil(collection.featuresByLayer[layer], "\(layer) went missing entirely")
+            XCTAssertEqual(collection.features(in: layer), [])
+        }
+    }
+
+    /// A response that is not JSON at all — an outage page, a proxy notice — must
+    /// not read as an area with no earthquakes in it.
+    func testAResponseThatIsNotACatalogueYieldsNoEvents() async throws {
+        let collection = try await provider(StubGET("<html>service unavailable</html>")).fetch(query)
+        XCTAssertEqual(collection.metadata["event_count"]?.doubleValue, 0)
+    }
+
+    // MARK: - What the metadata claims
+
+    func testMetadataSummarisesTheCatalogueWindow() async throws {
+        let collection = try await provider(StubGET(catalogue)).fetch(query)
+
+        XCTAssertEqual(collection.metadata["source"]?.stringValue, SourceID.usgsEarthquakes)
+        XCTAssertEqual(collection.metadata["event_count"]?.doubleValue, 3)
+        XCTAssertEqual(collection.metadata["strongest_magnitude"]?.doubleValue, 5.4)
+        XCTAssertEqual(collection.metadata["window_days"]?.doubleValue, 1825)
+        XCTAssertEqual(collection.metadata["truncated"]?.boolValue, false)
+    }
+
+    /// A catalogue cut off at the limit is a sample, not a census, and the
+    /// difference is the whole reason the flag exists.
+    func testHittingTheLimitIsReported() async throws {
+        var settings = SeismicitySettings()
+        settings.limit = 3
+        let provider = USGSEarthquakeProvider(
+            settings: settings, http: StubGET(catalogue), now: { Date(timeIntervalSince1970: 1_780_000_000) }
+        )
+        let metadata = try await provider.fetch(query).metadata
+        XCTAssertEqual(metadata["truncated"]?.boolValue, true)
+    }
+
+    func testEventsCarryMagnitudeDepthPlaceAndTime() async throws {
+        let collection = try await provider(StubGET(catalogue)).fetch(query)
+        let event = try XCTUnwrap(collection.features(in: EarthquakeLayer.shallow).first)
+
+        XCTAssertEqual(event.property("magnitude")?.doubleValue, 5.4)
+        XCTAssertEqual(event.property("depth_km")?.doubleValue, 12)
+        XCTAssertEqual(event.property("place")?.stringValue, "Aegean Sea")
+        XCTAssertEqual(event.property("url")?.stringValue, "https://example.invalid/us1")
+        XCTAssertTrue(
+            event.property("event_time")?.stringValue?.hasPrefix("2025") ?? false,
+            "epoch milliseconds did not become a readable time"
+        )
+        // Provenance is load-bearing: this is measured geophysics.
+        XCTAssertEqual(event.provenance, .measured)
+        XCTAssertEqual(event.source, SourceID.usgsEarthquakes)
+    }
+
+    // MARK: - How big a circle gets
+
+    /// A radius fixed in degrees would vanish on a city map and swamp a world
+    /// one, so it is a fraction of the window's shorter side.
+    func testSymbolsScaleWithTheWindow() async throws {
+        func width(_ query: BBoxQuery) async throws -> Double {
+            let collection = try await provider(StubGET(catalogue)).fetch(query)
+            let event = try XCTUnwrap(collection.features(in: EarthquakeLayer.shallow).first)
+            guard case .polygon(let polygon) = event.geometry else { throw StubError() }
+            return try XCTUnwrap(polygon.bounds).width
+        }
+
+        let wide = try await width(BBoxQuery(minLon: 20, minLat: 34, maxLon: 29, maxLat: 41))
+        let narrow = try await width(BBoxQuery(minLon: 23.4, minLat: 36.6, maxLon: 23.6, maxLat: 36.8))
+        XCTAssertGreaterThan(wide, narrow * 5, "the symbol did not follow the window")
+    }
+
+    /// Magnitude is logarithmic and the radius grows with it, so without a cap a
+    /// single M9 would cover the whole sheet.
+    func testHugeEventsAreCapped() {
+        var settings = SeismicitySettings()
+        settings.maxRadiusFraction = 0.02
+        let provider = USGSEarthquakeProvider(settings: settings)
+
+        XCTAssertEqual(provider.radius(for: 9.1, span: 7.0), 7.0 * 0.02, accuracy: 1e-9)
+        XCTAssertLessThan(provider.radius(for: 4.0, span: 7.0), 7.0 * 0.02)
+    }
+
     func testAnUnreachableServiceIsAnErrorRatherThanAnEmptyMap() async {
         let http = StubGET(responses: [.failure(StubError())])
         do {
@@ -319,6 +463,84 @@ final class GIBSProviderTests: XCTestCase {
             items["BBOX"], "36.3,23.2,37.1,24.2",
             "BBOX must read minLat,minLon,maxLat,maxLon — reversing it fetches the wrong place"
         )
+    }
+
+    /// A flat image of one value, for the cases where there is no gradient to
+    /// trace: an all-white city core, or an all-black sea.
+    private func flatImageData(_ value: UInt8, width: Int = 64, height: Int = 64) throws -> Data {
+        var pixels = [UInt8](repeating: 255, count: width * height * 4)
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            pixels[index] = value
+            pixels[index + 1] = value
+            pixels[index + 2] = value
+        }
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try XCTUnwrap(CGContext(
+            data: &pixels, width: width, height: height,
+            bitsPerComponent: 8, bytesPerRow: width * 4, space: space,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        let image = try XCTUnwrap(context.makeImage())
+        let output = NSMutableData()
+        let destination = try XCTUnwrap(
+            CGImageDestinationCreateWithData(output, "public.png" as CFString, 1, nil)
+        )
+        CGImageDestinationAddImage(destination, image, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return output as Data
+    }
+
+    /// **Kickoff detail 10.** GIBS is rendered brightness, and a city core clips
+    /// to white. Clipped pixels have no gradient, so they yield no contours — and
+    /// an empty layer that says nothing is indistinguishable from an unlit
+    /// countryside. The map has to report the saturation instead.
+    func testASaturatedWindowIsReportedRatherThanSilentlyEmpty() async throws {
+        let collection = try await GIBSImageryProvider(http: StubGET(data: try flatImageData(255)))
+            .fetch(query)
+
+        XCTAssertEqual(collection.features(in: NightLightsLayer.name), [])
+        XCTAssertEqual(collection.metadata["saturated"]?.boolValue, true)
+    }
+
+    /// An unlit area is genuinely empty, and must not claim saturation.
+    func testAnUnlitWindowIsEmptyWithoutClaimingSaturation() async throws {
+        let collection = try await GIBSImageryProvider(http: StubGET(data: try flatImageData(0)))
+            .fetch(query)
+
+        XCTAssertEqual(collection.features(in: NightLightsLayer.name), [])
+        XCTAssertEqual(collection.metadata["saturated"]?.boolValue, false)
+    }
+
+    /// Black Marble is a static composite, so the default request names no epoch
+    /// and takes whatever GIBS considers current. Sending an empty `TIME` would
+    /// be asking for a date of nothing.
+    func testADateIsOnlySentWhenConfigured() throws {
+        let undated = try XCTUnwrap(
+            GIBSImageryProvider().requestURL(bbox: query.bbox, width: 100, height: 80)
+        )
+        XCTAssertNil(queryItems(undated)["TIME"])
+
+        var settings = SatelliteImagerySettings()
+        settings.date = "2024-01-15"
+        let dated = try XCTUnwrap(
+            GIBSImageryProvider(settings: settings).requestURL(bbox: query.bbox, width: 100, height: 80)
+        )
+        XCTAssertEqual(queryItems(dated)["TIME"], "2024-01-15")
+    }
+
+    /// Retrying is what gets past a transient 500; retrying forever is a hang.
+    func testRetriesAreBoundedRatherThanEndless() async throws {
+        var settings = SatelliteImagerySettings()
+        settings.maxAttempts = 3
+        settings.retryDelay = .zero
+
+        let http = StubGET(responses: (0..<10).map { _ in .failure(StubError()) })
+        do {
+            _ = try await GIBSImageryProvider(settings: settings, http: http).fetch(query)
+            XCTFail("an imagery source that never answered must not look like a dark map")
+        } catch is SatelliteImageryError {
+            XCTAssertEqual(http.urls.count, 3, "the attempt budget was not honoured")
+        }
     }
 
     func testTheImageMatchesTheAreaAspect() {

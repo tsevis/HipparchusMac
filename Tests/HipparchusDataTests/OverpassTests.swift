@@ -325,6 +325,55 @@ final class CacheStoreTests: XCTestCase {
     }
 }
 
+// MARK: - The rate limiter
+
+/// The public Overpass instances are shared and unmetered, so this port has to
+/// be a good citizen of them without being told.
+final class RateLimiterTests: XCTestCase {
+
+    /// The first caller goes straight through — a limiter that made everyone wait
+    /// would add its interval to every fetch for nothing.
+    func testTheFirstTurnIsNotDelayed() async {
+        let limiter = RateLimiter(requestsPerSecond: 2)
+        let started = ContinuousClock.now
+        await limiter.waitTurn()
+        XCTAssertLessThan(ContinuousClock.now - started, .milliseconds(50))
+    }
+
+    /// The second is spaced by the configured interval.
+    func testCallsAreSpacedByTheConfiguredRate() async {
+        let limiter = RateLimiter(requestsPerSecond: 20)
+        let started = ContinuousClock.now
+        await limiter.waitTurn()
+        await limiter.waitTurn()
+
+        // Twenty a second is one every fifty milliseconds; the margin is for a
+        // sleep that may wake slightly early.
+        XCTAssertGreaterThanOrEqual(ContinuousClock.now - started, .milliseconds(45))
+    }
+
+    /// Concurrent callers queue behind one another rather than all going at once
+    /// — the point of the limiter being an actor rather than a per-caller wait.
+    func testConcurrentCallersAreSpacedToo() async {
+        let limiter = RateLimiter(requestsPerSecond: 20)
+        let started = ContinuousClock.now
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<3 {
+                group.addTask { await limiter.waitTurn() }
+            }
+        }
+        XCTAssertGreaterThanOrEqual(ContinuousClock.now - started, .milliseconds(90))
+    }
+
+    /// A nonsensical rate must not divide by zero and hang for ever.
+    func testAnImpossibleRateIsClampedRatherThanHanging() async {
+        let limiter = RateLimiter(requestsPerSecond: 0)
+        let started = ContinuousClock.now
+        await limiter.waitTurn()
+        XCTAssertLessThan(ContinuousClock.now - started, .milliseconds(50))
+    }
+}
+
 /// Relations are 1 097 of the elements in an Athens fetch — mostly buildings with
 /// courtyards, plus the Aegean Sea. They used to be dropped outright, because
 /// `out geom` resolves each member way's vertices without joining any of them up.

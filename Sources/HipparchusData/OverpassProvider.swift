@@ -55,13 +55,26 @@ public actor RateLimiter {
     }
 
     public func waitTurn() async {
-        if let lastRequest {
-            let elapsed = ContinuousClock.now - lastRequest
-            if elapsed < minimumInterval {
-                try? await Task.sleep(for: minimumInterval - elapsed)
-            }
+        let now = ContinuousClock.now
+
+        // The slot is claimed *before* sleeping, not after waking.
+        //
+        // `await` releases the actor, so callers that read the same
+        // `lastRequest` before any of them slept would all compute the same
+        // delay, wake together and fire at once — the limiter spacing nothing
+        // precisely when several fetches run concurrently, which is the case it
+        // exists for. Reserving first hands each caller its own slot.
+        let slot: ContinuousClock.Instant
+        if let lastRequest, lastRequest + minimumInterval > now {
+            slot = lastRequest + minimumInterval
+        } else {
+            slot = now
         }
-        lastRequest = ContinuousClock.now
+        lastRequest = slot
+
+        if slot > now {
+            try? await Task.sleep(until: slot, clock: ContinuousClock())
+        }
     }
 }
 
