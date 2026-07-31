@@ -766,6 +766,32 @@ final class DerivedLayerTests: XCTestCase {
         XCTAssertTrue(packing.geometries.allSatisfy(\.hasArea))
     }
 
+    /// A frame that is only roads still has a boundary to derive inside.
+    ///
+    /// The road hierarchy split deletes the generic "roads" layer before the
+    /// boundary is computed, so a boundary that reads "roads" by name sees a road
+    /// network of zero geometries — and in a rural frame with no buildings, water
+    /// or parks that meant every derived layer silently produced nothing while
+    /// the Derived panel said it was on.
+    func testARoadsOnlyFrameStillDerives() throws {
+        var collection = townCollection()
+        collection = FeatureCollection(
+            featuresByLayer: ["roads": collection.featuresByLayer["roads"] ?? []],
+            metadata: collection.metadata,
+            bbox: collection.bbox,
+            provenance: .measured
+        )
+        var profile = GeometryPipelineProfile()
+        profile.deriveHexGrid = true
+        profile.hexRadius = 120
+        let scene = try SceneBuilder(options: SceneBuilder.Options(
+            quality: Quality.profile("export_clean"), derivations: profile
+        )).build(from: collection)
+
+        let grid = try XCTUnwrap(layer(scene, "hex_grid"), "the road network was invisible to the boundary")
+        XCTAssertGreaterThan(grid.geometries.count, 10)
+    }
+
     /// A derived layer is drawn, not just built.
     func testADerivedLayerReachesTheCanvasAndTheLayerPanel() throws {
         let scene = try scene {

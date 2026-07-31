@@ -484,9 +484,13 @@ public struct SceneBuilder: Sendable {
     /// inlets, and a hex grid clipped to it would be lace rather than a grid, so
     /// the hull is what the derivations are built inside.
     private func sceneBoundary(from layers: [RenderLayer], geos: GEOSContext) throws -> Geometry? {
-        let candidates = ["buildings", "water", "parks", "roads"].flatMap { name in
-            layers.first { $0.name == name }?.geometries ?? []
-        }
+        // "roads" as well as the hierarchy: classification deletes the generic
+        // layer when it has anything to classify, but a source that already
+        // speaks the hierarchy bypasses it, and this must see roads either way.
+        let candidates = (["buildings", "water", "parks", "roads"] + Self.roadHierarchy)
+            .flatMap { name in
+                layers.first { $0.name == name }?.geometries ?? []
+            }
         guard !candidates.isEmpty else { return nil }
 
         // Unioning thousands of geometries is very expensive, and for a preview the
