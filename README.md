@@ -166,6 +166,52 @@ exists for the same reason `--search` does: a button is not something a
 screenshot-less environment can click, so this drives the real
 clipboard-reading code and prints what it found.
 
+**The Locator**, in the Frame panel, is a fourth way in: a real, live map of the
+whole world, to drag and pinch rather than search or type. It starts at world
+scale regardless of whatever area is already requested — a mirror of the main
+canvas would put you back where you started — and every pan or zoom becomes the
+requested area, the same one Update map then fetches. The area can also change
+from elsewhere — a search result, a saved place, typed coordinates, a pasted
+clipboard — and the Locator moves to show that too, without that reflected move
+being mistaken for a fresh drag and bouncing back out to the requested area a
+second time. A region this view is *told* to show is marked before it is set;
+the delegate callback that same `setRegion` triggers checks that mark and skips
+reporting it.
+
+Nobody can drag this map in a screenshot-less environment either, so it is
+verified the same way as the rest: driving the real `Coordinator` and a real
+`MKMapView` directly, establishing the world-scale starting region exactly as
+the live view does, then setting a region the same way a finished pan or zoom
+gesture would, with no mark beforehand.
+
+```sh
+Hipparchus.app/Contents/MacOS/Hipparchus --verify-locator 37.976,23.735,0.32,0.32
+Hipparchus.app/Contents/MacOS/Hipparchus --verify-locator 19.6,-155.4,1.4,1.4
+```
+
+```
+reported: 23.458214,37.816000 -> 24.011786,38.136000  (0.5536° × 0.3200°)
+reported: -156.413278,18.900000 -> -154.386722,20.300000  (2.0266° × 1.4000°)
+```
+
+The starting region is never reported back, and the simulated gesture is,
+with the requested latitude span exact and the longitude span wider by
+exactly the view's aspect ratio divided by the cosine of latitude — Mercator's
+own distortion, not an error. The first version of this check called the
+delegate a second time by hand after `setRegion`, on the assumption a windowless
+view might not fire it on its own; it does, synchronously, and that redundant
+second call landed after the real one had already cleared the mark, reading
+as a second, unmarked change and failing every run. That was a bug in the
+check, not in the Locator, which never calls the delegate itself.
+
+A locator that starts at world scale makes it an easy accident to drag out to
+the whole planet and press Update map. Past a few hundred square degrees —
+comfortably more than a large country — OpenStreetMap is refused outright
+rather than merely warned about: `FetchCost`'s own linear time estimate would
+otherwise answer with something like "3,366,000 minutes," which reads as
+broken rather than as the plain no this is instead. Turning OpenStreetMap off
+and fetching Elevation or another source alone still works at any size.
+
 The CLI does the same thing headlessly and writes PNG, SVG, PDF and a
 diagnostics JSON:
 

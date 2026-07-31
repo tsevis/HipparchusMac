@@ -451,6 +451,14 @@ final class MapModel {
         setArea(bbox)
     }
 
+    /// Set the area from the locator: the world map you can pan, zoom and
+    /// search on before anything has ever been fetched, when the main canvas
+    /// has nothing yet to draw a selection on top of.
+    func browseWorldMap(to bbox: BoundingBox) {
+        pendingAction = ("Browse World Map", "area")
+        setArea(bbox)
+    }
+
     func setArea(_ bbox: BoundingBox) {
         // Adopted searches route through here already carrying their own name.
         if pendingAction == nil { pendingAction = ("Draw Area", "area") }
@@ -816,6 +824,21 @@ final class MapModel {
         // the same syncAreaToVisibleView and fetch the click calls — end to
         // end against a live fetch, rather than asking anyone to trust that
         // the pieces work together.
+        // Exists for the same reason --search does: nobody can drag the
+        // locator map in a screenshot-less environment, so this drives the
+        // real Coordinator and a real MKMapView directly against known
+        // real-world coordinates.
+        if let flag = arguments.firstIndex(of: "--verify-locator"), flag + 1 < arguments.count {
+            let parts = arguments[flag + 1].split(separator: ",").compactMap { Double($0) }
+            guard parts.count == 4 else {
+                print("error: --verify-locator needs centerLat,centerLon,latSpan,lonSpan")
+                exit(2)
+            }
+            print(verifyLocatorRegionConversion(
+                centerLat: parts[0], centerLon: parts[1], latSpan: parts[2], lonSpan: parts[3]
+            ))
+            exit(0)
+        }
         if let flag = arguments.firstIndex(of: "--verify-zoom-then-update"), flag + 1 < arguments.count {
             let factor = Double(arguments[flag + 1]) ?? 0.5
             fetch()
