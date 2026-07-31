@@ -77,6 +77,60 @@ final class LayerInventoryTests: XCTestCase {
 
     /// A ferry route is transport, and reads beside the railways rather than in
     /// with the lakes.
+    /// The row reads its tick from the layer it describes, so a layer hidden by
+    /// a preset arrives in the panel already unticked.
+    func testVisibilityIsCarriedFromTheLayerStyle() throws {
+        var hidden = RenderLayer(name: "terrain_contours", rawFeatureCount: 2)
+        hidden.style.visible = false
+        hidden.append(.lineString(LineString([Coordinate(x: 0, y: 0), Coordinate(x: 1, y: 1)])))
+        var shown = RenderLayer(name: "roads", rawFeatureCount: 2)
+        shown.append(.lineString(LineString([Coordinate(x: 0, y: 0), Coordinate(x: 1, y: 1)])))
+
+        let rows = LayerInventory.entries(for: RenderScene(layers: [hidden, shown]))
+        XCTAssertEqual(rows.first { $0.layerID == "terrain_contours" }?.visible, false)
+        XCTAssertEqual(rows.first { $0.layerID == "roads" }?.visible, true)
+    }
+
+    /// A heading with nothing under it is furniture. Only groups the map
+    /// actually used appear.
+    func testEmptyGroupsAreNotShown() throws {
+        var contours = RenderLayer(name: "terrain_contours", rawFeatureCount: 1)
+        contours.append(.lineString(LineString([Coordinate(x: 0, y: 0), Coordinate(x: 1, y: 1)])))
+        let groups = LayerInventory.grouped(for: RenderScene(layers: [contours])).map(\.group)
+        XCTAssertEqual(groups, ["Terrain"])
+    }
+
+    /// Every group a layer can land in is one the panel knows how to order. A
+    /// group outside `groupOrder` would sort last by accident rather than by
+    /// design — which is how admin boundaries ended up filed under Derived.
+    func testGroupOrderCoversEveryGroupUsed() throws {
+        func line(_ name: String) -> RenderLayer {
+            var layer = RenderLayer(name: name, rawFeatureCount: 1)
+            layer.append(.lineString(LineString([Coordinate(x: 0, y: 0), Coordinate(x: 1, y: 1)])))
+            return layer
+        }
+        var places = RenderLayer(name: "places", rawFeatureCount: 1)
+        places.labels.append(PlaceLabel(name: "Thera", position: Coordinate(x: 0, y: 0)))
+
+        let scene = RenderScene(layers: [
+            line("terrain_contours"), line("water"), line("buildings"),
+            line("roads_primary"), places, line("hex_grid"),
+            line("admin_boundaries"), line("night_lights"), line("ferry_routes"),
+        ])
+        for (group, _) in LayerInventory.grouped(for: scene) {
+            XCTAssertTrue(
+                LayerInventory.groupOrder.contains(group),
+                "‘\(group)’ is not in the panel's reading order, so it sorts last by accident"
+            )
+        }
+    }
+
+    /// A map with nothing in it must produce a panel, not a crash.
+    func testAnEmptySceneIsSafe() {
+        XCTAssertEqual(LayerInventory.entries(for: RenderScene()), [])
+        XCTAssertTrue(LayerInventory.grouped(for: RenderScene()).isEmpty)
+    }
+
     // MARK: - Showing and hiding everything at once
 
     /// Ported from `LayersPanel.set_all`, which deliberately skips empty layers:

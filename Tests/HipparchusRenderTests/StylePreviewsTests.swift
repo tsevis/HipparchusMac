@@ -93,4 +93,40 @@ final class StylePreviewsTests: XCTestCase {
         XCTAssertEqual(swatches.count, StylePreviews.featuredNames.count)
         XCTAssertEqual(swatches.map(\.name), StylePreviews.featuredNames)
     }
+
+    /// The picker is meant to be read at a glance. Sixteen thumbnails is a
+    /// catalogue; a handful is a choice.
+    func testThePickerIsShortEnoughToScan() {
+        XCTAssertGreaterThanOrEqual(StylePreviews.featuredNames.count, 4)
+        XCTAssertLessThanOrEqual(StylePreviews.featuredNames.count, 8)
+    }
+
+    /// **Every** preset can be drawn, not only the featured ones — the picker
+    /// shows a handful, but any of the sixteen can be asked for by name, and a
+    /// swatch with no linework in it would render as an empty tile.
+    func testEveryPresetCanBeDrawn() {
+        for name in Presets.names {
+            let swatch = StylePreviews.swatch(for: name)
+            XCTAssertFalse(swatch.contourWidths.isEmpty, "\(name) draws no contours")
+            XCTAssertGreaterThan(
+                swatch.contourWidths.min() ?? 0, 0,
+                "\(name) has a zero-width contour, which draws as nothing"
+            )
+        }
+    }
+
+    /// A ring that does not come back to its start leaves a gap in the hill.
+    func testRingsAreClosedLoops() throws {
+        let ring = StylePreviews.ringGeometry(index: 1, total: 5)
+        let first = try XCTUnwrap(ring.first)
+        let last = try XCTUnwrap(ring.last)
+        XCTAssertEqual(first.x, last.x, accuracy: 1e-6)
+        XCTAssertEqual(first.y, last.y, accuracy: 1e-6)
+    }
+
+    /// The degenerate case: one ring, which is what a preset with a single
+    /// contour weight asks for. Dividing by `total - 1` would be a crash here.
+    func testASingleRingIsSafe() {
+        XCTAssertFalse(StylePreviews.ringGeometry(index: 0, total: 1).isEmpty)
+    }
 }

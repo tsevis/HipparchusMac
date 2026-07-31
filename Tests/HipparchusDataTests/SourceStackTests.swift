@@ -227,6 +227,53 @@ final class SourceStackTests: XCTestCase {
         XCTAssertTrue(SourceStack().providerOverrides(for: SourceID.overpass).isEmpty)
     }
 
+    /// Provenance is load-bearing: it is what stops a generated map being
+    /// mistaken for a survey, and a source that declares none would be invisible
+    /// in the one place that claim is made.
+    func testEverySourceDeclaresItsProvenance() {
+        for definition in SourceStack.defaultDefinitions {
+            XCTAssertFalse(
+                definition.label.trimmingCharacters(in: .whitespaces).isEmpty,
+                "\(definition.id) has no label for the sidebar"
+            )
+            XCTAssertFalse(
+                definition.subtitle.trimmingCharacters(in: .whitespaces).isEmpty,
+                "\(definition.id) says nothing about what it provides"
+            )
+        }
+    }
+
+    /// **A setting that targets nothing is a knob wired to no machinery** — the
+    /// defect this port has hit repeatedly in other guises. Every setting must
+    /// name a provider field, and two settings on one source must not name the
+    /// same one, or the second silently wins.
+    func testEverySettingTargetsADistinctProviderField() {
+        for definition in SourceStack.defaultDefinitions {
+            var seen: Set<String> = []
+            for setting in definition.settings {
+                XCTAssertFalse(
+                    setting.target.trimmingCharacters(in: .whitespaces).isEmpty,
+                    "\(definition.id).\(setting.key) targets no provider field"
+                )
+                XCTAssertFalse(
+                    setting.label.trimmingCharacters(in: .whitespaces).isEmpty,
+                    "\(definition.id).\(setting.key) has no label, so the undo menu cannot name it"
+                )
+                XCTAssertTrue(
+                    seen.insert(setting.target).inserted,
+                    "\(definition.id) has two settings writing to '\(setting.target)'"
+                )
+                // A choice with no choices is a control nobody can operate.
+                if setting.kind == .choice {
+                    XCTAssertFalse(
+                        setting.choices.isEmpty,
+                        "\(definition.id).\(setting.key) is a choice with nothing to choose"
+                    )
+                }
+            }
+        }
+    }
+
     /// A provider's own defaults are the better answer for anything untouched.
     func testUntouchedSourcesOverrideNothing() {
         XCTAssertTrue(SourceStack().providerOverrides(for: SourceID.terrainTiles).isEmpty)

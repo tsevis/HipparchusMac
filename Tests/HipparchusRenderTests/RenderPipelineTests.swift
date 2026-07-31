@@ -827,6 +827,64 @@ final class DerivedLayerTests: XCTestCase {
         XCTAssertTrue(packing.geometries.allSatisfy(\.hasArea))
     }
 
+    /// The per-layer cap actually fires, and scales with the quality profile.
+    ///
+    /// Nothing tested that it fires at all: a cap that never triggered would let
+    /// a dense city frame through unbounded, and the preview would simply stop
+    /// being a preview. Truncated rather than sampled, deliberately — cutting
+    /// the list short cannot shift a parallel colour array out of step with its
+    /// geometry, which is kickoff detail 6.
+    func testThePerLayerCapFiresAndFollowsTheQualityProfile() throws {
+        let bbox = BoundingBox(minLon: 0, minLat: 0, maxLon: 1, maxLat: 1)
+        let roads = (0..<400).map { index in
+            let y = 0.002 * Double(index)
+            return Feature(
+                id: "r/\(index)", layer: "roads", source: "test",
+                geometry: .lineString(LineString([
+                    Coordinate(lon: 0.1, lat: y), Coordinate(lon: 0.9, lat: y),
+                ])),
+                provenance: .measured,
+                properties: ["highway": .string("residential")]
+            )
+        }
+        let collection = FeatureCollection(
+            featuresByLayer: ["roads": roads], metadata: [:], bbox: bbox, provenance: .measured
+        )
+
+        // A preset with a small budget, so the rule is exercised without building
+        // the two hundred thousand features the shipped presets allow.
+        let standard = Presets.preset("Hypsometric Relief")
+        var profile = standard.geometryProfile
+        profile.maxOnScreenFeaturesPerLayer = 100
+        let preset = ArtisticPreset(
+            name: "Frugal", geometryProfile: profile, styleProfile: standard.styleProfile
+        )
+
+        func scene(_ quality: QualityProfile) throws -> RenderScene {
+            try SceneBuilder(options: SceneBuilder.Options(preset: preset, quality: quality))
+                .build(from: collection)
+        }
+        func drawn(_ quality: QualityProfile) throws -> Int {
+            try scene(quality).layers.first { $0.name == "roads_residential" }?.geometries.count ?? 0
+        }
+
+        let fast = try drawn(Quality.profile("preview_fast"))
+        let export = try drawn(Quality.profile("export_clean"))
+
+        XCTAssertLessThan(fast, 400, "the cap never fired")
+        XCTAssertLessThan(
+            fast, export,
+            "a fast preview must draw less than an export, which is what the cap scale is for"
+        )
+        // And what survives is still coherent: the arrays stay in step.
+        let layer = try XCTUnwrap(
+            try scene(Quality.profile("preview_fast")).layers.first { $0.name == "roads_residential" }
+        )
+        XCTAssertEqual(layer.geometries.count, layer.weights.count)
+        XCTAssertEqual(layer.geometries.count, layer.fillColors.count)
+        XCTAssertEqual(layer.rawFeatureCount, 400, "the panel should still say what was fetched")
+    }
+
     /// A frame that is only roads still has a boundary to derive inside.
     ///
     /// The road hierarchy split deletes the generic "roads" layer before the
