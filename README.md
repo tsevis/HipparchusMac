@@ -155,6 +155,35 @@ features; ticking Elevation on top gives 19 layers, 11 787 features and −79 m 
 525 m. The streets are still there. That is the whole idea of the source stack,
 and it is why the check is worth running.
 
+## Undo
+
+Everything a person can do is undoable — the area, however it was set; ticking a
+source and every inline setting; the preset and the quality; hiding a layer; the
+derived-layer switches and their sizes; and fetching a map. ⌘Z and the Edit menu
+name the action they will take back: "Undo Choose Place", "Undo Change Preset",
+"Undo Fetch Map".
+
+Two rules carry the design. A stepper drag or a typed coordinate coalesces into
+one action, because it was one intention. And **undo of a fetch restores the
+previous scene from a bounded store rather than re-fetching** — undo must never
+cost minutes of Overpass time to take back something that cost minutes of
+Overpass time. Only the newest few scenes are kept, so undoing very far back can
+reach a map that was let go; the status bar says so, and Update map redraws it —
+nothing ever re-fetches silently.
+
+The history itself is `SessionHistory`, a value type over `Session` snapshots,
+and every rule above is a test that runs without a window. The window's own
+`UndoManager` is driven by it, one registration per boundary, so the keyboard
+and the menu belong to the system.
+
+## Street names
+
+One label per named street, on its longest run. OSM splits a street into a way
+per block, so labelling every feature would stamp the same name dozens of times
+down one road; keeping the longest run per name puts the label where the street
+is most legible. Ported from `_street_labels`, budgeted at 90 labels a sheet,
+and checked against a fetch of central Athens.
+
 ## Things that are not bugs
 
 - **A ferry route crosses open water in a straight line**, because it does. OSM
