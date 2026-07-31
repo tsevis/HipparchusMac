@@ -99,4 +99,31 @@ public struct CanvasTransform: Sendable, Equatable {
     public func strokeWidth(_ points: Double) -> Double {
         max(0.0001, points) / fitScale
     }
+
+    /// The world-space rectangle a canvas of `size` is currently showing,
+    /// accounting for pan, zoom and rotation.
+    ///
+    /// This is what "Update map" reads instead of whatever was last typed:
+    /// zoom and pan are view state, kept deliberately out of the requested
+    /// area, so without this a zoomed-out view and a freshly re-fetched one
+    /// disagree — the button re-fetches the old area, the screen still shows
+    /// the wider one, and nothing looks like it happened.
+    ///
+    /// All four corners are used, not two opposite ones. A rotated viewport's
+    /// visible region is a rotated rectangle, and its true axis-aligned bounds
+    /// need the full corner set — at 90° two diagonal corners alone would
+    /// report the canvas's own width and height transposed onto the wrong
+    /// axes rather than the ground actually spanned.
+    public func visibleWorldBounds(canvasSize size: CGSize) -> Bounds {
+        let corners = [
+            CGPoint(x: 0, y: 0), CGPoint(x: size.width, y: 0),
+            CGPoint(x: size.width, y: size.height), CGPoint(x: 0, y: size.height),
+        ].map(screenToWorld)
+        let xs = corners.map(\.x)
+        let ys = corners.map(\.y)
+        return Bounds(
+            minX: xs.min() ?? 0, minY: ys.min() ?? 0,
+            maxX: xs.max() ?? 0, maxY: ys.max() ?? 0
+        )
+    }
 }

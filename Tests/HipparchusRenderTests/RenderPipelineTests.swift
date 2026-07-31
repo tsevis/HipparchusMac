@@ -367,6 +367,72 @@ final class CanvasTransformTests: XCTestCase {
         ))
     }
 
+    // MARK: - What the viewport is currently showing
+
+    /// "Update map" needs to know what is actually on screen right now, not
+    /// only what the fitted content bounds were at zoom 1 — that is what lets
+    /// zooming out, then updating, fetch the bigger area actually being looked
+    /// at rather than silently re-fetching the old one.
+    func testAtIdentityTheVisibleBoundsMatchTheWholeCanvasMappedBack() throws {
+        let t = try transform()
+        let size = CGSize(width: 800, height: 600)
+        let visible = t.visibleWorldBounds(canvasSize: size)
+
+        let topLeft = t.screenToWorld(CGPoint(x: 0, y: 0))
+        let bottomRight = t.screenToWorld(CGPoint(x: size.width, y: size.height))
+        XCTAssertEqual(visible.minX, min(topLeft.x, bottomRight.x), accuracy: 1e-6)
+        XCTAssertEqual(visible.maxY, max(topLeft.y, bottomRight.y), accuracy: 1e-6)
+    }
+
+    /// The whole point: zooming out doubles the ground shown, so fetching
+    /// what is now visible gets more than what was fetched before.
+    func testZoomingOutDoublesTheVisibleExtent() throws {
+        let size = CGSize(width: 800, height: 600)
+        let atOne = try transform(viewport: ViewportState(zoom: 1)).visibleWorldBounds(canvasSize: size)
+        let atHalf = try transform(viewport: ViewportState(zoom: 0.5)).visibleWorldBounds(canvasSize: size)
+
+        XCTAssertEqual(atHalf.maxX - atHalf.minX, (atOne.maxX - atOne.minX) * 2, accuracy: 1e-6)
+        XCTAssertEqual(atHalf.maxY - atHalf.minY, (atOne.maxY - atOne.minY) * 2, accuracy: 1e-6)
+    }
+
+    func testZoomingInHalvesTheVisibleExtent() throws {
+        let size = CGSize(width: 800, height: 600)
+        let atOne = try transform(viewport: ViewportState(zoom: 1)).visibleWorldBounds(canvasSize: size)
+        let atTwo = try transform(viewport: ViewportState(zoom: 2)).visibleWorldBounds(canvasSize: size)
+
+        XCTAssertEqual(atTwo.maxX - atTwo.minX, (atOne.maxX - atOne.minX) / 2, accuracy: 1e-6)
+    }
+
+    /// Panning slides the visible window across the ground without resizing it.
+    func testPanningMovesTheExtentWithoutResizingIt() throws {
+        let size = CGSize(width: 800, height: 600)
+        let still = try transform().visibleWorldBounds(canvasSize: size)
+        let panned = try transform(viewport: ViewportState(panX: 100, panY: 0))
+            .visibleWorldBounds(canvasSize: size)
+
+        XCTAssertEqual(panned.maxX - panned.minX, still.maxX - still.minX, accuracy: 1e-6)
+        XCTAssertNotEqual(panned.minX, still.minX)
+    }
+
+    /// A rotated viewport's visible region is a rotated rectangle, and only
+    /// its true axis-aligned bounds can be read off by using all four
+    /// corners — two opposite corners alone would under-report it, badly
+    /// enough at 90° that width and height come out swapped instead of equal.
+    func testRotationIsMeasuredFromAllFourCornersNotTwoOpposite() throws {
+        let size = CGSize(width: 800, height: 600)
+        let unrotated = try transform().visibleWorldBounds(canvasSize: size)
+        let rotated90 = try transform(viewport: ViewportState(rotation: 90))
+            .visibleWorldBounds(canvasSize: size)
+
+        // A 90° turn swaps which canvas dimension maps to which world axis.
+        XCTAssertEqual(
+            rotated90.maxX - rotated90.minX, unrotated.maxY - unrotated.minY, accuracy: 1e-6
+        )
+        XCTAssertEqual(
+            rotated90.maxY - rotated90.minY, unrotated.maxX - unrotated.minX, accuracy: 1e-6
+        )
+    }
+
     /// The property that makes modifier-drag-to-draw-an-area possible.
     func testScreenToWorldIsTheExactInverseOfWorldToScreen() throws {
         for viewport in [
