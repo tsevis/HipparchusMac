@@ -275,4 +275,62 @@ extension Orbits {
         if wrapped < 0 { wrapped += 360 }
         return wrapped - 180
     }
+
+    // MARK: - The date line
+
+    /// Divide a ring that runs past ±180° into the pieces the sheet holds.
+    ///
+    /// Ported from `_split_at_antimeridian`. The ring must arrive **unwrapped** —
+    /// longitudes running continuously past the date line rather than jumping
+    /// from +179° to −179°. Wrapping each vertex on its own is worse than not
+    /// wrapping at all: it turns a footprint over the Pacific into a band drawn
+    /// straight across the map.
+    ///
+    /// The ring is shifted by −360°, 0° and +360°, and each shift is trimmed to
+    /// the world; whatever survives is a piece. A ring already inside the world
+    /// comes back untouched, which is the overwhelmingly common case.
+    public static func splitAtAntimeridian(_ ring: [Coordinate]) -> [[Coordinate]] {
+        let longitudes = ring.map(\.lon)
+        guard let west = longitudes.min(), let east = longitudes.max() else { return [] }
+        guard west < -180 || east > 180 else { return [ring] }
+
+        return [-360.0, 0.0, 360.0].compactMap { shift in
+            let shifted = ring.map { Coordinate(lon: $0.lon + shift, lat: $0.lat) }
+            let piece = clippedToWorld(shifted)
+            return piece.count >= 3 ? piece : nil
+        }
+    }
+
+    /// Sutherland–Hodgman against the two meridians that bound the map.
+    ///
+    /// Exact for the rings this is asked about: a footprint is an ellipse in
+    /// unwrapped coordinates, and clipping a convex ring by a half-plane leaves
+    /// a convex ring. It avoids a general overlay — and so a GEOS dependency —
+    /// in the one module that is pure arithmetic.
+    private static func clippedToWorld(_ ring: [Coordinate]) -> [Coordinate] {
+        var result = ring
+        // Trim the eastern overhang, then the western one.
+        for (limit, keepBelow) in [(180.0, true), (-180.0, false)] {
+            guard !result.isEmpty else { return [] }
+            var clipped: [Coordinate] = []
+            for index in result.indices {
+                let current = result[index]
+                let previous = result[(index + result.count - 1) % result.count]
+                let currentInside = keepBelow ? current.lon <= limit : current.lon >= limit
+                let previousInside = keepBelow ? previous.lon <= limit : previous.lon >= limit
+
+                if currentInside != previousInside {
+                    // Where the edge crosses the meridian, in latitude.
+                    let span = current.lon - previous.lon
+                    let t = span == 0 ? 0 : (limit - previous.lon) / span
+                    clipped.append(Coordinate(
+                        lon: limit, lat: previous.lat + t * (current.lat - previous.lat)
+                    ))
+                }
+                if currentInside { clipped.append(current) }
+            }
+            result = clipped
+        }
+        return result
+    }
 }

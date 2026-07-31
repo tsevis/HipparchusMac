@@ -174,15 +174,20 @@ public struct SatelliteTrackProvider: MapProvider {
         index: Int
     ) -> Feature {
         let radius = Orbits.horizonRadiusDegrees(altitudeKm: position.altitudeKm)
+        // Built unwrapped and then divided: a footprint over the date line
+        // belongs against both edges of the sheet, not stretched between them.
+        let pieces = Orbits.splitAtAntimeridian(smallCircle(
+            centre: position.coordinate,
+            radiusDegrees: radius,
+            segments: settings.footprintSegments
+        )).map { Polygon(exterior: $0) }
         return Feature(
             id: "\(providerID)/footprint/\(satellite.catalogNumber)",
             layer: SatelliteLayer.footprints,
             source: providerID,
-            geometry: .polygon(Polygon(exterior: smallCircle(
-                centre: position.coordinate,
-                radiusDegrees: radius,
-                segments: settings.footprintSegments
-            ))),
+            geometry: pieces.count == 1
+                ? .polygon(pieces[0])
+                : .multiPolygon(pieces),
             provenance: .approximate,
             properties: [
                 "name": .string(""),
@@ -199,15 +204,22 @@ public struct SatelliteTrackProvider: MapProvider {
     /// Not a circle in degrees: at 60° north a degree of longitude is half a degree
     /// of latitude, and an uncorrected ring would draw the footprint as an ellipse.
     /// Latitude is clamped at the poles rather than allowed to fold over the top.
+    ///
+    /// **Longitude is left unwrapped**, running continuously past ±180°, because
+    /// wrapping each vertex on its own turns a ring over the date line into a
+    /// band across the whole map. `Orbits.splitAtAntimeridian` divides it after.
     func smallCircle(centre: Coordinate, radiusDegrees: Double, segments: Int) -> [Coordinate] {
         let cosLat = Swift.max(0.05, cos(Swift.min(Swift.max(centre.lat, -89.9), 89.9) * .pi / 180))
         return (0..<Swift.max(8, segments)).map { step in
             let angle = 2 * Double.pi * Double(step) / Double(Swift.max(8, segments))
             let lat = Swift.min(Swift.max(centre.lat + radiusDegrees * sin(angle), -90), 90)
-            return Coordinate(
-                lon: Orbits.wrappedLongitude(centre.lon + radiusDegrees * cos(angle) / cosLat),
-                lat: lat
-            )
+            // Half a world either side, at most. Near the pole the `cosLat`
+            // divisor runs away — at 88° a 20° radius asks for 573° of longitude
+            // — and a satellite that high over the pole genuinely sees every
+            // meridian, so a full band is the honest answer and anything wider
+            // is arithmetic rather than geography.
+            let offset = Swift.min(Swift.max(radiusDegrees * cos(angle) / cosLat, -180), 180)
+            return Coordinate(lon: centre.lon + offset, lat: lat)
         }
     }
 }

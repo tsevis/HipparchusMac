@@ -180,6 +180,27 @@ final class SatelliteProviderTests: XCTestCase {
         }
     }
 
+    /// A footprint over the Pacific belongs against both edges of the sheet.
+    ///
+    /// The ring is built unwrapped and divided afterwards; wrapping each vertex
+    /// as it was made drew a band straight across the map instead.
+    func testAFootprintOverTheDateLineDoesNotSpanTheWorld() {
+        let ring = provider(StubGET(listing)).smallCircle(
+            centre: Coordinate(lon: 178, lat: 5), radiusDegrees: 20, segments: 72
+        )
+        let pieces = Orbits.splitAtAntimeridian(ring)
+
+        XCTAssertEqual(pieces.count, 2, "the footprint did not divide at the date line")
+        for piece in pieces {
+            let lons = piece.map(\.lon)
+            XCTAssertLessThan(
+                (lons.max() ?? 0) - (lons.min() ?? 0), 180,
+                "a piece was stretched across the map"
+            )
+            XCTAssertTrue(lons.allSatisfy { $0 >= -180.0001 && $0 <= 180.0001 })
+        }
+    }
+
     /// This is not SGP4, and a map that implies otherwise is a lie.
     func testTracksDeclareThemselvesApproximate() async throws {
         let collection = try await provider(StubGET(listing)).fetch(query)
@@ -220,13 +241,27 @@ final class SatelliteProviderTests: XCTestCase {
         }
     }
 
+    /// Latitude is clamped rather than folded over the top.
+    ///
+    /// Longitude is deliberately *not* clamped here any more — the ring is built
+    /// unwrapped and `Orbits.splitAtAntimeridian` divides it, because wrapping
+    /// each vertex as it was made drew a band across the map. So the world-bounds
+    /// assertion belongs after the split, which is where it now is.
     func testAFootprintNearThePoleDoesNotFoldOverTheTop() {
         let provider = SatelliteTrackProvider()
         let circle = provider.smallCircle(
             centre: Coordinate(lon: 10, lat: 88), radiusDegrees: 20, segments: 36
         )
         XCTAssertTrue(circle.allSatisfy { $0.lat <= 90 && $0.lat >= -90 })
-        XCTAssertTrue(circle.allSatisfy { $0.lon >= -180 && $0.lon <= 180 })
+
+        // A satellite that high over the pole sees every meridian, so the ring is
+        // a full band — and never wider than the world, whatever `cos(lat)` does.
+        let lons = circle.map(\.lon)
+        XCTAssertLessThanOrEqual((lons.max() ?? 0) - (lons.min() ?? 0), 360.0001)
+
+        for piece in Orbits.splitAtAntimeridian(circle) {
+            XCTAssertTrue(piece.allSatisfy { $0.lon >= -180.0001 && $0.lon <= 180.0001 })
+        }
     }
 }
 
