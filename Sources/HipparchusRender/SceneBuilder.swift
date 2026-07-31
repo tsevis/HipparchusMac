@@ -219,6 +219,19 @@ public struct SceneBuilder: Sendable {
             layers.append(layer)
         }
 
+        // The sea, before the derived layers, because the boundary they are built
+        // inside counts water. OSM describes a coast as an open way, not as a
+        // filled ocean, so without this a coastal sheet has a line where the
+        // water should be.
+        var inferredSea = 0
+        if let clipRegion {
+            let sea = try seaPolygons(from: layers, clipRegion: clipRegion, geos: geos)
+            if !sea.isEmpty {
+                inferredSea = sea.count
+                layers = Self.prepending(sea, toWaterIn: layers, styleProfile: styleProfile)
+            }
+        }
+
         // Street names are read from the raw road ways, not from any drawn layer:
         // the longest run of a street may have been clipped, capped or smoothed by
         // now, and the label belongs where the street is, not where the linework
@@ -278,6 +291,9 @@ public struct SceneBuilder: Sendable {
                 "quality_profile": .string(quality.key),
                 "preset": .string(options.preset.name),
                 "illuminated_layers": .string(illuminatedLayers.sorted().joined(separator: ", ")),
+                // Inferred, not fetched: a reader is entitled to know the water
+                // was reasoned out of the linework rather than measured.
+                "inferred_sea_polygons": .int(inferredSea),
                 "geos_version": .string(geos.version),
             ]
         )
@@ -372,6 +388,141 @@ public struct SceneBuilder: Sendable {
         let minDimension = Swift.min(bounds.width, bounds.height)
         guard minDimension > 0 else { return 0 }
         return minDimension * (layer == "buildings" ? 0.08 : 0.2)
+    }
+
+    // MARK: - The sea
+
+    /// The layers whose presence on a face is evidence that the face is land.
+    ///
+    /// Ported from `_land_evidence_geometries`. The road hierarchy as well as the
+    /// generic layer, because classification deletes the generic one.
+    static let landEvidenceLayers: [String] =
+        ["buildings", "parks", "fields", "forests", "natural", "landuse", "roads", "railways"]
+        + roadHierarchy
+
+    /// Enough evidence to call a face land. Counting further cannot change which
+    /// face scores lowest unless every face reaches the cap — and a face holding
+    /// sixty-four intersecting buildings and roads is not the sea whatever the
+    /// arithmetic says. Without a cap this is a scan of every land feature in the
+    /// frame, which in a city is a hundred thousand of them.
+    static let landEvidenceCap = 64.0
+
+    /// Infer the sea from the coastline and the frame.
+    ///
+    /// Ported from `_derive_sea_polygons`. The frame's own boundary and the
+    /// coastline together cut the page into faces; the face carrying the least
+    /// evidence of land is the water. **Measured, never assumed** — the same
+    /// principle as elevation bands, which sample the field at each face rather
+    /// than reasoning about which ring contains which.
+    ///
+    /// Returns nothing when it cannot tell: no coastline, a coastline that does
+    /// not divide the frame, or every face scoring alike. A sheet with a line
+    /// where the sea should be is a smaller error than a sheet with the sea
+    /// painted over the town.
+    private func seaPolygons(
+        from layers: [RenderLayer],
+        clipRegion: Geometry,
+        geos: GEOSContext
+    ) throws -> [Polygon] {
+        let coastlines = layers.first { $0.name == "coastline" }?.geometries ?? []
+        let lines = coastlines.flatMap(\.lineStrings)
+        guard !lines.isEmpty, let frame = clipRegion.bounds else { return [] }
+
+        // Unioned before polygonizing, because GEOS polygonizes noded input only:
+        // a coastline crossing the frame edge has to become two lines meeting at
+        // a shared vertex before either bounds a face.
+        let boundary = Geometry.lineString(LineString(Polygon.box(frame).exterior.coordinates))
+        let noded = try geos.unaryUnion([boundary] + lines.map(Geometry.lineString)).lineStrings
+        let faces = try geos.polygonize(noded)
+        guard faces.count >= 2 else { return [] }
+
+        let frameArea = try geos.area(clipRegion)
+        guard frameArea > 0 else { return [] }
+
+        let evidence = Self.landEvidenceLayers.flatMap { name in
+            layers.first { $0.name == name }?.geometries ?? []
+        }
+
+        var scored: [(score: Double, polygon: Polygon)] = []
+        for face in faces {
+            let clipped = try geos.intersection(.polygon(face), clipRegion)
+            // A single polygon only, as the Python takes it: a face that clipping
+            // broke into pieces is not one body of water.
+            guard case .polygon(let polygon) = clipped else { continue }
+            // Slivers along the frame edge are artefacts of the cut, not sea.
+            guard try geos.area(clipped) >= frameArea * 0.005 else { continue }
+            scored.append((try landEvidenceScore(for: clipped, against: evidence, geos: geos), polygon))
+        }
+        guard scored.count >= 2, let lowest = scored.map(\.score).min() else { return [] }
+
+        let sea = scored.filter { $0.score <= lowest + 1e-9 }
+        // Every face alike means the evidence says nothing — including the common
+        // case of no land features at all.
+        guard sea.count < scored.count else { return [] }
+        return sea.map(\.polygon)
+    }
+
+    private func landEvidenceScore(
+        for face: Geometry,
+        against evidence: [Geometry],
+        geos: GEOSContext
+    ) throws -> Double {
+        guard let faceBounds = face.bounds else { return 0 }
+        var score = 0.0
+        for geometry in evidence {
+            // The cheap rectangle test first: most land features are nowhere near
+            // any given face, and an overlay on each of them is the whole cost.
+            guard let bounds = geometry.bounds, bounds.intersects(faceBounds) else { continue }
+            guard try geos.intersects(face, geometry) else { continue }
+            // A polygon on a face is stronger evidence than a line crossing it: a
+            // road may bridge the water, a building does not float on it.
+            switch geometry {
+            case .polygon, .multiPolygon: score += 4
+            case .lineString, .multiLineString: score += 2
+            default: score += 1
+            }
+            if score >= Self.landEvidenceCap { break }
+        }
+        return score
+    }
+
+    /// Put the sea under the water that was fetched, making the layer if the map
+    /// has no water of its own.
+    ///
+    /// Rebuilt through `append` so the weight and fill arrays stay in step with
+    /// the geometry — the one invariant this type exists to protect. The layer's
+    /// `rawFeatureCount` is left alone: the sea was inferred, not returned by a
+    /// provider, and the panel's count should stay honest about that.
+    private static func prepending(
+        _ sea: [Polygon],
+        toWaterIn layers: [RenderLayer],
+        styleProfile: StyleProfile
+    ) -> [RenderLayer] {
+        var result = layers
+        let existing = result.firstIndex { $0.name == "water" }
+        let old = existing.map { result[$0] }
+
+        var water = RenderLayer(
+            name: "water",
+            style: old?.style ?? styleProfile.style(for: "water"),
+            labels: old?.labels ?? [],
+            rawFeatureCount: old?.rawFeatureCount ?? 0
+        )
+        for polygon in sea { water.append(.polygon(polygon)) }
+        for (index, geometry) in (old?.geometries ?? []).enumerated() {
+            water.append(
+                geometry,
+                weight: old?.weight(at: index),
+                fillColor: old?.fillColor(at: index)
+            )
+        }
+
+        if let existing {
+            result[existing] = water
+        } else {
+            result.append(water)
+        }
+        return result
     }
 
     // MARK: - Derived layers
