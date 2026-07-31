@@ -51,8 +51,19 @@ source of truth and there is no `.xcodeproj` to merge:
 
 ```sh
 xcodegen generate --spec App/project.yml
-open HipparchusMac.xcodeproj
+open App/HipparchusMac.xcodeproj
 ```
+
+To get a double-clickable app rather than an Xcode session, one script builds it
+in release and puts it in `/Applications`:
+
+```sh
+Scripts/install-app.sh
+```
+
+The signature is **ad-hoc**: enough to run on the machine that built it, not
+enough to hand to anyone else. Giving it to someone would need a Developer ID
+and notarisation, which is a different job from building it.
 
 ## Layout
 
