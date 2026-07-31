@@ -200,6 +200,27 @@ public struct SceneBuilder: Sendable {
             layers.append(layer)
         }
 
+        // Street names are read from the raw road ways, not from any drawn layer:
+        // the longest run of a street may have been clipped, capped or smoothed by
+        // now, and the label belongs where the street is, not where the linework
+        // survived. The layer appears only when it has something to say.
+        let streetLabels = thinned(
+            Self.streetLabels(
+                from: collection.featuresByLayer["roads"] ?? [], projection: projection, geos: geos
+            ),
+            clippedTo: clipRegion?.bounds,
+            limit: labelLimit(for: "street_names")
+        )
+        if !streetLabels.isEmpty {
+            var layer = RenderLayer(
+                name: "street_names",
+                style: styleProfile.style(for: "street_names"),
+                rawFeatureCount: streetLabels.count
+            )
+            layer.labels = streetLabels
+            layers.append(layer)
+        }
+
         // Derived layers last, and built from the projected, clipped geometry the
         // base layers just produced — not from the raw features. A Voronoi diagram
         // of building centroids has to be a diagram of where the buildings ended up
@@ -509,6 +530,58 @@ public struct SceneBuilder: Sendable {
         case "summits": 24
         case "satellite_tracks": 20
         default: 60
+        }
+    }
+
+    /// One label per named street, on its longest run.
+    ///
+    /// Ported from `_street_labels`. OSM splits a street into one way per block,
+    /// so labelling every feature would stamp the same name dozens of times down
+    /// one road. Keeping only the longest run per name puts the label where the
+    /// street is most legible and leaves the rest of the sheet clear.
+    static func streetLabels(
+        from roads: [Feature],
+        projection: ProjectionProfile,
+        geos: GEOSContext,
+        maxStreets: Int = 160
+    ) -> [PlaceLabel] {
+        var longest: [String: (length: Double, geometry: Geometry)] = [:]
+        for feature in roads {
+            guard let name = feature.property("name")?.stringValue?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                !name.isEmpty
+            else { continue }
+            guard let length = try? geos.length(feature.geometry), length > 0 else { continue }
+            if let best = longest[name], best.length >= length { continue }
+            longest[name] = (length, feature.geometry)
+        }
+
+        // Longest first; the name breaks exact ties so the same map always keeps
+        // the same streets.
+        let ranked = longest
+            .sorted { ($1.value.length, $0.key) < ($0.value.length, $1.key) }
+            .prefix(Swift.max(0, maxStreets))
+
+        return ranked.compactMap { name, entry in
+            guard let anchor = Self.labelAnchor(entry.geometry, geos: geos) else { return nil }
+            return PlaceLabel(name: name, position: projection.project(anchor), placeType: "street")
+        }
+    }
+
+    /// Midpoint of a line, or a point guaranteed inside anything else.
+    ///
+    /// Ported from `_label_anchor`. A MultiLineString anchors on its longest
+    /// member — half the *combined* length of a street's fragments can land in the
+    /// gap between two of them.
+    private static func labelAnchor(_ geometry: Geometry, geos: GEOSContext) -> Coordinate? {
+        switch geometry {
+        case .lineString(let line):
+            return try? geos.interpolate(line, distance: line.length / 2)
+        case .multiLineString(let lines):
+            guard let longest = lines.max(by: { $0.length < $1.length }) else { return nil }
+            return try? geos.interpolate(longest, distance: longest.length / 2)
+        default:
+            return try? geos.pointOnSurface(geometry)
         }
     }
 
