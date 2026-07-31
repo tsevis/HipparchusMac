@@ -34,6 +34,20 @@ struct FramePanel: View {
                     coordinate("South", $model.south)
                     coordinate("West", $model.west)
                     coordinate("East", $model.east)
+
+                    Button {
+                        showsCoordinates = true
+                        model.importCoordinates()
+                    } label: {
+                        Label("Paste Coordinates", systemImage: "doc.on.clipboard")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(
+                        "Reads the clipboard for a bounding box (west, south, east, "
+                        + "north — the same order as this app's own --bbox), two "
+                        + "corners, a single point, or a Google or Apple Maps link."
+                    )
                 }
                 .font(.subheadline)
             }

@@ -148,6 +148,24 @@ Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48
 Hipparchus.app/Contents/MacOS/Hipparchus --search "Twin Peaks San Francisco"
 ```
 
+**Paste Coordinates**, beside the coordinate boxes, reads whatever is on the
+clipboard rather than asking for four numbers typed one at a time. It reads a
+box copied from this app's own `--bbox` output (`west, south, east, north`),
+two corners copied from elsewhere, a bare point — latitude first, the
+convention Google Maps, Apple Maps and every GPS device already copy in — or a
+Google or Apple Maps link with the coordinates in its address. Four numbers
+that are ambiguous between this app's own convention and two lat,lon corners
+resolve to this app's convention, since that is what four bare numbers already
+mean everywhere else here.
+
+```sh
+Hipparchus.app/Contents/MacOS/Hipparchus --import-clipboard
+```
+
+exists for the same reason `--search` does: a button is not something a
+screenshot-less environment can click, so this drives the real
+clipboard-reading code and prints what it found.
+
 The CLI does the same thing headlessly and writes PNG, SVG, PDF and a
 diagnostics JSON:
 

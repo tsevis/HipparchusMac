@@ -419,6 +419,25 @@ final class MapModel {
     }
 
     /// Set the area from a rectangle drawn on the canvas.
+    /// Read the general pasteboard and set the area from whatever coordinates
+    /// it finds — a box copied from this app's own `--bbox` output, two
+    /// corners, a single point, or a map link. Does not fetch: picking the
+    /// wrong thing off the clipboard should not cost a fetch, the same reason
+    /// adopting a search result does not.
+    func importCoordinates() {
+        guard let text = NSPasteboard.general.string(forType: .string),
+              let box = CoordinateImport.parse(text)
+        else {
+            isError = true
+            status = "Nothing on the clipboard looked like coordinates."
+            return
+        }
+        pendingAction = ("Import Coordinates", "area")
+        setArea(box)
+        status = "Imported \(areaDescription)."
+        isError = false
+    }
+
     func setArea(_ bbox: BoundingBox) {
         // Adopted searches route through here already carrying their own name.
         if pendingAction == nil { pendingAction = ("Draw Area", "area") }
@@ -730,6 +749,14 @@ final class MapModel {
         }
         if let flag = arguments.firstIndex(of: "--rotate"), flag + 1 < arguments.count {
             renderRotation = Double(arguments[flag + 1]) ?? 0
+        }
+        // Exists for the same reason --search does: a Paste Coordinates button
+        // is not something a screenshot-less environment can click, so this
+        // drives the real clipboard-reading code and prints what it found.
+        if arguments.contains("--import-clipboard") {
+            importCoordinates()
+            print(isError ? "error: \(status)" : status)
+            exit(isError ? 1 : 0)
         }
         if let flag = arguments.firstIndex(of: "--bbox"), flag + 1 < arguments.count {
             let parts = arguments[flag + 1]
