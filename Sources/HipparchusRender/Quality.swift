@@ -23,8 +23,6 @@ public struct QualityProfile: Sendable, Equatable, Identifiable {
     public let simplifyScale: Double
     /// Multiplies the preset's per-layer feature cap.
     public let geometryCapScale: Double
-    /// Oversampling for the preview bitmap.
-    public let supersample: Double
     /// Decimal places in exported SVG coordinates.
     public let svgPrecision: Int
     /// Export profiles refuse to write a file whose diagnostics look wrong.
@@ -45,7 +43,6 @@ public enum Quality {
             smoothingScale: 0.0,
             simplifyScale: 1.0,
             geometryCapScale: 0.55,
-            supersample: 1.0,
             svgPrecision: 3,
             strictDiagnostics: false
         ),
@@ -56,7 +53,6 @@ public enum Quality {
             smoothingScale: 1.0,
             simplifyScale: 0.5,
             geometryCapScale: 1.0,
-            supersample: 1.5,
             svgPrecision: 3,
             strictDiagnostics: false
         ),
@@ -67,7 +63,6 @@ public enum Quality {
             smoothingScale: 2.0,
             simplifyScale: 0.35,
             geometryCapScale: 1.0,
-            supersample: 1.0,
             svgPrecision: 4,
             strictDiagnostics: false
         ),
@@ -78,7 +73,6 @@ public enum Quality {
             smoothingScale: 2.0,
             simplifyScale: 0.0,
             geometryCapScale: 1.0,
-            supersample: 1.0,
             svgPrecision: 6,
             strictDiagnostics: true
         ),

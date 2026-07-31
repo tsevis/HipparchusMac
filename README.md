@@ -320,13 +320,31 @@ had noticed.
 
 **Smaller divergences, each deliberate.**
 
-- **`supersample` is declared and unread.** `Quality.swift` carries it because
-  the profiles were ported whole, and "High Preview" advertises 1.5× where
-  nothing oversamples. Core Graphics antialiases where skia did not, so the
-  Python's reason for the knob does not survive the port. **It should be
-  implemented or deleted** — an advertised behaviour that does not happen is the
-  exact defect this file spends so long warning about, and listing it here is
-  not the same as fixing it.
+- **`supersample` is gone, because it made the maps worse.** The Python's
+  quality profiles oversample the preview bitmap — skia rasterised it, and 1.5×
+  averaged down was an improvement there. Ported here it was declared and read
+  by nothing, so it was implemented properly and then measured on a Santorini
+  sheet with everything but the sampling held still:
+
+  | Oversampling | Local contrast | Ink |
+  |---|---|---|
+  | 1× | 2.77 | 33.03 |
+  | 1.5× | 2.21 | 31.96 |
+  | 2× | 1.74 | 31.11 |
+
+  Both fall monotonically. Contours on these sheets sit a pixel or two apart, so
+  averaging merges neighbouring lines into a smear and lightens every hairline,
+  and the type softens with them. Core Graphics antialiases against the real
+  pixel grid and keeps each line's contrast, which is what line art needs. The
+  field, its four values and the wiring are deleted rather than left as a knob
+  that costs 2.25× the pixels to make a map harder to read.
+
+  **A synthetic measurement said the opposite**, and is worth recording as a
+  warning: scoring each candidate against a 4× downsample as though that were
+  ground truth showed a 38% improvement, because the reference *is* the smear —
+  it rewarded exactly the blurring it should have caught. Looking at two crops
+  side by side settled it in seconds. A metric that encodes the wrong ideal is
+  more dangerous than no metric.
 - **Simplification does not collapse collinear runs.** `simplification.py` walks
   the vertex list removing redundant nodes; here GEOS `simplify` does the work
   and nothing counts removed nodes afterwards.

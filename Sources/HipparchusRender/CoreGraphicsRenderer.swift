@@ -61,6 +61,21 @@ public struct CoreGraphicsRenderer: Sendable {
     /// Render to an image, for tests and for thumbnails.
     ///
     /// This is the headless half of the answer to "did the change break drawing?".
+    /// **Rasterised once, at the size asked for, deliberately.**
+    ///
+    /// Drawing large and averaging down — the Python's `supersample`, and the
+    /// obvious thing to reach for — makes these maps *worse*, and it was measured
+    /// rather than assumed. On a Santorini sheet at `export_clean`, oversampling
+    /// cost local contrast monotonically: 2.77 at 1×, 2.21 at 1.5×, 1.74 at 2×,
+    /// while total ink fell with it. Contours on these sheets sit a pixel or two
+    /// apart, so averaging merges neighbouring lines into a smear and lightens
+    /// every hairline; Core Graphics antialiases against the real pixel grid and
+    /// keeps each line's contrast instead. Type softens too.
+    ///
+    /// A synthetic measurement said the opposite, by scoring each candidate
+    /// against a 4× downsample as though it were ground truth — but that
+    /// reference *is* the smear, so it rewarded the blur it should have caught.
+    /// The visual check settled it. See "What is not here" in the README.
     public func image(of scene: RenderScene, size: CGSize, viewport: ViewportState = ViewportState()) -> CGImage? {
         let width = Int(size.width.rounded())
         let height = Int(size.height.rounded())
