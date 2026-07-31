@@ -580,6 +580,15 @@ final class MapModel {
         if let interval = collection.metadata["contour_interval_metres"]?.doubleValue {
             parts.append(String(format: "%.0f m interval", interval))
         }
+        // Whether the answer came off the disk or off the network. The manager
+        // namespaces every provider key, so this reads "<source>.cache" rather
+        // than "cache" — which is why nothing had been reading it at all.
+        let cacheStates = collection.metadata
+            .filter { $0.key.hasSuffix(".cache") }
+            .compactMap { $0.value.stringValue }
+        if !cacheStates.isEmpty, cacheStates.allSatisfy({ $0 == "hit" }) {
+            parts.append("from cache")
+        }
         if collection.metadata["cancelled"]?.boolValue == true {
             parts.append("incomplete — the fetch was cancelled")
         }

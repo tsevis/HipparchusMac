@@ -205,6 +205,23 @@ carrying that fork over would have been porting a bug.
 Headlessly, `hipparchus-cli santorini --furniture` writes the full sheet for
 looking at.
 
+## The sea, which OSM does not give you
+
+OpenStreetMap describes a coast as open ways, not as a filled ocean, so a coastal
+sheet drawn from the linework alone has a line where the water should be. The
+frame's own boundary and the coastline together cut the page into faces, and the
+face carrying the least evidence of land — a building counts for more than a
+road, since a road may bridge water but a building does not float on it — is the
+sea.
+
+Measured, never assumed: the same principle as elevation bands, which sample the
+field at each face rather than reasoning about which ring contains which. It
+returns nothing when it cannot tell — no coastline, a coast that does not divide
+the frame, or every face scoring alike — because a line where the sea should be
+is a smaller error than the sea painted over the town. The count is in the
+scene's diagnostics as `inferred_sea_polygons`, since a reader is entitled to
+know the water was reasoned rather than measured.
+
 ## Things that are not bugs
 
 - **A ferry route crosses open water in a straight line**, because it does. OSM
