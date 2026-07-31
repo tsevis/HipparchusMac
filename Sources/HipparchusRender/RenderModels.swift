@@ -224,8 +224,29 @@ public struct ViewportState: Sendable, Equatable {
         ViewportState(zoom: zoom, panX: panX + dx, panY: panY + dy, rotation: rotation)
     }
 
+    /// Turn to a bearing.
+    ///
+    /// Normalised into the half-turn either side of north, because the number is
+    /// read as a bearing: after a dozen steps of 15° the map should say −165°
+    /// rather than counting on to 195°, and −180° and 180° are the same way round.
     public func rotated(to degrees: Double) -> ViewportState {
-        ViewportState(zoom: zoom, panX: panX, panY: panY, rotation: degrees)
+        ViewportState(
+            zoom: zoom, panX: panX, panY: panY, rotation: Self.normalisedBearing(degrees)
+        )
+    }
+
+    /// Turn by a step, which is what the rotate controls do.
+    public func rotated(by degrees: Double) -> ViewportState {
+        rotated(to: rotation + degrees)
+    }
+
+    /// Into `(-180, 180]`.
+    static func normalisedBearing(_ degrees: Double) -> Double {
+        guard degrees.isFinite else { return 0 }
+        var bearing = degrees.truncatingRemainder(dividingBy: 360)
+        if bearing <= -180 { bearing += 360 }
+        if bearing > 180 { bearing -= 360 }
+        return bearing
     }
 }
 

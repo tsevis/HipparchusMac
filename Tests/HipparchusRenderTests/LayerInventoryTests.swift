@@ -77,6 +77,44 @@ final class LayerInventoryTests: XCTestCase {
 
     /// A ferry route is transport, and reads beside the railways rather than in
     /// with the lakes.
+    // MARK: - Showing and hiding everything at once
+
+    /// Ported from `LayersPanel.set_all`, which deliberately skips empty layers:
+    /// there is nothing in them to show, and the row that says "none here" is
+    /// disabled for exactly that reason.
+    func testShowingEverythingClearsOnlyThePopulatedLayers() throws {
+        let scene = try sceneWithAnEmptyLayer()
+        let hidden = LayerInventory.hiddenLayers(
+            in: scene, settingAllVisible: true, from: ["buildings", "water", "ghosts"]
+        )
+        // "ghosts" holds nothing, so its state is left exactly as it was found.
+        XCTAssertEqual(hidden, ["ghosts"])
+    }
+
+    func testHidingEverythingCoversOnlyThePopulatedLayers() throws {
+        let scene = try sceneWithAnEmptyLayer()
+        let hidden = LayerInventory.hiddenLayers(in: scene, settingAllVisible: false, from: [])
+        XCTAssertEqual(hidden, ["buildings", "water"])
+        XCTAssertFalse(hidden.contains("ghosts"), "an empty layer cannot be hidden")
+    }
+
+    /// The controls have nothing to do on a map with nothing in it, and the view
+    /// asks this rather than deciding for itself.
+    func testAMapWithNothingInItHasNothingToToggle() {
+        XCTAssertTrue(LayerInventory.toggleableLayerIDs(in: RenderScene()).isEmpty)
+    }
+
+    private func sceneWithAnEmptyLayer() throws -> RenderScene {
+        var buildings = RenderLayer(name: "buildings", rawFeatureCount: 1)
+        buildings.append(.polygon(Polygon(exterior: [
+            Coordinate(x: 0, y: 0), Coordinate(x: 1, y: 0), Coordinate(x: 1, y: 1),
+        ])))
+        var water = RenderLayer(name: "water", rawFeatureCount: 1)
+        water.append(.lineString(LineString([Coordinate(x: 0, y: 0), Coordinate(x: 1, y: 1)])))
+        let ghosts = RenderLayer(name: "ghosts", rawFeatureCount: 0)
+        return RenderScene(layers: [buildings, water, ghosts])
+    }
+
     /// A national border is measured geography, not invented geometry. The
     /// "Derived" fallback exists for layers nobody anticipated; a layer the file
     /// sources produce by name is anticipated.

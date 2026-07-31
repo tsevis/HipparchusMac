@@ -387,6 +387,44 @@ final class CanvasTransformTests: XCTestCase {
         }
     }
 
+    /// Zooming and rotating turn the map where it is, rather than swinging it
+    /// out of the window.
+    ///
+    /// Both used to happen about the origin of the pre-transform space, so the
+    /// content walked down-right as it grew and left the canvas entirely at 90°.
+    /// Nothing caught it because the round-trip stayed exact either way — an
+    /// inverse can be perfect and still describe the wrong picture.
+    func testZoomAndRotationTurnAboutTheCentreOfTheCanvas() throws {
+        let scene = try Sample.scene()
+        let bounds = try XCTUnwrap(scene.contentBounds)
+        let middle = Coordinate(
+            x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2
+        )
+
+        for viewport in [
+            ViewportState(),
+            ViewportState(zoom: 3),
+            ViewportState(rotation: 90),
+            ViewportState(zoom: 2.5, rotation: -45),
+        ] {
+            let point = try transform(viewport: viewport).worldToScreen(middle)
+            XCTAssertEqual(point.x, 400, accuracy: 0.5, "zoom \(viewport.zoom) rot \(viewport.rotation)")
+            XCTAssertEqual(point.y, 300, accuracy: 0.5, "zoom \(viewport.zoom) rot \(viewport.rotation)")
+        }
+    }
+
+    /// Panning still moves the map, and by exactly what it was asked for.
+    func testPanningMovesTheMapByTheAmountGiven() throws {
+        let scene = try Sample.scene()
+        let bounds = try XCTUnwrap(scene.contentBounds)
+        let corner = Coordinate(x: bounds.minX, y: bounds.maxY)
+
+        let still = try transform().worldToScreen(corner)
+        let moved = try transform(viewport: ViewportState(panX: 30, panY: -20)).worldToScreen(corner)
+        XCTAssertEqual(moved.x - still.x, 30, accuracy: 1e-9)
+        XCTAssertEqual(moved.y - still.y, -20, accuracy: 1e-9)
+    }
+
     func testTheMapIsCentredWithAMargin() throws {
         let transform = try self.transform()
         let scene = try Sample.scene()

@@ -10,7 +10,7 @@ struct LayersPanel: View {
     @Bindable var model: MapModel
 
     var body: some View {
-        Section("Layers in this map") {
+        Section {
             if model.layerRows.isEmpty {
                 Text("Nothing fetched yet.")
                     .font(.caption)
@@ -28,6 +28,22 @@ struct LayersPanel: View {
                     LayerRow(row: row, model: model)
                 }
             }
+        } header: {
+            HStack(spacing: 4) {
+                Text("Layers in this map")
+                Spacer(minLength: 4)
+                // A sheet is usually built by turning most of the map off and a
+                // few layers back on, which is a lot of clicks from a full
+                // fetch. Both skip the empty layers — there is nothing in them
+                // to show, which is why their rows are disabled.
+                Button("All") { model.setAllLayers(visible: true) }
+                    .help("Show every layer that has something in it")
+                Button("None") { model.setAllLayers(visible: false) }
+                    .help("Hide every layer that has something in it")
+            }
+            .buttonStyle(.borderless)
+            .controlSize(.small)
+            .disabled(!model.hasToggleableLayers)
         }
     }
 }

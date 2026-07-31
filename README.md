@@ -155,6 +155,32 @@ features; ticking Elevation on top gives 19 layers, 11 787 features and −79 m 
 525 m. The streets are still there. That is the whole idea of the source stack,
 and it is why the check is worth running.
 
+## Turning the view
+
+The map turns fifteen degrees a step from the controls on the canvas, which is
+what it takes to run a coastline horizontally or square a street grid to the
+page. The readout doubles as the way back to north, and Fit undoes the turn
+along with the zoom.
+
+Rotation is **view state, not map state**: like pan and zoom it is absent from
+the session and from the undo history, and the exporters build their transform
+with a fresh viewport — so turning the preview frames the screen, never the
+file. The Python behaves the same way.
+
+Fixing this exposed an older defect. Zoom and rotation both happened about the
+origin of the pre-transform space rather than the middle of the canvas, so a map
+at zoom 3 landed three times its own offset down and right, and a map at 90°
+left the window altogether. The round-trip test passed throughout — an inverse
+can be exact and still describe the wrong picture — so the test that catches it
+now asserts where the content *lands*, and a second one counts painted pixels
+in a turned render.
+
+To look at a turned sheet without a window:
+
+```bash
+Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48 --rotate 30 --render-to turned.png
+```
+
 ## Undo
 
 Everything a person can do is undoable — the area, however it was set; ticking a

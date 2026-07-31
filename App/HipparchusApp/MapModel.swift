@@ -459,6 +459,26 @@ final class MapModel {
         placeName = ""
     }
 
+    /// Whether a show-all or hide-all would do anything. The view asks rather
+    /// than deciding for itself.
+    var hasToggleableLayers: Bool {
+        scene.map { !LayerInventory.toggleableLayerIDs(in: $0).isEmpty } ?? false
+    }
+
+    /// Show or hide every populated layer at once.
+    ///
+    /// One action to a person, so one entry in the history — named for what was
+    /// asked rather than for whichever layer happened to differ first.
+    func setAllLayers(visible: Bool) {
+        guard let scene else { return }
+        let updated = LayerInventory.hiddenLayers(
+            in: scene, settingAllVisible: visible, from: hiddenLayers
+        )
+        guard updated != hiddenLayers else { return }
+        pendingAction = (visible ? "Show All Layers" : "Hide All Layers", nil)
+        hiddenLayers = updated
+    }
+
     func toggleLayer(_ layerID: String) {
         if hiddenLayers.contains(layerID) {
             hiddenLayers.remove(layerID)
@@ -737,6 +757,9 @@ final class MapModel {
                 }
             }
         }
+        if let flag = arguments.firstIndex(of: "--rotate"), flag + 1 < arguments.count {
+            renderRotation = Double(arguments[flag + 1]) ?? 0
+        }
         if let flag = arguments.firstIndex(of: "--bbox"), flag + 1 < arguments.count {
             let parts = arguments[flag + 1]
                 .split(separator: ",")
@@ -832,6 +855,14 @@ final class MapModel {
     /// leaves a file that can be looked at, which is as close to "did the window
     /// draw?" as anything headless gets. It does **not** prove the SwiftUI layout is
     /// right; only a person looking at the window can say that.
+    /// Degrees for `--rotate`, applied to the headless render.
+    ///
+    /// The rotate controls live on a canvas nobody can screenshot, so without a
+    /// flag there is no way to check that a turned map is drawn rather than
+    /// merely computed — which is exactly the distinction that caught the
+    /// transform turning about the origin.
+    private var renderRotation = 0.0
+
     private func renderWhenReady(to url: URL) {
         Task { [weak self] in
             // Generous: a debug build contours roughly thirty times slower than a
@@ -850,7 +881,9 @@ final class MapModel {
 
             let status = self.status
             guard let image = CoreGraphicsRenderer().image(
-                of: scene, size: CGSize(width: 1600, height: 1200)
+                of: scene,
+                size: CGSize(width: 1600, height: 1200),
+                viewport: ViewportState().rotated(to: self.renderRotation)
             ) else {
                 FileHandle.standardError.write(Data("the scene produced no image\n".utf8))
                 exit(1)

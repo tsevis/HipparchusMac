@@ -154,6 +154,27 @@ public enum LayerInventory {
         return entries
     }
 
+    /// The layers a show-all or hide-all applies to: the ones with something in
+    /// them. Ported from `LayersPanel.set_all`, which skips the rest — an empty
+    /// layer has nothing to show, which is why its row is disabled.
+    public static func toggleableLayerIDs(in scene: RenderScene) -> [String] {
+        entries(for: scene).filter(\.hasData).map(\.layerID)
+    }
+
+    /// What `hiddenLayers` becomes when the user asks for all or none.
+    ///
+    /// Layers holding nothing keep whatever state they had: a layer hidden by
+    /// hand and later emptied by a re-fetch should still be hidden when it fills
+    /// again, and a bulk control is no reason to forget that.
+    public static func hiddenLayers(
+        in scene: RenderScene,
+        settingAllVisible visible: Bool,
+        from current: Set<String>
+    ) -> Set<String> {
+        let toggleable = Set(toggleableLayerIDs(in: scene))
+        return visible ? current.subtracting(toggleable) : current.union(toggleable)
+    }
+
     /// The inventory as `(group, rows)`, skipping groups with no layers.
     public static func grouped(for scene: RenderScene) -> [(group: String, rows: [Entry])] {
         let rows = entries(for: scene)

@@ -21,6 +21,11 @@ public struct CanvasTransform: Sendable, Equatable {
     public let worldMinX: Double
     public let worldMaxY: Double
     public let viewport: ViewportState
+    /// The point the viewport turns and scales about — the middle of the canvas,
+    /// which is also where `offsetX`/`offsetY` put the middle of the map. Zooming
+    /// and rotating about the origin instead walked the map out of the window.
+    public let pivotX: Double
+    public let pivotY: Double
 
     /// Points of breathing room around the map, so linework does not run to the
     /// very edge of the canvas.
@@ -42,6 +47,8 @@ public struct CanvasTransform: Sendable, Equatable {
         offsetY = (size.height - spanY * fitScale) * 0.5
         worldMinX = bounds.minX
         worldMaxY = bounds.maxY
+        pivotX = size.width * 0.5
+        pivotY = size.height * 0.5
         self.viewport = viewport
     }
 
@@ -51,12 +58,20 @@ public struct CanvasTransform: Sendable, Equatable {
     public func worldToScreen(_ world: Coordinate) -> CGPoint {
         let px = offsetX + (world.x - worldMinX) * fitScale
         let py = offsetY + (worldMaxY - world.y) * fitScale
+        // Turned and scaled about the middle of the canvas. About the origin — as
+        // this did — a map at zoom 3 lands three times its own offset down and
+        // right, and a map at 90° leaves the window altogether.
+        let dx = px - pivotX
+        let dy = py - pivotY
         let radians = viewport.rotation * .pi / 180.0
         let cosR = cos(radians)
         let sinR = sin(radians)
-        let rx = px * cosR - py * sinR
-        let ry = px * sinR + py * cosR
-        return CGPoint(x: viewport.panX + rx * viewport.zoom, y: viewport.panY + ry * viewport.zoom)
+        let rx = dx * cosR - dy * sinR
+        let ry = dx * sinR + dy * cosR
+        return CGPoint(
+            x: viewport.panX + pivotX + rx * viewport.zoom,
+            y: viewport.panY + pivotY + ry * viewport.zoom
+        )
     }
 
     /// Canvas points back to world (projected) coordinates.
@@ -65,13 +80,13 @@ public struct CanvasTransform: Sendable, Equatable {
     /// as an input device rather than only as a picture.
     public func screenToWorld(_ point: CGPoint) -> Coordinate {
         let zoom = viewport.zoom == 0 ? 1.0 : viewport.zoom
-        let rx = (point.x - viewport.panX) / zoom
-        let ry = (point.y - viewport.panY) / zoom
+        let rx = (point.x - viewport.panX - pivotX) / zoom
+        let ry = (point.y - viewport.panY - pivotY) / zoom
         let radians = viewport.rotation * .pi / 180.0
         let cosR = cos(radians)
         let sinR = sin(radians)
-        let px = rx * cosR + ry * sinR
-        let py = -rx * sinR + ry * cosR
+        let px = rx * cosR + ry * sinR + pivotX
+        let py = -rx * sinR + ry * cosR + pivotY
         return Coordinate(
             x: worldMinX + (px - offsetX) / fitScale,
             y: worldMaxY - (py - offsetY) / fitScale

@@ -108,11 +108,35 @@ struct ContentView: View {
                 Image(systemName: "minus").frame(width: 22, height: 22)
             }
             Divider().frame(width: 22)
+            Button { viewport = viewport.rotated(by: -15) } label: {
+                Image(systemName: "rotate.left").frame(width: 22, height: 22)
+            }
+            .help("Turn the view anticlockwise")
+            Button { viewport = viewport.rotated(by: 15) } label: {
+                Image(systemName: "rotate.right").frame(width: 22, height: 22)
+            }
+            .help("Turn the view clockwise")
+
+            // The bearing, and the way back to it. Shown only when the view is
+            // turned, because a row reading 0° every other minute is furniture.
+            if viewport.rotation != 0 {
+                Button { viewport = viewport.rotated(to: 0) } label: {
+                    Text("\(Int(viewport.rotation.rounded()))°")
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .frame(width: 22, height: 18)
+                }
+                .help("Back to north up")
+            }
+
+            Divider().frame(width: 22)
             Button { viewport = ViewportState() } label: {
                 Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .frame(width: 22, height: 22)
             }
-            .help("Fit the map to the window")
+            // Fit undoes the turn as well as the zoom: one control meaning
+            // "show me the whole thing, the right way up".
+            .help("Fit the map to the window, north up")
         }
         .buttonStyle(.borderless)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
