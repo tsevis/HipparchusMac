@@ -188,6 +188,45 @@ final class SourceStackTests: XCTestCase {
         )
     }
 
+    /// Overpass is the source that dominates a fetch and the one most likely to
+    /// need adjusting: a large area times out at the stock sixty seconds, and a
+    /// self-hosted or mirrored instance answers where the main one is refusing.
+    /// The Python offers all three in its Settings tab; here they are inline on
+    /// the source, where the rest of a source's settings already live.
+    func testOverpassExposesItsTimeoutRateAndEndpoint() throws {
+        var stack = SourceStack()
+        stack.setSetting(SourceID.overpass, "timeout", .number(180))
+        stack.setSetting(SourceID.overpass, "rate", .number(0.5))
+
+        let overrides = stack.providerOverrides(for: SourceID.overpass)
+        XCTAssertEqual(overrides["timeoutSeconds"], .number(180))
+        XCTAssertEqual(overrides["requestsPerSecond"], .number(0.5))
+
+        // The endpoint is a choice of known instances rather than free text: a
+        // mistyped URL in a sidebar row fails as silently as a dead server.
+        let endpoint = try XCTUnwrap(
+            stack.settings(for: SourceID.overpass).first { $0.key == "endpoint" }
+        )
+        XCTAssertEqual(endpoint.kind, .choice)
+        XCTAssertGreaterThan(endpoint.choices.count, 1)
+        XCTAssertEqual(endpoint.value, .text(OverpassSettings().endpoint))
+        XCTAssertTrue(
+            endpoint.choices.contains(.text(OverpassSettings().endpoint)),
+            "the default instance is not among the choices"
+        )
+    }
+
+    /// The defaults must be the provider's own, or the sidebar would quietly
+    /// freeze today's values into every saved session.
+    func testOverpassSettingsDefaultToTheProvidersOwn() throws {
+        let settings = SourceStack().settings(for: SourceID.overpass)
+        let timeout = try XCTUnwrap(settings.first { $0.key == "timeout" })
+        let rate = try XCTUnwrap(settings.first { $0.key == "rate" })
+        XCTAssertEqual(timeout.value, .number(OverpassSettings().timeoutSeconds))
+        XCTAssertEqual(rate.value, .number(OverpassSettings().requestsPerSecond))
+        XCTAssertTrue(SourceStack().providerOverrides(for: SourceID.overpass).isEmpty)
+    }
+
     /// A provider's own defaults are the better answer for anything untouched.
     func testUntouchedSourcesOverrideNothing() {
         XCTAssertTrue(SourceStack().providerOverrides(for: SourceID.terrainTiles).isEmpty)

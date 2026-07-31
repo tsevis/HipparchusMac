@@ -195,6 +195,32 @@ public struct SourceStack: Sendable, Equatable {
             label: "OpenStreetMap",
             subtitle: "streets · places · water",
             provenance: .live,
+            settings: [
+                // Overpass dominates a fetch — 325 of 331 seconds in the
+                // measurement the kickoff records — so these are the knobs most
+                // likely to be needed: a large area times out at sixty seconds,
+                // and a mirror answers when the main instance is refusing.
+                SourceSetting(
+                    "timeout", "Timeout", .number,
+                    .number(OverpassSettings().timeoutSeconds),
+                    suffix: "s", attribute: "timeoutSeconds"
+                ),
+                SourceSetting(
+                    "rate", "Requests / sec", .number,
+                    .number(OverpassSettings().requestsPerSecond),
+                    attribute: "requestsPerSecond"
+                ),
+                // A choice, not free text. The Python takes a typed URL; a
+                // mistyped one in a sidebar row fails exactly as silently as a
+                // dead server, and these are the instances worth naming.
+                SourceSetting(
+                    "endpoint", "Instance", .choice,
+                    .text(OverpassSettings().endpoint),
+                    choices: ([OverpassSettings().endpoint] + OverpassSettings().fallbackEndpoints)
+                        .map { .text($0) },
+                    attribute: "endpoint"
+                ),
+            ],
             defaultEnabled: true
         ),
         SourceDefinition(

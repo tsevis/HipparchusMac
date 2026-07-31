@@ -597,7 +597,19 @@ final class MapModel {
             let overrides = stack.providerOverrides(for: id)
             switch id {
             case SourceID.overpass:
-                providers.append(OverpassProvider(cache: cache))
+                var settings = OverpassSettings()
+                if let timeout = overrides["timeoutSeconds"]?.doubleValue, timeout > 0 {
+                    settings.timeoutSeconds = timeout
+                }
+                if let rate = overrides["requestsPerSecond"]?.doubleValue, rate > 0 {
+                    settings.requestsPerSecond = rate
+                }
+                if let endpoint = overrides["endpoint"]?.stringValue, !endpoint.isEmpty {
+                    // Chosen first, the rest still tried after it: a mirror that
+                    // is refusing today should not become a dead end.
+                    settings.endpoint = endpoint
+                }
+                providers.append(OverpassProvider(settings: settings, cache: cache))
 
             case SourceID.terrainTiles:
                 var settings = TerrainTileSettings()
