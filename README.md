@@ -1,8 +1,15 @@
 # HipparchusMac
 
-A native macOS rewrite of [Hipparchus](../Hipparchus): choose an area of the
-world, fetch map data from public sources, and export layered,
-Illustrator-editable SVG.
+A native macOS rewrite of [Hipparchus](https://github.com/tsevis/Hipparchus):
+choose an area of the world, fetch map data from public sources, and export
+layered, Illustrator-editable SVG.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands, Mauna Kea and Mauna Loa reading as concentric shields, from real elevation data"></td>
+    <td width="50%"><img src="docs/assets/gallery-amsterdam-fragmented-urban.png" width="100%" alt="Amsterdam's canals, rail fan and building footprints drawn from OpenStreetMap"></td>
+  </tr>
+</table>
 
 The Python application is the specification. It is finished, it works, and its
 454 tests are an executable description of the behaviour being ported. Anything
@@ -10,7 +17,7 @@ here that disagrees with it is a bug here.
 
 **Status: the app is built, and the window has never been looked at.** Every
 online source, the composing source stack, the sixteen presets, illuminated
-contours, the three-column interface and the exports are in, with 572 tests and
+contours, the three-column interface and the exports are in, with 606 tests and
 the output checked against real ground. See `KICKOFF.md` for the brief.
 
 Every claim here is backed by a test or by a render someone can open. **None of
@@ -175,6 +182,66 @@ than against my reading of it:
 
 Regenerate them with the scripts in `Scripts/`. A diff there means one of the two
 implementations changed; find out which before accepting it.
+
+## Gallery
+
+Ten regions, drawn by this app, each in a different preset. They are also the
+widest test it has been put through: every one was fetched, built and rendered
+in a single run, and the elevations below were read off the result rather than
+asserted in advance.
+
+**Terrain, from the elevation mosaic alone.** No account, no key, global.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/gallery-papua-new-guinea-contour-study.png" width="100%" alt="Papua New Guinea in illuminated contours, the Owen Stanley Range and the trenches around New Britain"></td>
+    <td width="50%"><img src="docs/assets/gallery-france-hypsometric.png" width="100%" alt="France as filled elevation bands, the Alps and Pyrenees against the Atlantic shelf"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/assets/gallery-ghana-relief-sheet.png" width="100%" alt="Ghana as a dense hairline relief sheet, the Volta basin and the Akwapim ridge"></td>
+    <td width="50%"><img src="docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands, five shield volcanoes and the sea floor around them"></td>
+  </tr>
+</table>
+
+**Cities, from OpenStreetMap**, two of them with elevation stacked underneath —
+which is the whole point of the source stack: ticking Elevation onto a street
+map adds contours and never discards the streets.
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/assets/gallery-amsterdam-fragmented-urban.png" width="100%" alt="Amsterdam in the Fragmented Urban preset, canals, the IJ and the Centraal rail fan"></td>
+    <td width="50%"><img src="docs/assets/gallery-dusseldorf-clean-atlas.png" width="100%" alt="Dusseldorf in the Clean Atlas preset, the Rhine and the Altstadt"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/assets/gallery-los-angeles-technical-blueprint.png" width="100%" alt="Los Angeles in the Technical Blueprint preset, the downtown grid with contours beneath it"></td>
+    <td width="50%"><img src="docs/assets/gallery-toronto-editorial-print.png" width="100%" alt="Toronto in the Editorial Print preset, the waterfront and the downtown core"></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/assets/gallery-rio-night.png" width="100%" alt="Rio de Janeiro in the Night preset, lit streets over the Tijuca massif with Copacabana and Ipanema"></td>
+    <td width="50%"><img src="docs/assets/gallery-beijing-figure-ground.png" width="100%" alt="Beijing in the Monochrome Figure Ground preset, the hutong blocks against the ring roads"></td>
+  </tr>
+</table>
+
+The elevations are worth stating, because they are the check: nothing here was
+chosen to flatter the renderer, and each number can be looked up.
+
+| Region | Measured | What it should be |
+|---|---|---|
+| Papua New Guinea | −8 836 m to 4 084 m | the New Britain Trench bottoms at −8 940 m |
+| Hawaii | −5 594 m to 4 177 m | Mauna Kea is 4 207 m |
+| France | −5 022 m to 4 222 m | the Alps, sampled at zoom 7 |
+| Ghana | −3 937 m to 916 m | Mount Afadja is 885 m |
+| Rio de Janeiro | −529 m to 778 m | the Tijuca massif |
+| Los Angeles | 49 m to 245 m | downtown to the Hollywood Hills |
+
+The city sheets have their label layers switched off, the same switch the Layers
+panel offers. With them on, four label layers thin independently and a dense
+city carries several hundred names — true to the data and busier than a sheet
+wants to be.
+
+**That run found a bug**, which is what a wide test is for: on Hawaii every
+summit label sat on top of its neighbour. See "What is not here" for the reason
+and the fix.
 
 ## Verifying the app itself
 
@@ -374,6 +441,14 @@ had noticed.
   it rewarded exactly the blurring it should have caught. Looking at two crops
   side by side settled it in seconds. A metric that encodes the wrong ideal is
   more dangerous than no metric.
+- **Label collision boxes are a fraction of the frame, not 50 metres.** The
+  Python reserves a fixed box around each label — 50 units wide, 20 tall — in
+  projected space, and its own docstring calls that "obvious projected-space
+  overlap". Those units are metres. Across a city that is a few pixels; across
+  an island chain 150 km wide it is a fraction of one, so no two boxes can ever
+  overlap and the thinning does nothing at all. A render of Hawaii put every
+  summit height on top of its neighbour. Sized against the frame instead, it
+  means the same thing at every scale.
 - **Simplification does not collapse collinear runs.** `simplification.py` walks
   the vertex list removing redundant nodes; here GEOS `simplify` does the work
   and nothing counts removed nodes afterwards.
