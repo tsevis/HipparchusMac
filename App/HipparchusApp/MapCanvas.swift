@@ -12,16 +12,36 @@ import SwiftUI
 ///
 /// The map is the product, so it gets the room: drag to pan, scroll to zoom,
 /// Option-drag to draw a new area.
+/// A weak handle onto the live canvas, so "Update map" can ask it what is on
+/// screen right now.
+///
+/// `MapCanvas` is a value type recreated on every body evaluation, so a parent
+/// cannot hold the `NSView` itself; this is the usual small reference-type
+/// go-between for reaching into an `NSViewRepresentable` on demand rather than
+/// only reacting to callbacks it chooses to fire.
+@MainActor
+final class MapCanvasHandle {
+    fileprivate weak var view: MapCanvasView?
+
+    /// The area currently on screen, accounting for pan, zoom and rotation —
+    /// `nil` before anything has ever been drawn.
+    func visibleArea() -> BoundingBox? {
+        view?.visibleArea()
+    }
+}
+
 struct MapCanvas: NSViewRepresentable {
     let scene: RenderScene?
     var viewport: ViewportState
     var onViewportChange: (ViewportState) -> Void
     var onAreaDrawn: (BoundingBox) -> Void
+    var handle: MapCanvasHandle?
 
     func makeNSView(context: Context) -> MapCanvasView {
         let view = MapCanvasView()
         view.onViewportChange = onViewportChange
         view.onAreaDrawn = onAreaDrawn
+        handle?.view = view
         return view
     }
 
@@ -51,6 +71,25 @@ final class MapCanvasView: NSView {
 
     override var isOpaque: Bool { true }
     override var acceptsFirstResponder: Bool { true }
+
+    /// What this canvas is showing right now, in real coordinates — what
+    /// "Update map" fetches instead of whatever was last typed, so zooming
+    /// out (or in, or panning) and pressing it gets what is actually being
+    /// looked at.
+    ///
+    /// Reuses the transform the last `draw(_:)` built rather than
+    /// reconstructing one, so this can never disagree with what is actually
+    /// on screen.
+    func visibleArea() -> BoundingBox? {
+        guard let scene, let transform else { return nil }
+        let world = transform.visibleWorldBounds(canvasSize: bounds.size)
+        let southWest = scene.projection.unproject(Coordinate(x: world.minX, y: world.minY))
+        let northEast = scene.projection.unproject(Coordinate(x: world.maxX, y: world.maxY))
+        return BoundingBox(
+            minLon: min(southWest.lon, northEast.lon), minLat: min(southWest.lat, northEast.lat),
+            maxLon: max(southWest.lon, northEast.lon), maxLat: max(southWest.lat, northEast.lat)
+        )
+    }
 
     // MARK: - Drawing
 

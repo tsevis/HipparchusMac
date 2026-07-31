@@ -321,6 +321,18 @@ To look at a turned sheet without a window:
 Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48 --rotate 30 --render-to turned.png
 ```
 
+**One deliberate exception.** Pan and zoom stay out of the requested area right
+up until the moment **Update map** is pressed — that button is asking the app
+to act on what is actually on screen, so it reads the canvas's current pan,
+zoom and rotation, sets the area to whatever ground that implies, and resets
+the view to a plain fit before fetching. Without this, zooming out and pressing
+Update map re-fetched the same area as before while the screen still showed the
+wider view, and looked exactly like nothing had happened. `CanvasTransform` does
+the measuring — reading all four corners of the canvas rather than two opposite
+ones, since a turned viewport's visible ground is a turned rectangle and only
+the full corner set gives its true bounds — and it is tested there; the button
+itself is a few lines of wiring this environment cannot watch someone click.
+
 ## Undo
 
 Everything a person can do is undoable — the area, however it was set; ticking a

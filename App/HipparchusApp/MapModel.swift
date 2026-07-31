@@ -438,6 +438,19 @@ final class MapModel {
         isError = false
     }
 
+    /// Set the area to whatever the canvas is currently showing.
+    ///
+    /// Turning the view — pan, zoom, rotation — is deliberately kept out of
+    /// the requested area, so that turning the preview frames the screen and
+    /// never the file. That is right for everything except this one moment:
+    /// pressing Update map is asking the app to act on what is on screen, and
+    /// without this it instead re-fetches whatever was last typed, so zooming
+    /// out and pressing it looked like nothing happened.
+    func syncAreaToVisibleView(_ bbox: BoundingBox) {
+        pendingAction = ("Sync Area to View", "area")
+        setArea(bbox)
+    }
+
     func setArea(_ bbox: BoundingBox) {
         // Adopted searches route through here already carrying their own name.
         if pendingAction == nil { pendingAction = ("Draw Area", "area") }

@@ -12,6 +12,11 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = MapModel()
     @State private var viewport = ViewportState()
+    /// A handle onto the live canvas, so Update map can ask what is actually
+    /// on screen — turning the view is deliberately kept out of the requested
+    /// area, so without this, zooming out and pressing Update map re-fetches
+    /// the same old bbox while the screen still shows the wider one.
+    @State private var canvasHandle = MapCanvasHandle()
     @State private var columnVisibility = NavigationSplitViewVisibility.all
     /// The window's own undo manager, which puts ⌘Z and the Edit menu in charge
     /// of the model's history rather than inventing a parallel mechanism.
@@ -74,7 +79,8 @@ struct ContentView: View {
                 scene: model.visibleScene,
                 viewport: viewport,
                 onViewportChange: { viewport = $0 },
-                onAreaDrawn: { model.setArea($0) }
+                onAreaDrawn: { model.setArea($0) },
+                handle: canvasHandle
             )
 
             zoomControls
@@ -165,9 +171,19 @@ struct ContentView: View {
             // Cancel appears beside Update map while a fetch runs — where the eye
             // already is — as well as in the status bar next to the progress.
             HStack(spacing: 8) {
-                Button("Update map") { model.update() }
-                    .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(model.isFetching || model.bbox == nil)
+                Button("Update map") {
+                    // Fetch what is actually on screen, not whatever was last
+                    // typed — turning the view (pan, zoom, rotation) stays out
+                    // of the requested area everywhere else, but pressing this
+                    // button is asking the app to act on what it is showing.
+                    if let visible = canvasHandle.visibleArea() {
+                        model.syncAreaToVisibleView(visible)
+                        viewport = ViewportState()
+                    }
+                    model.update()
+                }
+                .keyboardShortcut(.return, modifiers: .command)
+                .disabled(model.isFetching || model.bbox == nil)
                 if model.isFetching {
                     Button("Cancel") { model.cancel() }
                         .help("Skips sources not yet started and discards the result. A request already in flight runs to completion.")
