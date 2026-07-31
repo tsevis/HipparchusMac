@@ -45,6 +45,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hipparchus.HipparchusMac
+        # Modest on purpose: the model behind the window is well tested, and the
+        # window itself has never been reviewed by anyone.
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
         PRODUCT_NAME: Hipparchus
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         INFOPLIST_KEY_NSPrincipalClass: NSApplication

@@ -20,3 +20,6 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# Built artefacts: the disk image is made by Scripts/make-dmg.sh.
+dist/
