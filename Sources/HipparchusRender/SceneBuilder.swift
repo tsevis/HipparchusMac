@@ -152,13 +152,27 @@ public struct SceneBuilder: Sendable {
                         layer.labels.append(PlaceLabel(
                             name: name,
                             position: projection.project(point),
-                            placeType: feature.property("place")?.stringValue
-                                ?? feature.property("amenity")?.stringValue
-                                ?? feature.property("shop")?.stringValue
-                                ?? labelType(for: layer.name)
+                            placeType: labelType(for: feature, in: layer.name)
                         ))
                     }
                     continue
+                }
+
+                // A label layer labels whatever shape its features arrive as —
+                // ported from `extract_labels`, which anchors a line or ring at
+                // the average of its coordinates. Earthquakes are circles and
+                // satellite tracks are lines, so a points-only rule left both
+                // styled, budgeted, and permanently empty; a restaurant mapped
+                // as its building outline vanished the same way. Unlike a point,
+                // the geometry still draws — the label is in addition to it.
+                if Self.labelLayers.contains(name) || name.hasPrefix("earthquakes"),
+                   let labelName = feature.property("name")?.stringValue, !labelName.isEmpty,
+                   let anchor = Self.coordinateAverage(of: feature.geometry) {
+                    layer.labels.append(PlaceLabel(
+                        name: labelName,
+                        position: projection.project(anchor),
+                        placeType: labelType(for: feature, in: layer.name)
+                    ))
                 }
 
                 guard let geometry = try process(
@@ -510,6 +524,22 @@ public struct SceneBuilder: Sendable {
 
     // MARK: - Labels
 
+    /// The layers whose non-point features still label themselves — the set the
+    /// Python passes through `extract_labels`. Streets have their own rule (one
+    /// label per name, on the longest run), and everything else draws unlabelled.
+    static let labelLayers: Set<String> = [
+        "places", "shops", "amenities", "summits", "satellite_tracks",
+    ]
+
+    /// What a label says it is: the feature's own word for itself, or the
+    /// layer's when it has none.
+    private func labelType(for feature: Feature, in layer: String) -> String {
+        feature.property("place")?.stringValue
+            ?? feature.property("amenity")?.stringValue
+            ?? feature.property("shop")?.stringValue
+            ?? labelType(for: layer)
+    }
+
     /// The type a label carries when the feature does not name one itself.
     private func labelType(for layer: String) -> String {
         switch layer {
@@ -518,6 +548,24 @@ public struct SceneBuilder: Sendable {
         case let name where name.hasPrefix("earthquakes"): "earthquake"
         default: ""
         }
+    }
+
+    /// The average of a geometry's coordinates — a line's, or a ring's. Ported
+    /// from `extract_labels`, which anchors non-point labels exactly this way;
+    /// crude beside a centroid, but it is what the Python draws.
+    static func coordinateAverage(of geometry: Geometry) -> Coordinate? {
+        let coordinates: [Coordinate]
+        switch geometry {
+        case .lineString(let line):
+            coordinates = line.coordinates
+        case .polygon(let polygon):
+            coordinates = polygon.exterior.coordinates
+        default:
+            return nil
+        }
+        guard !coordinates.isEmpty else { return nil }
+        let sum = coordinates.reduce((x: 0.0, y: 0.0)) { ($0.x + $1.x, $0.y + $1.y) }
+        return Coordinate(x: sum.x / Double(coordinates.count), y: sum.y / Double(coordinates.count))
     }
 
     /// How many labels a layer may place. Ported from the Python's per-layer budgets.
