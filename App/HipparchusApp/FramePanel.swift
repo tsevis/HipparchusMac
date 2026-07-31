@@ -16,17 +16,29 @@ struct FramePanel: View {
     @State private var showsCoordinates = false
 
     var body: some View {
+        VStack(spacing: 0) {
+            // Outside the list on purpose: a `List` on macOS owns a real
+            // `NSScrollView`, which competes with `MKMapView`'s own pan and
+            // magnify recognizers for the same mouse-down-drag and scroll
+            // events — a map row that looks right but never actually pans
+            // or zooms. A plain sibling view has no scroll view to compete with.
+            Locator(bbox: model.bbox, onRegionChanged: { model.browseWorldMap(to: $0) })
+                .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6)
+                        .strokeBorder(.separator, lineWidth: 0.5)
+                }
+                .padding(8)
+                .help("Drag to pan, scroll or pinch to zoom. The area shown becomes the area Update map fetches.")
+
+            list
+        }
+    }
+
+    private var list: some View {
         List {
             Section("Frame") {
-                Locator(bbox: model.bbox, onRegionChanged: { model.browseWorldMap(to: $0) })
-                    .frame(height: 220)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 6)
-                            .strokeBorder(.separator, lineWidth: 0.5)
-                    }
-                    .help("Drag to pan, scroll or pinch to zoom. The area shown becomes the area Update map fetches.")
-
                 Text(model.areaDescription)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -116,7 +128,7 @@ struct FramePanel: View {
 /// is marked before it is set, and the delegate callback that same `setRegion`
 /// triggers checks that mark and does not report it back as if the user had
 /// just panned there.
-private struct Locator: NSViewRepresentable {
+struct Locator: NSViewRepresentable {
     let bbox: BoundingBox?
     var onRegionChanged: (BoundingBox) -> Void
 

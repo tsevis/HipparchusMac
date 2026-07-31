@@ -18,6 +18,7 @@ struct ContentView: View {
     /// the same old bbox while the screen still shows the wider one.
     @State private var canvasHandle = MapCanvasHandle()
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @State private var locatorPanel = LocatorPanelController()
     /// The window's own undo manager, which puts ⌘Z and the Edit menu in charge
     /// of the model's history rather than inventing a parallel mechanism.
     @Environment(\.undoManager) private var undoManager
@@ -165,6 +166,15 @@ struct ContentView: View {
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
             PlaceSearchField(model: model)
+        }
+
+        ToolbarItem(placement: .navigation) {
+            Button {
+                locatorPanel.show(model: model)
+            } label: {
+                Image(systemName: "map")
+            }
+            .help("Open the Locator in its own floating window")
         }
 
         ToolbarItem(placement: .principal) {

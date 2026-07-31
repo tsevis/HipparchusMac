@@ -166,10 +166,11 @@ exists for the same reason `--search` does: a button is not something a
 screenshot-less environment can click, so this drives the real
 clipboard-reading code and prints what it found.
 
-**The Locator**, in the Frame panel, is a fourth way in: a real, live map of the
-whole world, to drag and pinch rather than search or type. It starts at world
-scale regardless of whatever area is already requested — a mirror of the main
-canvas would put you back where you started — and every pan or zoom becomes the
+**The Locator**, in the Frame panel and also — via the map icon in the toolbar —
+its own floating window, is a fourth way in: a real, live map of the whole
+world, to drag and pinch rather than search or type. It starts at world scale
+regardless of whatever area is already requested — a mirror of the main canvas
+would put you back where you started — and every pan or zoom becomes the
 requested area, the same one Update map then fetches. The area can also change
 from elsewhere — a search result, a saved place, typed coordinates, a pasted
 clipboard — and the Locator moves to show that too, without that reflected move
@@ -177,6 +178,16 @@ being mistaken for a fresh drag and bouncing back out to the requested area a
 second time. A region this view is *told* to show is marked before it is set;
 the delegate callback that same `setRegion` triggers checks that mark and skips
 reporting it.
+
+It first shipped as a row inside the Frame panel's `List`, and did not actually
+pan or zoom there: a `List` on macOS owns a real `NSScrollView`, which competes
+with `MKMapView`'s own pan and magnify recognizers for the same mouse-down-drag
+and scroll events, so the map drew correctly but never moved. It now sits above
+the list as a plain sibling view, with no scroll view left to compete with, and
+the floating window is a second way to reach the same live map, undocked from
+the list entirely and free to be positioned wherever is convenient — opening it
+again brings the same window forward rather than spawning another, and closing
+it keeps the map's position rather than resetting to the whole world.
 
 Nobody can drag this map in a screenshot-less environment either, so it is
 verified the same way as the rest: driving the real `Coordinator` and a real
