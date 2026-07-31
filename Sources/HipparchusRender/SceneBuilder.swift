@@ -858,20 +858,46 @@ public struct SceneBuilder: Sendable {
             return a == b ? first.name < second.name : a < b
         }
 
+        // The frame the labels are being placed on. Without one there is no
+        // scale to reserve room against, so nothing is thinned.
+        guard let frame = bounds ?? Bounds(candidates.map(\.position)) else {
+            return Array(candidates.prefix(limit))
+        }
+
         var accepted: [PlaceLabel] = []
         var occupied: [Bounds] = []
         for label in candidates {
             guard accepted.count < limit else { break }
-            // A rough box in projected units, sized from the text it will hold.
-            let width = Swift.max(50.0, Double(label.name.count) * 8.0)
-            let box = Bounds(
-                minX: label.position.x - width * 0.5, minY: label.position.y - 10.0,
-                maxX: label.position.x + width * 0.5, maxY: label.position.y + 10.0
-            )
+            let box = Self.labelBox(for: label, in: frame)
             if occupied.contains(where: { $0.intersects(box) }) { continue }
             occupied.append(box)
             accepted.append(label)
         }
         return accepted
+    }
+
+    /// The room a label reserves, as a fraction of the frame it is drawn on.
+    ///
+    /// **A deliberate divergence from the Python**, which reserves a fixed box —
+    /// 50 units wide, 20 tall — in projected space, and whose own docstring
+    /// calls that "obvious projected-space overlap". Those units are metres, so
+    /// the box means something different on every sheet: a few pixels across a
+    /// city, and a small fraction of one across an island chain. A render of
+    /// Hawaii put every summit label on top of its neighbour, because no two
+    /// boxes could ever be found to overlap.
+    ///
+    /// Sized against the frame instead, it means the same thing at every scale —
+    /// roughly the room twelve-point type takes on a sheet about twelve hundred
+    /// points wide, which is what both the canvas and the exporters draw.
+    static func labelBox(for label: PlaceLabel, in frame: Bounds) -> Bounds {
+        let span = Swift.max(frame.width, frame.height)
+        // A character is about 1/200th of the sheet across, a line about
+        // 1/55th of it tall, with a floor so a one-letter name still holds ground.
+        let width = Swift.max(span / 40, Double(label.name.count) * span / 200)
+        let height = span / 55
+        return Bounds(
+            minX: label.position.x - width * 0.5, minY: label.position.y - height * 0.5,
+            maxX: label.position.x + width * 0.5, maxY: label.position.y + height * 0.5
+        )
     }
 }
