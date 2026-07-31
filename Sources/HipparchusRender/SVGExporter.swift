@@ -14,6 +14,66 @@ import HipparchusGeometry
 /// a map you cannot take apart is a picture, not a drawing.
 public struct SVGExporter: Sendable {
 
+    /// Map furniture and page composition. Ported from `MapComposition` in
+    /// `export/profiles.py`.
+    ///
+    /// **Everything is off by default**, matching the Python: the map is the
+    /// product, and furniture is asked for. The paper preset and orientation are
+    /// declarations for whatever opens the file, not instructions to this
+    /// exporter — the SVG is composed for them, never resized by them.
+    public struct Composition: Codable, Sendable, Equatable {
+        public var title = ""
+        public var subtitle = ""
+        public var includeTitle = false
+        public var includeScaleBar = false
+        public var includeNorthArrow = false
+        public var includeLegend = false
+        /// Fraction of the page kept clear around the furniture, clamped to
+        /// 0.02…0.18 when used.
+        public var marginRatio = 0.06
+        public var paperPreset = "Canvas"
+        public var orientation = "Landscape"
+
+        public init() {}
+
+        public var wantsAnything: Bool {
+            (includeTitle && !(title.isEmpty && subtitle.isEmpty))
+                || includeScaleBar || includeNorthArrow || includeLegend
+        }
+
+        /// The paper sizes the export dialog offers, in pixels — A4 and A3 at
+        /// 300 dpi. Ported from the Python's `PAPER_PRESETS`; "Canvas" means
+        /// whatever size the caller was already using.
+        public static let paperPresets: [(name: String, width: Int, height: Int)] = [
+            ("Canvas", 0, 0),
+            ("Square 2048", 2048, 2048),
+            ("A4", 2480, 3508),
+            ("A3", 3508, 4961),
+            ("Poster", 5400, 7200),
+        ]
+
+        public static let orientations = ["Landscape", "Portrait"]
+
+        /// The pixel size this composition asks the export to be. The orientation
+        /// turns the sheet, not the map, so it swaps the axes; an unknown preset
+        /// behaves as Canvas rather than as a zero-size page.
+        public func exportSize(canvasWidth: Int, canvasHeight: Int) -> (width: Int, height: Int) {
+            let preset = Self.paperPresets.first { $0.name == paperPreset }
+            var width = preset?.width ?? 0
+            var height = preset?.height ?? 0
+            if width <= 0 || height <= 0 {
+                width = max(1024, canvasWidth)
+                height = max(1024, canvasHeight)
+            }
+            if orientation == "Landscape", height > width {
+                swap(&width, &height)
+            } else if orientation == "Portrait", width > height {
+                swap(&width, &height)
+            }
+            return (width, height)
+        }
+    }
+
     public struct Options: Sendable {
         public var width = 4096
         public var height = 4096
@@ -23,6 +83,7 @@ public struct SVGExporter: Sendable {
         /// Paint the ground. Without it a dark preset exports pale strokes onto a
         /// transparent canvas, which reads as blank on white paper.
         public var includeBackground = true
+        public var composition = Composition()
 
         public init() {}
     }
@@ -59,6 +120,7 @@ public struct SVGExporter: Sendable {
             out += group(for: layer, transform: transform)
         }
         out += "  </g>\n"
+        out += furniture(for: scene, transform: transform)
         out += "</svg>\n"
         return out
     }
@@ -128,18 +190,172 @@ public struct SVGExporter: Sendable {
             }
         }
 
+        // Each label is a halo/text pair, as the Python exports it: the halo is
+        // the same string stroked wide in the ground colour behind the fill text,
+        // which is what keeps a street name legible over the linework it sits on.
         for label in layer.labels where !label.name.isEmpty {
             let point = transform.worldToScreen(label.position)
-            out += "      <text x=\"\(format(point.x))\" y=\"\(format(point.y))\""
-            out += " fill=\"\(style.strokeColor.hex)\" font-size=\"\(format(9.0))\""
-            out += " text-anchor=\"middle\" dominant-baseline=\"middle\""
+            var shared = "x=\"\(format(point.x))\" y=\"\(format(point.y))\""
+            shared += " font-family=\"Arial, Helvetica, sans-serif\" font-size=\"12\""
+            shared += " text-anchor=\"middle\" dominant-baseline=\"central\""
             if label.rotation != 0 {
-                out += " transform=\"rotate(\(format(label.rotation)) \(format(point.x)) \(format(point.y)))\""
+                shared += " transform=\"rotate(\(format(label.rotation)) \(format(point.x)) \(format(point.y)))\""
             }
-            out += ">\(escape(label.name))</text>\n"
+            let name = escape(label.name)
+            let halo = style.labelHaloColor.hex
+            out += "      <text \(shared) fill=\"\(halo)\" stroke=\"\(halo)\""
+            out += " stroke-width=\"\(format(style.labelHaloWidth))\" stroke-linejoin=\"round\">\(name)</text>\n"
+            out += "      <text \(shared) fill=\"\(style.strokeColor.hex)\" stroke=\"none\">\(name)</text>\n"
         }
 
         return out + "    </g>\n"
+    }
+
+    // MARK: - Furniture
+
+    /// Title, north arrow, scale bar and legend, ported from
+    /// `_add_composition_furniture`. Drawn after the map so they sit above it,
+    /// and inverted on a dark ground so they do not vanish into it.
+    private func furniture(for scene: RenderScene, transform: CanvasTransform?) -> String {
+        let composition = options.composition
+        guard composition.wantsAnything else { return "" }
+
+        let width = Double(options.width)
+        let height = Double(options.height)
+        let short = min(width, height)
+        let margin = max(18.0, short * min(0.18, max(0.02, composition.marginRatio)))
+
+        // Rec. 709 luminance on the 0–255 scale decides which way to invert.
+        let background = scene.background
+        let luminance = 0.2126 * Double(background.r)
+            + 0.7152 * Double(background.g) + 0.0722 * Double(background.b)
+        let darkGround = luminance < 128.0
+        let text = darkGround ? "#f2f2f2" : "#222222"
+        let halo = darkGround ? "#101010" : "#ffffff"
+        let panelFill = darkGround ? "#12151c" : "#ffffff"
+        let panelStroke = darkGround ? "#3a4050" : "#d0d0d0"
+        let subtitleColor = darkGround ? "#b8bdc9" : "#555555"
+
+        var out = "  <g id=\"map_furniture\">\n"
+
+        if composition.includeTitle, !(composition.title.isEmpty && composition.subtitle.isEmpty) {
+            out += "    <g id=\"map_title\">\n"
+            var titleY = margin
+            if !composition.title.isEmpty {
+                out += "      <text x=\"\(format(margin))\" y=\"\(format(titleY))\""
+                out += " font-family=\"Arial, Helvetica, sans-serif\""
+                out += " font-size=\"\(format(max(18.0, short * 0.028)))\" font-weight=\"700\""
+                out += " fill=\"\(text)\">\(escape(composition.title))</text>\n"
+                titleY += max(18.0, short * 0.032)
+            }
+            if !composition.subtitle.isEmpty {
+                out += "      <text x=\"\(format(margin))\" y=\"\(format(titleY))\""
+                out += " font-family=\"Arial, Helvetica, sans-serif\""
+                out += " font-size=\"\(format(max(11.0, short * 0.015)))\""
+                out += " fill=\"\(subtitleColor)\">\(escape(composition.subtitle))</text>\n"
+            }
+            out += "    </g>\n"
+        }
+
+        if composition.includeNorthArrow {
+            let size = max(36.0, short * 0.055)
+            let cx = width - margin - size * 0.5
+            let cy = margin + size * 0.55
+            let points = [
+                (cx, cy - size * 0.55),
+                (cx - size * 0.22, cy + size * 0.28),
+                (cx, cy + size * 0.12),
+                (cx + size * 0.22, cy + size * 0.28),
+            ]
+            out += "    <g id=\"north_arrow\">\n"
+            out += "      <polygon points=\""
+            out += points.map { "\(format($0.0)),\(format($0.1))" }.joined(separator: " ")
+            out += "\" fill=\"\(text)\" stroke=\"\(halo)\""
+            out += " stroke-width=\"\(format(max(1.0, size * 0.035)))\" stroke-linejoin=\"round\"/>\n"
+            out += "      <text x=\"\(format(cx))\" y=\"\(format(cy + size * 0.62))\""
+            out += " font-family=\"Arial, Helvetica, sans-serif\""
+            out += " font-size=\"\(format(max(10.0, size * 0.24)))\" font-weight=\"700\""
+            out += " text-anchor=\"middle\" fill=\"\(text)\">N</text>\n"
+            out += "    </g>\n"
+        }
+
+        if composition.includeScaleBar, let transform {
+            // The bar is drawn a round number of pixels long and *labelled* with
+            // the ground distance it happens to span, not the other way round —
+            // the label is derived from the transform, so it cannot lie.
+            let barPx = max(90.0, short * 0.18)
+            let worldDistance = barPx / max(transform.fitScale, 1e-9)
+            let label = Self.formatDistance(worldDistance, renderCRS: scene.projection.renderCRS)
+            let x = margin
+            let y = height - margin
+            out += "    <g id=\"scale_bar\">\n"
+            out += "      <rect x=\"\(format(x - 6))\" y=\"\(format(y - 28))\""
+            out += " width=\"\(format(barPx + 12))\" height=\"38\" fill=\"\(panelFill)\" opacity=\"0.78\"/>\n"
+            out += "      <line x1=\"\(format(x))\" y1=\"\(format(y))\" x2=\"\(format(x + barPx))\""
+            out += " y2=\"\(format(y))\" stroke=\"\(text)\" stroke-width=\"3\"/>\n"
+            out += "      <line x1=\"\(format(x))\" y1=\"\(format(y - 8))\" x2=\"\(format(x))\""
+            out += " y2=\"\(format(y + 8))\" stroke=\"\(text)\" stroke-width=\"2\"/>\n"
+            out += "      <line x1=\"\(format(x + barPx))\" y1=\"\(format(y - 8))\" x2=\"\(format(x + barPx))\""
+            out += " y2=\"\(format(y + 8))\" stroke=\"\(text)\" stroke-width=\"2\"/>\n"
+            out += "      <text x=\"\(format(x + barPx * 0.5))\" y=\"\(format(y - 12))\""
+            out += " font-family=\"Arial, Helvetica, sans-serif\" font-size=\"12\""
+            out += " text-anchor=\"middle\" fill=\"\(text)\">\(escape(label))</text>\n"
+            out += "    </g>\n"
+        }
+
+        if composition.includeLegend {
+            // The first ten visible layers with anything in them. The legend
+            // names them what the layer panel names them — one vocabulary; the
+            // Python keeps a second map in `svg_clean.py` that differs from its
+            // panel in casing, and carrying that fork over would port a bug.
+            let layers = scene.layers
+                .filter { $0.style.visible && (!$0.geometries.isEmpty || !$0.labels.isEmpty) }
+                .prefix(10)
+            if !layers.isEmpty {
+                let rowHeight = 20.0
+                let legendWidth = min(260.0, width * 0.32)
+                let legendHeight = 22.0 + rowHeight * Double(layers.count)
+                let x = width - margin - legendWidth
+                let y = height - margin - legendHeight
+                out += "    <g id=\"map_legend\">\n"
+                out += "      <rect x=\"\(format(x))\" y=\"\(format(y))\""
+                out += " width=\"\(format(legendWidth))\" height=\"\(format(legendHeight))\""
+                out += " fill=\"\(panelFill)\" opacity=\"0.84\" stroke=\"\(panelStroke)\"/>\n"
+                for (index, layer) in layers.enumerated() {
+                    let rowY = y + 18.0 + rowHeight * Double(index)
+                    let stroke = layer.style.strokeColor.hex
+                    let fill = layer.style.fillEnabled ? layer.style.fillColor.hex : "none"
+                    out += "      <rect x=\"\(format(x + 12))\" y=\"\(format(rowY - 10))\""
+                    out += " width=\"18\" height=\"10\" fill=\"\(fill)\" stroke=\"\(stroke)\" stroke-width=\"1\"/>\n"
+                    out += "      <text x=\"\(format(x + 38))\" y=\"\(format(rowY))\""
+                    out += " font-family=\"Arial, Helvetica, sans-serif\" font-size=\"11\""
+                    out += " fill=\"\(text)\">\(escape(LayerInventory.label(for: layer.name)))</text>\n"
+                }
+                out += "    </g>\n"
+            }
+        }
+
+        return out + "  </g>\n"
+    }
+
+    /// The scale bar's label, in the projection's own units. Ported from
+    /// `_format_distance`: degrees stay degrees, metres grow into kilometres, and
+    /// anything smaller than a metre admits to being mere units.
+    static func formatDistance(_ worldUnits: Double, renderCRS: String) -> String {
+        let value = abs(worldUnits)
+        if renderCRS == "EPSG:4326" {
+            return value >= 1.0
+                ? String(format: "%.2f deg", value)
+                : String(format: "%.4f deg", value)
+        }
+        if value >= 1000.0 {
+            let km = value / 1000.0
+            return km >= 10.0
+                ? String(format: "%.0f km", km)
+                : String(format: "%.1f km", km)
+        }
+        if value >= 1.0 { return String(format: "%.0f m", value) }
+        return String(format: "%.2f units", value)
     }
 
     /// One path string per ring or line.
@@ -201,6 +417,10 @@ public struct SVGExporter: Sendable {
         var attributes = [
             "data-hipparchus-render-crs": scene.projection.renderCRS,
             "data-hipparchus-source-crs": scene.projection.sourceCRS,
+            // Declared whether or not furniture is on, so an importer can honour
+            // the intended page without parsing anything else.
+            "data-hipparchus-paper": options.composition.paperPreset,
+            "data-hipparchus-orientation": options.composition.orientation,
         ]
         if let provenance = scene.metadata["provenance"]?.stringValue {
             attributes["data-hipparchus-provenance"] = provenance
@@ -237,7 +457,8 @@ public struct SVGExporter: Sendable {
                 )
             },
             metadata: scene.metadata.compactMapValues { $0.stringValue },
-            diagnostics: scene.diagnostics.compactMapValues { $0.stringValue }
+            diagnostics: scene.diagnostics.compactMapValues { $0.stringValue },
+            composition: options.composition
         )
     }
 
@@ -297,6 +518,9 @@ public struct ExportDiagnostics: Codable, Sendable, Equatable {
     public let layers: [Layer]
     public let metadata: [String: String]
     public let diagnostics: [String: String]
+    /// How the page was composed, when the exporter was told. Optional so a
+    /// diagnostics file from before composition existed still decodes.
+    public let composition: SVGExporter.Composition?
 
     public var totalGeometries: Int { layers.reduce(0) { $0 + $1.geometries } }
 

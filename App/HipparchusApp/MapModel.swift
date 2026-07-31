@@ -112,6 +112,16 @@ final class MapModel {
     /// Shown before a fetch that will take minutes rather than seconds.
     var pendingWarning: String?
 
+    // MARK: - Export composition
+
+    /// Page and furniture for the SVG export. Transient and all off by default,
+    /// as the Python keeps them: furniture is asked for per export, not
+    /// remembered as map state — which is also why none of this is undoable.
+    var svgComposition = SVGExporter.Composition()
+    /// Paint the ground in the export. Off gives a transparent SVG for
+    /// compositing; dark presets need it on to be legible.
+    var svgIncludeBackground = true
+
     // MARK: - Searching for a place
 
     var searchQuery = ""
@@ -838,8 +848,16 @@ final class MapModel {
     // MARK: - Export
 
     func exportSVG() {
+        var options = SVGExporter.Options()
+        options.composition = svgComposition
+        options.includeBackground = svgIncludeBackground
+        let size = svgComposition.exportSize(
+            canvasWidth: options.width, canvasHeight: options.height
+        )
+        options.width = size.width
+        options.height = size.height
         export(type: .svg, extension: "svg") { scene, url in
-            _ = try SVGExporter().write(scene, to: url)
+            _ = try SVGExporter(options: options).write(scene, to: url)
         }
     }
 

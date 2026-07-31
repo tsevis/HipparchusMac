@@ -35,6 +35,7 @@ struct ContentView: View {
                     LayersPanel(model: model)
                     StylePicker(model: model)
                     DerivedPanel(model: model)
+                    CompositionPanel(model: model)
                 }
                 .listStyle(.sidebar)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 380)

@@ -184,6 +184,27 @@ down one road; keeping the longest run per name puts the label where the street
 is most legible. Ported from `_street_labels`, budgeted at 90 labels a sheet,
 and checked against a fetch of central Athens.
 
+## Page furniture
+
+The SVG export can carry a title block, a scale bar, a north arrow and a simple
+legend, composed for a paper preset — A4 and A3 at 300 dpi, a square, a poster —
+with the orientation turning the sheet rather than the map. Ported from
+`export/profiles.py` and the furniture half of `export/svg_clean.py`, and like
+the Python it is **all off by default**: the map is the product, and furniture
+is asked for per export from the Page section of the style column, not
+remembered as map state.
+
+The scale bar is drawn a round number of pixels long and *labelled* with the
+ground distance it happens to span — the label is derived from the transform,
+so it cannot lie — in the projection's own units, kilometres or degrees. On a
+dark preset the furniture inverts, or it would vanish into the ground. The
+legend names layers what the layer panel names them; the Python keeps a second
+label map in `svg_clean.py` that differs from its own panel in casing, and
+carrying that fork over would have been porting a bug.
+
+Headlessly, `hipparchus-cli santorini --furniture` writes the full sheet for
+looking at.
+
 ## Things that are not bugs
 
 - **A ferry route crosses open water in a straight line**, because it does. OSM

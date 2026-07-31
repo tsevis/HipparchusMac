@@ -75,6 +75,7 @@ func usage() -> Never {
       --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
       --quality <key>    \(Quality.keys.joined(separator: ", "))
       --list-presets     print the preset names and exit
+      --furniture        title, scale bar, north arrow and legend on the SVG, A4
       --no-files         measure only, write nothing
 
     Writes <name>.png, <name>.svg, <name>.pdf and <name>.diagnostics.json.
@@ -93,6 +94,7 @@ struct Options {
     var writeFiles = true
     var preset = SceneBuilder.Options().preset
     var quality = Quality.default
+    var furniture = false
 }
 
 var options = Options()
@@ -111,6 +113,11 @@ while argumentIndex < arguments.count {
         options.targetPixels = value
     case "--no-files":
         options.writeFiles = false
+    case "--furniture":
+        // Everything on at once, because this flag exists to look at the result:
+        // the title block, the scale bar, the north arrow and the legend, framed
+        // for A4. The app offers the same pieces one by one in its Page section.
+        options.furniture = true
     case "--list-presets":
         for name in Presets.names { print(name) }
         exit(0)
@@ -245,7 +252,25 @@ func run(_ place: Place, options: Options) async throws {
     if let image = CoreGraphicsRenderer().image(of: scene, size: CGSize(width: 1600, height: 1200)) {
         try writePNG(image, to: base.appendingPathExtension("png"))
     }
-    let diagnostics = try SVGExporter().write(scene, to: base.appendingPathExtension("svg"))
+    var svgOptions = SVGExporter.Options()
+    if options.furniture {
+        svgOptions.composition.title = place.name == "custom" ? "Hipparchus" : place.name.capitalized
+        svgOptions.composition.subtitle = String(
+            format: "%.2f, %.2f → %.2f, %.2f",
+            place.bbox.minLon, place.bbox.minLat, place.bbox.maxLon, place.bbox.maxLat
+        )
+        svgOptions.composition.includeTitle = true
+        svgOptions.composition.includeScaleBar = true
+        svgOptions.composition.includeNorthArrow = true
+        svgOptions.composition.includeLegend = true
+        svgOptions.composition.paperPreset = "A4"
+        let size = svgOptions.composition.exportSize(
+            canvasWidth: svgOptions.width, canvasHeight: svgOptions.height
+        )
+        svgOptions.width = size.width
+        svgOptions.height = size.height
+    }
+    let diagnostics = try SVGExporter(options: svgOptions).write(scene, to: base.appendingPathExtension("svg"))
     try PDFExporter().write(scene, to: base.appendingPathExtension("pdf"))
     try diagnostics.jsonData().write(to: base.appendingPathExtension("diagnostics.json"))
 
