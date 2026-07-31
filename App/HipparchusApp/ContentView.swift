@@ -96,6 +96,14 @@ struct ContentView: View {
             .frame(maxWidth: .infinity)
             .allowsHitTesting(false)
         }
+        // `NavigationSplitView` does not stretch a content column's view to
+        // fill it the way a plain `VStack` would — `.navigationSplitViewColumnWidth`
+        // (below, where this is placed) sets the column's allowed *range*, not
+        // whether what sits inside stretches to fill it. Without this,
+        // `MapCanvasView` — a plain `NSView` with no `intrinsicContentSize` —
+        // can resolve to a size smaller than the pane, leaving the map
+        // floating in a corner of a mostly empty column rather than filling it.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var zoomControls: some View {
