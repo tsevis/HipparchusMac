@@ -6,8 +6,8 @@ layered, Illustrator-editable SVG.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands, Mauna Kea and Mauna Loa reading as concentric shields, from real elevation data"></td>
-    <td width="50%"><img src="docs/assets/gallery-amsterdam-fragmented-urban.png" width="100%" alt="Amsterdam's canals, rail fan and building footprints drawn from OpenStreetMap"></td>
+    <td width="50%"><img src="Docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands, Mauna Kea and Mauna Loa reading as concentric shields, from real elevation data"></td>
+    <td width="50%"><img src="Docs/assets/gallery-amsterdam-fragmented-urban.png" width="100%" alt="Amsterdam's canals, rail fan and building footprints drawn from OpenStreetMap"></td>
   </tr>
 </table>
 
@@ -194,12 +194,12 @@ asserted in advance.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/gallery-papua-new-guinea-contour-study.png" width="100%" alt="Papua New Guinea in illuminated contours, the Owen Stanley Range and the trenches around New Britain"></td>
-    <td width="50%"><img src="docs/assets/gallery-france-hypsometric.png" width="100%" alt="France as filled elevation bands, the Alps and Pyrenees against the Atlantic shelf"></td>
+    <td width="50%"><img src="Docs/assets/gallery-papua-new-guinea-contour-study.png" width="100%" alt="Papua New Guinea in illuminated contours, the Owen Stanley Range and the trenches around New Britain"></td>
+    <td width="50%"><img src="Docs/assets/gallery-france-hypsometric.png" width="100%" alt="France as filled elevation bands, the Alps and Pyrenees against the Atlantic shelf"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/assets/gallery-ghana-relief-sheet.png" width="100%" alt="Ghana as a dense hairline relief sheet, the Volta basin and the Akwapim ridge"></td>
-    <td width="50%"><img src="docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands, five shield volcanoes and the sea floor around them"></td>
+    <td width="50%"><img src="Docs/assets/gallery-ghana-relief-sheet.png" width="100%" alt="Ghana as a dense hairline relief sheet, the Volta basin and the Akwapim ridge"></td>
+    <td width="50%"><img src="Docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands, five shield volcanoes and the sea floor around them"></td>
   </tr>
 </table>
 
@@ -209,16 +209,16 @@ map adds contours and never discards the streets.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/assets/gallery-amsterdam-fragmented-urban.png" width="100%" alt="Amsterdam in the Fragmented Urban preset, canals, the IJ and the Centraal rail fan"></td>
-    <td width="50%"><img src="docs/assets/gallery-dusseldorf-clean-atlas.png" width="100%" alt="Dusseldorf in the Clean Atlas preset, the Rhine and the Altstadt"></td>
+    <td width="50%"><img src="Docs/assets/gallery-amsterdam-fragmented-urban.png" width="100%" alt="Amsterdam in the Fragmented Urban preset, canals, the IJ and the Centraal rail fan"></td>
+    <td width="50%"><img src="Docs/assets/gallery-dusseldorf-clean-atlas.png" width="100%" alt="Dusseldorf in the Clean Atlas preset, the Rhine and the Altstadt"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/assets/gallery-los-angeles-technical-blueprint.png" width="100%" alt="Los Angeles in the Technical Blueprint preset, the downtown grid with contours beneath it"></td>
-    <td width="50%"><img src="docs/assets/gallery-toronto-editorial-print.png" width="100%" alt="Toronto in the Editorial Print preset, the waterfront and the downtown core"></td>
+    <td width="50%"><img src="Docs/assets/gallery-los-angeles-technical-blueprint.png" width="100%" alt="Los Angeles in the Technical Blueprint preset, the downtown grid with contours beneath it"></td>
+    <td width="50%"><img src="Docs/assets/gallery-toronto-editorial-print.png" width="100%" alt="Toronto in the Editorial Print preset, the waterfront and the downtown core"></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/assets/gallery-rio-night.png" width="100%" alt="Rio de Janeiro in the Night preset, lit streets over the Tijuca massif with Copacabana and Ipanema"></td>
-    <td width="50%"><img src="docs/assets/gallery-beijing-figure-ground.png" width="100%" alt="Beijing in the Monochrome Figure Ground preset, the hutong blocks against the ring roads"></td>
+    <td width="50%"><img src="Docs/assets/gallery-rio-night.png" width="100%" alt="Rio de Janeiro in the Night preset, lit streets over the Tijuca massif with Copacabana and Ipanema"></td>
+    <td width="50%"><img src="Docs/assets/gallery-beijing-figure-ground.png" width="100%" alt="Beijing in the Monochrome Figure Ground preset, the hutong blocks against the ring roads"></td>
   </tr>
 </table>
 
