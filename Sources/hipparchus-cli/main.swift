@@ -72,6 +72,10 @@ func usage() -> Never {
     Options:
       --out <dir>        where to write files (default: ./out)
       --pixels <n>       sampling width to aim for (default: 1200)
+      --streets          stack OpenStreetMap onto the elevation: roads,
+                         buildings, water and land cover. Slow, and it is the
+                         area that decides — a city block answers, a county does
+                         not. Overpass is shared hardware run on donations.
       --hillshade        shade the relief, banded into filled polygons
       --sun <az,alt>     where the light comes from (default: 315,45)
       --exaggeration <x> stretch the relief before lighting it (default: 1)
@@ -102,6 +106,7 @@ struct Options {
     var quality = Quality.default
     var furniture = false
     var hillshade = false
+    var streets = false
     var sun = SunPosition()
     var exaggeration = 1.0
     var shadeBands = TerrainTileSettings().hillshadeBandCount
@@ -157,6 +162,8 @@ while argumentIndex < arguments.count {
         options.targetPixels = value
     case "--no-files":
         options.writeFiles = false
+    case "--streets":
+        options.streets = true
     case "--hillshade":
         options.hillshade = true
     case "--sun":
@@ -288,16 +295,42 @@ func run(_ place: Place, options: Options) async throws {
     print("  expected: \(place.expected)")
 
     let started = ContinuousClock.now
-    let provider = TerrainTileProvider(settings: settings)
-    let collection = try await provider.fetch(BBoxQuery(bbox: place.bbox))
+    let terrain = TerrainTileProvider(settings: settings)
+    let collection: FeatureCollection
+    if options.streets {
+        // The same manager the app fetches through, so the merge, the layer
+        // precedence and the weakest-provenance-wins rule are the shipped ones
+        // rather than a second implementation written for a flag.
+        let manager = DataSourceManager(providers: [terrain, OverpassProvider()])
+        collection = try await manager.fetch(
+            BBoxQuery(bbox: place.bbox),
+            plan: FetchPlan(base: SourceID.overpass, extras: [SourceID.terrainTiles])
+        )
+        // Said out loud. A city that came back with no roads and no explanation
+        // is how you end up blaming the renderer.
+        if let failures = collection.metadata["provider_errors"]?.stringValue {
+            print("  provider errors: \(failures)")
+        }
+    } else {
+        collection = try await terrain.fetch(BBoxQuery(bbox: place.bbox))
+    }
     let fetched = ContinuousClock.now - started
 
-    let low = collection.metadata["elevation_min_metres"]?.doubleValue ?? .nan
-    let high = collection.metadata["elevation_max_metres"]?.doubleValue ?? .nan
-    let interval = collection.metadata["contour_interval_metres"]?.doubleValue ?? .nan
-    let zoom = collection.metadata["zoom"]?.doubleValue ?? .nan
-    let columns = collection.metadata["grid_columns"]?.doubleValue ?? .nan
-    let rows = collection.metadata["grid_rows"]?.doubleValue ?? .nan
+    /// A merged fetch keeps each provider's metadata under its own name, so that
+    /// two sources reporting a `zoom` cannot overwrite each other. A single
+    /// fetch does not. Read both rather than only the one this run happens to
+    /// produce.
+    func terrainMetadata(_ key: String) -> Double? {
+        collection.metadata[key]?.doubleValue
+            ?? collection.metadata["\(terrainTilesProviderID).\(key)"]?.doubleValue
+    }
+
+    let low = terrainMetadata("elevation_min_metres") ?? .nan
+    let high = terrainMetadata("elevation_max_metres") ?? .nan
+    let interval = terrainMetadata("contour_interval_metres") ?? .nan
+    let zoom = terrainMetadata("zoom") ?? .nan
+    let columns = terrainMetadata("grid_columns") ?? .nan
+    let rows = terrainMetadata("grid_rows") ?? .nan
 
     print(String(
         format: "  measured: %.0f m to %.0f m   interval %.0f m   zoom %.0f   grid %.0fx%.0f   %@",
@@ -313,7 +346,7 @@ func run(_ place: Place, options: Options) async throws {
         print(String(
             format: "  sun %.0f° at %.0f° · exaggeration %.2g · %.0f tones",
             options.sun.azimuthDegrees, options.sun.altitudeDegrees, options.exaggeration,
-            collection.metadata["hillshade_band_count"]?.doubleValue ?? 0
+            terrainMetadata("hillshade_band_count") ?? 0
         ))
     }
     for layer in scene.layers {

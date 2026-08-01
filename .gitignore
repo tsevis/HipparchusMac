@@ -18,6 +18,10 @@ xcuserdata/
 /out/
 *.png.actual
 
+# Notes for a version that does not exist yet. Deliberately local: they are
+# thinking, not a record of this one.
+/docs not to push/
+
 # macOS
 .DS_Store
 

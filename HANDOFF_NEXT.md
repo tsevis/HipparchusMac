@@ -162,7 +162,20 @@ release or the contour tracer runs about thirty times slower:
 swift build -c release
 .build/release/hipparchus-cli everest --hillshade --preset "Relief Sheet" --out out
 .build/release/hipparchus-cli everest --sun 135,25 --exaggeration 2 --out out
+.build/release/hipparchus-cli kefalonia --plugins Plugins --preset "Admiralty Chart" --hillshade --out out
+.build/release/hipparchus-cli --bbox -122.46,37.74,-122.42,37.77 --streets --hillshade --out out
 ```
+
+`--plugins <dir>` makes a style pack's presets and places nameable; `--streets`
+stacks OpenStreetMap onto the elevation through the same `DataSourceManager`
+the app fetches through. Keep a `--streets` area small — the Twin Peaks window
+above is 0.04° × 0.03° and returns 29,000 features in about half a minute;
+Overpass is shared hardware run on donations.
+
+One trap: this shell is **zsh**, where an unquoted `$ARGS` does not word-split.
+A batch loop that builds its flags in a variable passes them as a single
+argument, every run exits 2 through `usage()`, and if stderr went to
+`/dev/null` you get a silent no-op that looks like a crash.
 
 Run `swift test` after touching `Sources/`. A run started with any of those
 flags **does not save the session** — that was a real bug: artwork renders
@@ -179,9 +192,17 @@ reopening on a style of nowhere they had chosen.
 - `⌘1`–`⌘9` reaches only the first nine of sixteen saved places.
 - Hawaii and the Dominican Republic are large enough that Overpass declines
   them; terrain renders fine. That is correct behaviour, not a bug.
-- The hillshade has been looked at on Everest (Hypsometric Relief) and San
-  Francisco (Night), as PNGs, and never in the window. Nobody has seen it on
-  gentle ground, on the four style packs, or over a city.
+- The hillshade has been looked at on Everest (Hypsometric Relief), San
+  Francisco on Night, all seven style-pack presets over Kefalonia, and a city
+  with streets on it (Twin Peaks and the Mission, four presets) — all as PNGs,
+  and **never in the window**.
+- **In a dense city the shading is largely buried under the buildings.** Relief
+  is ground and buildings sit on it, so the draw order is right, but with
+  21,380 opaque building fills over a grid the shade only shows in parks, open
+  space and the street corridors. Most visible in `Editorial Print`, which
+  states no `elevation_bands` style at all and fills its buildings opaque.
+  Whether relief should read *through* a city is a design question nobody has
+  answered yet.
 - Shading costs about 0.16 s on Everest in release — 0.95 s to 1.11 s — but it
   is the heaviest layer in the *export*: 1,150 SVG paths and 1.5 MB against the
   elevation bands' 103 paths, because banding a derivative gives complex
