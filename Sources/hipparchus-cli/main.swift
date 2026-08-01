@@ -79,6 +79,8 @@ func usage() -> Never {
       --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
       --quality <key>    \(Quality.keys.joined(separator: ", "))
       --list-presets     print the preset names and exit
+      --plugins <dir>    also load style packs from a plugin folder, so their
+                         presets and places can be named like the built-in ones
       --furniture        title, scale bar, north arrow and legend on the SVG, A4
       --no-files         measure only, write nothing
 
@@ -104,6 +106,40 @@ struct Options {
     var exaggeration = 1.0
     var shadeBands = TerrainTileSettings().hillshadeBandCount
 }
+
+/// Style packs, loaded before anything else is parsed.
+///
+/// A pre-pass rather than another `case` in the loop below, because loading a
+/// pack changes what `--preset` and a bare place name are allowed to mean, and
+/// arguments do not have to arrive in a helpful order. The same `PluginLoader`
+/// the app uses, so a pack that the app refuses is refused here too, out loud.
+func loadPacks(from arguments: [String]) -> (presets: [String: ArtisticPreset], places: [String: Place]) {
+    guard let flag = arguments.firstIndex(of: "--plugins"), flag + 1 < arguments.count else {
+        return ([:], [:])
+    }
+    let directory = URL(fileURLWithPath: arguments[flag + 1])
+    let loader = PluginLoader(userPluginDirectory: directory, reservedPlaceNames: Set(places.values.map(\.name)))
+    let registry = loader.loadAll()
+
+    for error in loader.loadErrors { print("warning: \(error)") }
+    if !loader.loadedPlugins.isEmpty {
+        print("loaded \(loader.loadedPlugins.count) pack(s): \(loader.loadedPlugins.map(\.name).joined(separator: ", "))")
+    }
+
+    let presets = Dictionary(
+        registry.presets.map { ($0.name.lowercased(), $0) },
+        uniquingKeysWith: { first, _ in first }
+    )
+    let packPlaces = Dictionary(
+        registry.places.map {
+            ($0.name.lowercased(), Place(name: $0.name, bbox: $0.bbox, expected: "from a style pack"))
+        },
+        uniquingKeysWith: { first, _ in first }
+    )
+    return (presets, packPlaces)
+}
+
+let packs = loadPacks(from: arguments)
 
 var options = Options()
 var requested: [Place] = []
@@ -150,18 +186,31 @@ while argumentIndex < arguments.count {
         // the title block, the scale bar, the north arrow and the legend, framed
         // for A4. The app offers the same pieces one by one in its Page section.
         options.furniture = true
+    case "--plugins":
+        // Already read by the pre-pass; skip its argument.
+        argumentIndex += 1
     case "--list-presets":
         for name in Presets.names { print(name) }
+        for preset in packs.presets.values.map(\.name).sorted() { print(preset) }
         exit(0)
     case "--preset":
         argumentIndex += 1
         guard argumentIndex < arguments.count else { usage() }
         let requestedName = arguments[argumentIndex]
+        let cleaned = requestedName.trimmingCharacters(in: .whitespaces).lowercased()
+        // A pack's preset wins over the fallback, but never over a built-in of
+        // the same name — that is the rule `PluginRegistry` already enforces.
+        if !Presets.names.contains(where: { $0.lowercased() == cleaned }),
+           let fromPack = packs.presets[cleaned] {
+            options.preset = fromPack
+            argumentIndex += 1
+            continue
+        }
         let resolved = Presets.resolveName(requestedName)
         // Say so rather than silently drawing something else. A preset name that
         // fell back without a word is how you end up debugging the renderer for a
         // look the preset never had.
-        if resolved.lowercased() != requestedName.trimmingCharacters(in: .whitespaces).lowercased() {
+        if resolved.lowercased() != cleaned {
             print("warning: no preset '\(requestedName)'; using '\(resolved)'")
         }
         options.preset = Presets.preset(resolved)
@@ -189,7 +238,8 @@ while argumentIndex < arguments.count {
     case "--help", "-h":
         usage()
     default:
-        guard let place = places[arguments[argumentIndex].lowercased()] else {
+        let name = arguments[argumentIndex].lowercased()
+        guard let place = places[name] ?? packs.places[name] else {
             print("error: unknown place '\(arguments[argumentIndex])'")
             usage()
         }
