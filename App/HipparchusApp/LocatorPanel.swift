@@ -53,13 +53,19 @@ final class LocatorPanelController: NSObject {
             backing: .buffered,
             defer: false
         )
-        // The build, in the title, because "is this even the new app?" has
-        // cost more time here than any actual bug. Several copies of this app
-        // can exist at once — an old release in /Applications, a stale one in
-        // Xcode's DerivedData — and they are identical from the outside, same
-        // name, same icon, same version. The binary's own timestamp is the one
-        // thing that differs, and it needs no build system to produce.
-        panel.title = "Locator — build \(Self.buildStamp)"
+        // The build time used to be here, because "is this even the new app?"
+        // has cost more time on this project than any actual bug: several
+        // copies can exist at once — an old release in /Applications, a stale
+        // one in Xcode's DerivedData — identical from the outside, same name,
+        // same icon, same version.
+        //
+        // It is gone from the title because this window appears in the
+        // README's screenshot, and a development aid does not belong in the
+        // picture of the finished thing. The check itself is not lost; it
+        // never needed the app's help:
+        //
+        //     stat -f "%Sm" /Applications/Hipparchus.app/Contents/MacOS/Hipparchus
+        panel.title = "Locator"
         panel.level = .floating
         panel.minSize = NSSize(width: 420, height: 380)
         panel.isMovableByWindowBackground = false
@@ -156,17 +162,6 @@ final class LocatorPanelController: NSObject {
         }
     }
 
-    /// When this binary was built, to the minute — read off the executable
-    /// itself, so it cannot drift from what is actually running.
-    private static let buildStamp: String = {
-        guard let path = Bundle.main.executablePath,
-              let modified = try? FileManager.default
-                  .attributesOfItem(atPath: path)[.modificationDate] as? Date
-        else { return "unknown" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM HH:mm"
-        return formatter.string(from: modified)
-    }()
 }
 
 /// The panel's content: a world map to look at, buttons to get closer with,

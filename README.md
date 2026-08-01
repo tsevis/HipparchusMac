@@ -4,7 +4,7 @@ A native macOS rewrite of [Hipparchus](https://github.com/tsevis/Hipparchus):
 choose an area of the world, fetch map data from public sources, and export
 layered, Illustrator-editable SVG.
 
-<img src="Docs/assets/interface.png" width="100%" alt="The Hipparchus window: the Ambracian Gulf and Lefkada in the Tsevis Nocturne style, turquoise linework on a dark ground. Left, the locator, the frame and the saved places; centre, the map; right, the layer list, the style picker open on twenty-three styles, and the page controls. The floating Locator window shows the same ground on Apple Maps. The status bar reads 29 layers, 26,642 features, -8 m to 1,426 m.">
+<img src="Docs/assets/interface.png" width="100%" alt="The Hipparchus window: the Serra do Mar behind São Paulo in the Fragmented Urban style, shaded relief in the Admiralty palette. Left, the locator, the frame and the saved places; centre, the map; right, the layer list, the sixteen style swatches, and the controls — palette, quality, line weight at 1.16x, relief over buildings, and a page set to 600 dpi. The floating Locator shows the same ground on Apple Maps. The status bar reads 8 layers, 11,137 features, -305 m to 1,388 m.">
 
 <table>
   <tr>
