@@ -17,6 +17,7 @@ final class LocatorPanelController: NSObject {
     /// below needs to reach the map too, and it outlives any one SwiftUI update.
     private let handle = LocatorHandle()
     private let trace = PenTrace()
+    private let mode = LocatorMode()
     private var monitor: Any?
     /// Pressing Render map here must do exactly what pressing it in the
     /// toolbar does, so it is the same closure rather than a second
@@ -69,7 +70,7 @@ final class LocatorPanelController: NSObject {
         panel.isReleasedWhenClosed = false
         panel.contentView = NSHostingView(
             rootView: LocatorPanelContent(
-                model: model, handle: handle, trace: trace,
+                model: model, handle: handle, trace: trace, mode: mode,
                 onRender: { [weak self] in self?.onRender() }
             )
         )
@@ -96,8 +97,11 @@ final class LocatorPanelController: NSObject {
     /// harmless: they resolve the same point to the same place and set the
     /// same area twice, which the model coalesces into one.
     private func watchForPresses(in panel: NSPanel) {
-        monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) {
-            [weak self, weak panel] event in
+        // `.leftMouseDragged` as well as down and up, because this route now
+        // carries the whole of drawing an area, not only clicking a place.
+        monitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]
+        ) { [weak self, weak panel] event in
             MainActor.assumeIsolated { self?.note(event, in: panel) }
             return event
         }
@@ -106,20 +110,35 @@ final class LocatorPanelController: NSObject {
     private func note(_ event: NSEvent, in panel: NSPanel?) {
         guard let panel, event.window === panel, let map = handle.view else { return }
         let point = map.convert(event.locationInWindow, from: nil)
-        guard map.bounds.contains(point) else { return }
+        // A drag may leave the map on its way; only its start has to be on it.
+        guard map.bounds.contains(point) || pressedAt != nil else { return }
 
         switch event.type {
         case .leftMouseDown:
+            guard map.bounds.contains(point) else { return }
             trace.notePress(at: point)
             pressedAt = point
+            if mode.isDrawingArea { handle.beginDrawing(at: point) }
+
+        case .leftMouseDragged:
+            guard mode.isDrawingArea, let down = pressedAt else { return }
+            handle.updateDrawing(from: down, to: point)
+
         case .leftMouseUp:
             defer { pressedAt = nil }
+            guard let down = pressedAt else { return }
+
+            // Drawing an area and choosing a place are the same gesture until
+            // the mouse comes up; which one it was is decided here.
+            if mode.isDrawingArea {
+                handle.finishDrawing(from: down, to: point)
+                return
+            }
             // The same tolerance the recognizer uses, for the same reason: a
             // hand holding a pen is never perfectly still.
-            guard let down = pressedAt,
-                  ForgivingClickRecognizer.isAClick(from: down, to: point)
-            else { return }
+            guard ForgivingClickRecognizer.isAClick(from: down, to: point) else { return }
             handle.selectPoint(at: point)
+
         default:
             break
         }
@@ -154,8 +173,8 @@ private struct LocatorPanelContent: View {
     /// as well.
     let handle: LocatorHandle
     let trace: PenTrace
+    @Bindable var mode: LocatorMode
     let onRender: () -> Void
-    @State private var isDrawingArea = false
     @State private var chosen: ChosenPoint?
 
     /// What was clicked, kept so it can be shown. The area it produced lives
@@ -188,9 +207,9 @@ private struct LocatorPanelContent: View {
                         // One rectangle, then back to browsing: leaving the
                         // mode on makes the next pan draw another area by
                         // accident, which is how a chosen area gets lost.
-                        isDrawingArea = false
+                        mode.isDrawingArea = false
                     },
-                    isDrawingArea: isDrawingArea,
+                    isDrawingArea: mode.isDrawingArea,
                     handle: handle,
                     trace: trace
                 )
@@ -241,13 +260,13 @@ private struct LocatorPanelContent: View {
             // Drag out an area rather than clicking a place. Tinted while on,
             // because a mode that does not look different from the mode beside
             // it is a mode nobody can tell they are in.
-            Button { isDrawingArea.toggle() } label: {
+            Button { mode.isDrawingArea.toggle() } label: {
                 Image(systemName: "rectangle.dashed")
                     .frame(width: 22, height: 22)
-                    .foregroundStyle(isDrawingArea ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
+                    .foregroundStyle(mode.isDrawingArea ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
             }
             .help(
-                isDrawingArea
+                mode.isDrawingArea
                     ? "Drag on the map to draw the area. Click here again to go back to panning."
                     : "Draw an area by dragging a rectangle, instead of clicking a single place."
             )

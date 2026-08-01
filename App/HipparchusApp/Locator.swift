@@ -334,7 +334,7 @@ struct Locator: NSViewRepresentable {
             return area
         }
 
-        private func showBand(on mapView: MKMapView, from start: CGPoint, to end: CGPoint) {
+        func showBand(on mapView: MKMapView, from start: CGPoint, to end: CGPoint) {
             let layer: CAShapeLayer
             if let band {
                 layer = band
@@ -361,9 +361,23 @@ struct Locator: NSViewRepresentable {
             CATransaction.commit()
         }
 
-        private func clearBand() {
+        func clearBand() {
             band?.removeFromSuperlayer()
             band = nil
+        }
+
+        /// The same three moments the recognizer goes through, named for the
+        /// monitor that also drives them.
+        func beginBand(on mapView: MKMapView, at point: CGPoint) {
+            showBand(on: mapView, from: point, to: point)
+        }
+
+        func updateBand(on mapView: MKMapView, from start: CGPoint, to end: CGPoint) {
+            showBand(on: mapView, from: start, to: end)
+        }
+
+        func endBand() {
+            clearBand()
         }
 
         // MARK: - NSGestureRecognizerDelegate
@@ -426,6 +440,32 @@ final class LocatorHandle {
         return coordinator.selectPoint(at: point, in: view, via: "monitor") != nil
     }
 
+    // MARK: - Drawing an area, driven from the event monitor
+
+    /// The three moments of a drag, exposed so the panel's event monitor can
+    /// drive them.
+    ///
+    /// The gesture recognizer can drive the same three, and does. Both exist
+    /// for the reason the click has two routes: a recognizer that never fires
+    /// is indistinguishable from a map that ignores you, and the monitor is
+    /// the route already known to receive a pen's events.
+    func beginDrawing(at point: CGPoint) {
+        guard let view, let coordinator else { return }
+        coordinator.beginBand(on: view, at: point)
+    }
+
+    func updateDrawing(from start: CGPoint, to end: CGPoint) {
+        guard let view, let coordinator else { return }
+        coordinator.updateBand(on: view, from: start, to: end)
+    }
+
+    @discardableResult
+    func finishDrawing(from start: CGPoint, to end: CGPoint) -> Bool {
+        guard let view, let coordinator else { return false }
+        coordinator.endBand()
+        return coordinator.report(from: start, to: end, in: view) != nil
+    }
+
     /// Zoom about the middle of what is on screen. Greater than one moves
     /// closer, matching `ViewportState.zoomed(by:)` on the main canvas so the
     /// two pairs of buttons mean the same thing.
@@ -484,4 +524,16 @@ extension MKCoordinateRegion {
             span: MKCoordinateSpan(latitudeDelta: abs(bbox.latSpan), longitudeDelta: abs(bbox.lonSpan))
         )
     }
+}
+
+
+/// Whether the floating Locator is drawing an area or choosing a place.
+///
+/// A type of its own, and observable, because two things need it: the button
+/// that toggles it, and the panel's event monitor, which is not a SwiftUI view
+/// and cannot read `@State`.
+@MainActor
+@Observable
+final class LocatorMode {
+    var isDrawingArea = false
 }

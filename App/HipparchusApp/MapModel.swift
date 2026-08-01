@@ -1140,6 +1140,20 @@ final class MapModel {
             print(status)
             exit(saved ? 0 : 1)
         }
+        // Does a chosen file survive a relaunch? Mint a bookmark, put it
+        // through the session file, resolve it in a fresh stack, and read the
+        // file with it — the whole chain that used to break silently between
+        // one launch and the next.
+        if let flag = arguments.firstIndex(of: "--verify-file-access"), flag + 1 < arguments.count {
+            let early = verifyFileAccess(path: arguments[flag + 1])
+            // Non-empty means it failed before reaching the fetch, which owns
+            // the exit in the success path.
+            if !early.isEmpty {
+                print(early)
+                exit(early.contains("FAIL") ? 1 : 0)
+            }
+            return
+        }
         if arguments.contains("--verify-locator-drag") {
             let report = verifyLocatorDrag()
             print(report)
@@ -1199,6 +1213,104 @@ final class MapModel {
 
         fetch()
         renderWhenReady(to: URL(fileURLWithPath: arguments[flag + 1]))
+    }
+
+    /// Prove that a file chosen once is still readable after a relaunch.
+    ///
+    /// The failure this replaces was invisible until the next day: the app is
+    /// sandboxed, a saved path is text rather than permission, and a
+    /// file-backed source that worked yesterday simply fetched nothing today.
+    /// So this drives the whole chain rather than any one link — mint a
+    /// bookmark, write it through the real `Session` encoder, read it back in
+    /// a *fresh* `SourceStack` as a relaunch would, redeem it, and then
+    /// actually read the file through `FileSourceProvider`.
+    ///
+    /// What it cannot reproduce is `NSOpenPanel` granting access to a file
+    /// outside the container in the first place; that grant is what a real
+    /// choice supplies, and only a person clicking Choose… can make one.
+    private func verifyFileAccess(path: String) -> String {
+        let url = URL(fileURLWithPath: path)
+        var log = "file: \(path)\n"
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            return log + "FAIL: no such file\n"
+        }
+
+        guard let minted = SecurityScopedAccess.bookmark(for: url) else {
+            return log + "FAIL: no bookmark could be minted for it\n"
+        }
+        log += "  bookmark minted: \(minted.count) bytes\n"
+
+        // Through the real session encoder and back, as a relaunch does.
+        var stack = SourceStack()
+        stack.setPath(SourceID.naturalEarth, url.path, bookmark: minted)
+        stack.setEnabled(SourceID.naturalEarth, true)
+        let session = Session(
+            stack: stack, area: Session.Area(BoundingBox(minLon: 0, minLat: 0, maxLon: 1, maxLat: 1)),
+            placeName: "", preset: preset.name, quality: quality.key, hiddenLayers: []
+        )
+        guard let encoded = try? JSONEncoder().encode(session),
+              let decoded = try? JSONDecoder().decode(Session.self, from: encoded)
+        else {
+            return log + "FAIL: the session would not round trip\n"
+        }
+        log += "  session json: \(encoded.count) bytes, "
+        log += "\(decoded.sourceBookmarks.count) bookmark(s) survived\n"
+
+        let reborn = decoded.stack()
+        guard let restored = reborn.bookmark(SourceID.naturalEarth) else {
+            return log + "FAIL: the bookmark did not survive the session file\n"
+        }
+        guard restored == minted else {
+            return log + "FAIL: the bookmark came back different from the one saved\n"
+        }
+        log += "  path restored:   \(reborn.path(SourceID.naturalEarth))\n"
+        log += "  ticked again:    \(reborn.isEnabled(SourceID.naturalEarth))\n"
+
+        guard let resolved = SecurityScopedAccess.resolve(restored) else {
+            return log + "FAIL: the restored bookmark would not resolve — access is lost\n"
+        }
+        log += "  resolved to:     \(resolved.url.path)\(resolved.isStale ? "  (stale, refreshed)" : "")\n"
+
+        // And the point of all of it: can the file actually be read now?
+        guard let contents = try? Data(contentsOf: resolved.url) else {
+            return log + "FAIL: resolved, but the file still could not be read\n"
+        }
+        log += "  read back:       \(contents.count) bytes\n"
+
+        let provider = FileSourceProvider.naturalEarth(path: resolved.url)
+        log += "  provider says:   \(provider.availability.detail)"
+        log += " (\(provider.availability.isAvailable ? "usable" : "unusable"))\n"
+        guard provider.availability.isAvailable else {
+            return log + "FAIL: the provider will not read it\n"
+        }
+
+        // Readable is not the same as usable. The question a person actually
+        // has is whether the source still draws anything, so fetch from it.
+        print(log, terminator: "")
+        Task {
+            do {
+                let collection = try await provider.fetch(
+                    BBoxQuery(bbox: BoundingBox(minLon: 20.5, minLat: 38.8, maxLon: 21.0, maxLat: 39.1))
+                )
+                let counted = collection.featuresByLayer.filter { !$0.value.isEmpty }
+                let total = counted.values.reduce(0) { $0 + $1.count }
+                print("  fetched:         \(total) feature(s) in \(counted.count) layer(s)")
+                for (layer, features) in counted.sorted(by: { $0.key < $1.key }) {
+                    print("                     \(layer): \(features.count)")
+                }
+                guard total > 0 else {
+                    print("FAIL: the source read the file but produced nothing")
+                    exit(1)
+                }
+                print("PASS: a file chosen once is still readable, and still draws, after a relaunch.")
+                exit(0)
+            } catch {
+                print("FAIL: fetching from the restored file threw: \(error)")
+                exit(1)
+            }
+        }
+        // The Task above owns the exit.
+        return ""
     }
 
     /// Measure how much of the window the drawn map actually fills, before and
