@@ -28,14 +28,14 @@ final class SessionEditTests: XCTestCase {
     // MARK: - Sources
 
     func testTickingASourceIsNamedForTheSource() {
-        let edit = describe { $0.enabledSources.append(SourceID.terrainTiles) }
-        XCTAssertEqual(edit?.action, "Enable Elevation")
+        let edit = describe { $0.enabledSources.append(SourceID.overpass) }
+        XCTAssertEqual(edit?.action, "Enable OpenStreetMap")
         XCTAssertNil(edit?.coalescingKey, "a tick is a single act, never merged with the next")
     }
 
     func testUntickingASourceSaysSo() {
-        let edit = describe { $0.enabledSources.removeAll { $0 == SourceID.overpass } }
-        XCTAssertEqual(edit?.action, "Disable OpenStreetMap")
+        let edit = describe { $0.enabledSources.removeAll { $0 == SourceID.terrainTiles } }
+        XCTAssertEqual(edit?.action, "Disable Elevation")
     }
 
     func testChoosingAFileIsNamedForTheSourceItFeeds() {
@@ -104,11 +104,11 @@ final class SessionEditTests: XCTestCase {
     /// user actually reached for wins, and the rest ride along in the same entry.
     func testTheSourceStackOutranksEverythingElse() {
         var after = Session()
-        after.enabledSources.append(SourceID.terrainTiles)
+        after.enabledSources.append(SourceID.overpass)
         after.presetName = "Night"
         after.area.west = 20
 
-        XCTAssertEqual(SessionEdit.describe(from: Session(), to: after)?.action, "Enable Elevation")
+        XCTAssertEqual(SessionEdit.describe(from: Session(), to: after)?.action, "Enable OpenStreetMap")
     }
 
     func testThePresetOutranksTheSizesItBrings() {

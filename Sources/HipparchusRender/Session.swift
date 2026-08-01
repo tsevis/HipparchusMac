@@ -89,9 +89,15 @@ public struct Session: Codable, Sendable, Equatable {
     }
 
     public init(
-        area: Area = Area(west: 25.32, south: 36.33, east: 25.50, north: 36.48),
-        placeName: String = "Santorini",
-        enabledSources: [String] = [SourceID.overpass],
+        // The whole earth, and Elevation rather than OpenStreetMap to draw
+        // it with. A first launch should open on the world and be able to
+        // render it: Overpass refuses anything this size — rightly, it is a
+        // shared service — while terrain tiles are tiled and bounded, so the
+        // first Render map produces a world relief map rather than a refusal.
+        // ±85° because that is where Mercator stops, not where the world does.
+        area: Area = Area(west: -180, south: -85, east: 180, north: 85),
+        placeName: String = "",
+        enabledSources: [String] = [SourceID.terrainTiles],
         sourcePaths: [String: String] = [:],
         sourceBookmarks: [String: String] = [:],
         sourceSettings: [String: Double] = [:],

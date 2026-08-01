@@ -127,11 +127,22 @@ final class SessionTests: XCTestCase {
     /// every other choice because one new field is absent would make an update
 
 
-    /// The defaults have to be a map that works, not a blank.
-    func testTheDefaultSessionIsUsable() {
+    /// The defaults have to be a map that works, not a blank — and, since the
+    /// app now opens on the whole earth, a map that works *at that size*.
+    ///
+    /// Elevation rather than OpenStreetMap for exactly that reason: Overpass
+    /// refuses an area this large, so a default pairing of world-plus-Overpass
+    /// would open on a first run whose only button cannot be pressed.
+    func testTheDefaultSessionIsUsable() throws {
         let session = Session()
-        XCTAssertNotNil(session.area.bbox)
-        XCTAssertEqual(session.stack().enabledIDs, [SourceID.overpass])
+        let area = try XCTUnwrap(session.area.bbox)
+        XCTAssertEqual(session.stack().enabledIDs, [SourceID.terrainTiles])
+        XCTAssertFalse(
+            session.stack().isEnabled(SourceID.overpass),
+            "the default area is larger than Overpass will serve"
+        )
+        XCTAssertGreaterThan(area.lonSpan, 300, "the default area is the whole earth")
+        XCTAssertGreaterThan(area.latSpan, 160)
         XCTAssertEqual(Presets.preset(session.presetName).name, session.presetName)
         XCTAssertEqual(Quality.profile(session.qualityKey).key, session.qualityKey)
     }

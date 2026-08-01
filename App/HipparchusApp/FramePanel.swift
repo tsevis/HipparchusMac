@@ -47,7 +47,7 @@ struct FramePanel: View {
             // this is where the eye already is when the strip is too small to
             // aim at — which is the moment the bigger window is wanted.
             Button(action: openLocator) {
-                Label("Open", systemImage: "map")
+                Label("Open bigger map", systemImage: "map")
                     .font(.caption)
             }
             .buttonStyle(.borderless)

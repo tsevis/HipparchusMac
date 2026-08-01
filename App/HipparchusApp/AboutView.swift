@@ -218,16 +218,28 @@ final class AboutWindowController: NSObject {
     /// window, not about how maps are made.
     private static let showOnLaunchKey = "ShowAboutOnLaunch"
 
-    func showOnLaunchIfWanted() {
+    /// Show the splash if it is wanted, and run `then` once it is out of the
+    /// way — immediately if it was never shown.
+    ///
+    /// The ordering matters: the Locator is a `.floating` panel, so opening it
+    /// alongside the splash would put it *over* the thing the splash is for.
+    func showOnLaunchIfWanted(then next: @escaping () -> Void) {
         let defaults = UserDefaults.standard
         // Absent means yes — the first launch is exactly when the attribution
         // and the credits are worth reading.
         if defaults.object(forKey: Self.showOnLaunchKey) == nil {
             defaults.set(true, forKey: Self.showOnLaunchKey)
         }
-        guard defaults.bool(forKey: Self.showOnLaunchKey) else { return }
+        guard defaults.bool(forKey: Self.showOnLaunchKey) else {
+            next()
+            return
+        }
+        onDismiss = next
         show()
     }
+
+    /// Run when the splash goes away, whether by the button or the close box.
+    private var onDismiss: (() -> Void)?
 
     func show() {
         if let window {
@@ -246,11 +258,22 @@ final class AboutWindowController: NSObject {
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
+        window.delegate = self
         window.contentView = NSHostingView(
             rootView: AboutView(close: { [weak self] in self?.window?.close() })
         )
         window.center()
         window.makeKeyAndOrderFront(nil)
         self.window = window
+    }
+}
+
+extension AboutWindowController: NSWindowDelegate {
+    /// Whatever was waiting on the splash runs when it closes — by the
+    /// Continue button or by the close box, which have to mean the same thing.
+    func windowWillClose(_ notification: Notification) {
+        let next = onDismiss
+        onDismiss = nil
+        next?()
     }
 }

@@ -48,11 +48,14 @@ final class MapModel {
         Place(name: "Hawaii", bbox: BoundingBox(minLon: -160.30, minLat: 18.85, maxLon: -154.75, maxLat: 22.25)),
     ]
 
-    var west = "25.32" { didSet { record() } }
-    var south = "36.33" { didSet { record() } }
-    var east = "25.50" { didSet { record() } }
-    var north = "36.48" { didSet { record() } }
-    var placeName = "Santorini" { didSet { record() } }
+    // The whole earth, matching `Session`'s own default — these are what the
+    // boxes hold before a saved session has been read, and the two disagreeing
+    // showed as the frame changing under you a moment after launch.
+    var west = "-180.00000" { didSet { record() } }
+    var south = "-85.00000" { didSet { record() } }
+    var east = "180.00000" { didSet { record() } }
+    var north = "85.00000" { didSet { record() } }
+    var placeName = "" { didSet { record() } }
 
     /// The area currently drawn, which is not the area in the boxes until Render map
     /// is pressed. Keeping them apart is what lets the boxes be edited without the

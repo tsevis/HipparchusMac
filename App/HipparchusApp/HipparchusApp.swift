@@ -19,8 +19,10 @@ struct HipparchusApp: App {
         Window("Hipparchus", id: "map") {
             ContentView(model: model, actions: actions)
                 .task {
-                    // Once per launch, unless someone has turned it off.
-                    about.showOnLaunchIfWanted()
+                    // The splash first, then the Locator behind it — the
+                    // Locator floats, so opening both at once would bury the
+                    // splash under it.
+                    about.showOnLaunchIfWanted { actions.openLocator?() }
                 }
         }
         .defaultSize(width: 1100, height: 800)
