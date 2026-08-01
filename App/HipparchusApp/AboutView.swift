@@ -20,6 +20,32 @@ struct AboutView: View {
     private static let version = Bundle.main
         .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
 
+    // MARK: - The lockup
+
+    private static let titleSize: CGFloat = 36
+    private static let subtitleSize: CGFloat = 13
+
+    /// Cap height of the title down to the baseline of the subtitle.
+    ///
+    /// The mark should read as the same object as the words beside it, which
+    /// means matching the block the type actually occupies — not the line
+    /// box, which hangs empty space above the capitals and below the last
+    /// baseline. Measured from the fonts rather than guessed, so it stays
+    /// right if either size changes: 36pt/13pt system currently gives ~48pt,
+    /// against the 34pt that was there before.
+    private static let logoHeight: CGFloat = {
+        let title = NSFont.systemFont(ofSize: titleSize, weight: .semibold)
+        let subtitle = NSFont.systemFont(ofSize: subtitleSize)
+
+        // A line box places the baseline `ascender` below its top, so the
+        // capitals begin `ascender - capHeight` down from it.
+        let titleCapInset = title.ascender - title.capHeight
+        let titleLine = title.ascender - title.descender
+        let subtitleBaseline = titleLine + subtitle.ascender
+
+        return subtitleBaseline - titleCapInset
+    }()
+
     var body: some View {
         VStack(spacing: 0) {
             keyArt
@@ -52,18 +78,23 @@ struct AboutView: View {
             )
             .frame(height: 250)
 
-            HStack(alignment: .bottom, spacing: 12) {
+            // `.lastTextBaseline` puts the mark's bottom edge on the
+            // subtitle's baseline — a view with no text of its own reports
+            // its bottom for that guide — so the logo occupies exactly the
+            // block the two lines of type describe, rather than a height
+            // picked by eye.
+            HStack(alignment: .lastTextBaseline, spacing: 12) {
                 Image("TVDLogo")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 34)
+                    .frame(height: Self.logoHeight)
 
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Hipparchus")
-                        .font(.system(size: 36, weight: .semibold))
+                        .font(.system(size: Self.titleSize, weight: .semibold))
                         .tracking(-0.6)
                     Text("Maps built from sources that stack")
-                        .font(.system(size: 13, weight: .regular))
+                        .font(.system(size: Self.subtitleSize, weight: .regular))
                         .opacity(0.85)
                 }
                 Spacer()
@@ -71,7 +102,6 @@ struct AboutView: View {
                     .font(.system(size: 11, weight: .medium))
                     .monospacedDigit()
                     .opacity(0.7)
-                    .padding(.bottom, 3)
             }
             .foregroundStyle(.white)
             .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
