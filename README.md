@@ -33,7 +33,7 @@ below is as close as anything headless gets to it.
 
 ## Download
 
-[**Hipparchus 0.2.3**](https://github.com/tsevis/HipparchusMac/releases/latest)
+[**Hipparchus 0.2.4**](https://github.com/tsevis/HipparchusMac/releases/latest)
 — a disk image, on the releases page. Drag the app to Applications.
 
 The build is **signed ad-hoc: no Developer ID, no notarisation.** It opens on
@@ -260,6 +260,31 @@ swift run -c release hipparchus-cli --bbox 23.2,36.3,24.2,37.1
 Build it in release. In debug the contour tracer is about thirty times slower,
 which is the difference between a six-second fetch and a three-minute one.
 
+Everything the window can do to a sheet, it can do too, which is how the
+choices above were checked without a window to look at:
+
+| | |
+|---|---|
+| `--hillshade` | shade the relief; `--sun az,alt`, `--exaggeration`, `--shade-bands` |
+| `--relief-on-top` | draw the shading over the buildings rather than under |
+| `--palette <name>` | recolour a preset; `--list-palettes` |
+| `--line-weight <x>` | multiply every stroke |
+| `--paper <name>` `--dpi <n>` `--portrait` | the sheet, for all three formats |
+| `--plugins <dir>` | load a style pack, so its presets and places can be named |
+| `--streets` | stack OpenStreetMap onto the elevation |
+| `--simulated` | a generated field, needing no network at all |
+
+```sh
+swift run -c release hipparchus-cli everest --hillshade \
+    --paper "24 × 36 in" --portrait --dpi 300 --out out
+swift run -c release hipparchus-cli kefalonia --plugins Plugins \
+    --preset "Admiralty Chart" --hillshade --out out
+```
+
+Keep a `--streets` area small: a window of 0.04° × 0.03° over San Francisco
+returns 29,000 features in about half a minute, and Overpass is shared hardware
+run on donations.
+
 ## Verifying output
 
 Rendering is visual, so the checks are numbers rather than impressions. These
@@ -285,15 +310,26 @@ contours, 798 index contours, 7 bathymetry and 24 summit labels — the same cou
 the Python's own screenshot shows — and its longest contour is 8,097 vertices,
 arriving whole.
 
-Beyond that, three fixtures compare this port against the Python directly rather
-than against my reading of it:
+Beyond that, fixtures compare this port against something other than my reading
+of it. Most are the Python itself:
 
 - **Contours** — the same field traced by both, matching line for line and vertex
   for vertex across five levels, 24 lines and 644 vertices.
 - **Elevation bands** — areas matching Shapely to one part in 10⁹, and polygon and
   hole counts matching exactly, over a cone and a crater.
+- **Illumination** — every run boundary and weight around a lopsided ring, for the
+  four profiles the shipped presets use.
+- **The simulated field** — the same seed producing the same ground.
 - **Terrarium decoding** — a real AWS tile decoded to the same metres by Core
   Graphics, skia and PIL.
+
+Two have no Python to be in parity with, and are pinned against something else:
+
+- **Hillshade** — against the published ESRI/GDAL slope-aspect-zenith formulation,
+  because that repo names the layer and computes it nowhere.
+- **Palettes** — against `Scripts/build-style-packs.py`, whose `sheet()` is the
+  same derivation and ships the four style packs. Two copies of one function
+  drift; this is what stops them.
 
 Regenerate them with the scripts in `Scripts/`. A diff there means one of the two
 implementations changed; find out which before accepting it.
@@ -483,6 +519,7 @@ something with no button is a secret, not a feature.
 | `⌘F` | Search for a place |
 | `⇧⌘V` | Paste coordinates |
 | `⌘1`…`⌘9` | Saved places, in sidebar order |
+| `⌥⌘1`…`⌥⌘7` | The rest of them — `⌘0` is Fit to Window, so the run continues on the option key rather than stealing a shortcut everyone already knows |
 | `⌘E` / `⇧⌘E` / `⌥⌘E` | Export SVG / PDF / PNG |
 | `⌘+` / `⌘−` / `⌘0` | Zoom in, out, fit to window |
 | `⌘[` / `⌘]` | Turn the view |
@@ -544,11 +581,37 @@ down one road; keeping the longest run per name puts the label where the street
 is most legible. Ported from `_street_labels`, budgeted at 90 labels a sheet,
 and checked against a fetch of central Athens.
 
+## The page, and printing at a real size
+
+Paper is stated in **inches**, and one description drives all three exports.
+Pixels are inches × dpi for the bitmap, points are inches × 72 for the PDF — so
+a PDF carries physical size and ignores the resolution entirely — and SVG keeps
+taking pixels, because that is what a viewport is. A sheet asked for at 24 × 36
+is the same sheet in every format.
+
+Ten sheets, from A4 to the 24 × 36 inches a print shop treats as a standard
+poster, and four resolutions. Everest at 24 × 36 and 300 dpi is a 7,200 ×
+10,800 PNG and a PDF whose MediaBox is exactly 1728 × 2592 points: 78
+megapixels, drawn in about a second and a half.
+
+Resolution is a choice from four rather than a text field, because a field
+invites 1200 dpi on a poster — 1.2 gigapixels — and Core Graphics does not
+refuse that politely: it returns a nil context, and the export reports "could
+not render" for a request nobody could satisfy. The cost is measured before
+drawing, shown under the controls in inches, pixels and megapixels, and refused
+past 120 megapixels with a message that says what was asked for and points at
+SVG or PDF, which have no pixels to run out of.
+
+This is a divergence: the Python's paper presets are a table of pixel sizes,
+which is A4 at 300 dpi with the 300 left implicit, and it gives the other two
+exporters nothing to work from. Before this, PNG was hardcoded to 2400 × 1800
+and PDF to A4 in points whatever the Page section said.
+
 ## Page furniture
 
 The SVG export can carry a title block, a scale bar, a north arrow and a simple
-legend, composed for a paper preset — A4 and A3 at 300 dpi, a square, a poster —
-with the orientation turning the sheet rather than the map. Ported from
+legend, composed for the chosen sheet, with the orientation turning the sheet
+rather than the map. Ported from
 `export/profiles.py` and the furniture half of `export/svg_clean.py`, and like
 the Python it is **all off by default**: the map is the product, and furniture
 is asked for per export from the Page section of the style column, not
@@ -564,6 +627,81 @@ carrying that fork over would have been porting a bug.
 
 Headlessly, `hipparchus-cli santorini --furniture` writes the full sheet for
 looking at.
+
+## Relief shading
+
+`terrain_hillshade` was named in the draw order, the layer panel and the file
+source list, and produced by nothing — the layer existed so a hillshade
+polygonised in QGIS could be dropped in as a file. It is now computed from the
+elevation grid the terrain provider already fetches, and from the simulated
+field too.
+
+Horn's method, lit from the north-west at 45° by default, because lit from the
+south-east most readers see the valleys as ridges — that inversion is a
+property of the reader, not of the data, which is why the default matters more
+than it looks like it should. The shade is **banded into filled polygons**
+rather than rasterised: this application draws vectors and exports SVG and PDF,
+and a shaded raster has nowhere to go in either. Banding it through the same
+tracer elevation already uses means the tones carry `band_index`, so they ramp
+along a preset's two-stop fill with no renderer change at all.
+
+Off by default — shading lands under the contours and changes the look of every
+sheet, which is a choice about the drawing rather than a fact about the ground.
+Elevation → Relief shading, with sun bearing, sun height and relief stretch
+beside it.
+
+Two things were learned by looking rather than by reasoning:
+
+- **Tones band on a fixed 0…1 scale, not the observed range.** Stretching the
+  observed range sounds right — gentle ground never reaches either extreme — and
+  it turns "how much relief is there" into "always maximum contrast". Amsterdam
+  has 25 m of relief across 14 km, most of it rooftops in a surface model and
+  step noise from the DEM, and stretched banding covered the whole city in a
+  mottle that looked like terrain and was not. A shade value is physically
+  meaningful, so absolute edges are too: Everest reaches all seven tones and
+  Amsterdam two. A sheet reaching fewer than two is not shaded at all.
+- **In a dense city the shading is buried under the buildings.** Relief is ground
+  and buildings sit on it, so that draw order is right, and twenty thousand
+  opaque building fills leave the shading showing in the parks and the street
+  corridors and nowhere else. **Relief over buildings** lifts it over the whole
+  sheet instead; labels stay on top either way.
+
+There is no Python counterpart to be in parity with — that repo names the layer
+in three places and computes it in none — so the fixture pins the published
+ESRI/GDAL slope-aspect-zenith formulation, computed independently, against the
+dot-product form the Swift is written in. Two pieces of algebra for one number,
+agreeing to 1e-12 across 6,864 cells of tilted, curved, noisy and holed ground.
+
+## Palettes, and line weight
+
+A preset here is a whole sheet: thirty-seven layer styles, colour and weight and
+opacity chosen together. That makes "the same map in other colours" a thing you
+cannot ask for — you can only pick a different sheet, and its geometry and
+emphasis come with it.
+
+`Scripts/build-style-packs.py` had already solved this at build time. Its
+`sheet()` derives all thirty-seven styles from eight named colours, which is
+exactly a palette engine, run once by a script and frozen into JSON. The same
+function now exists in Swift and runs at render time, so any of ten palettes can
+be laid over any preset without a build step. The preset keeps its geometry
+profile, which is what a preset still is once colour has been lifted out of it.
+
+Two copies of one derivation drift, and the drift would be invisible: a green
+four units off looks like a green. So the parity fixture is the script's own
+output and the test compares every layer and every channel. Making them agree
+turned up two things worth knowing: the script defaults an unstated stroke
+colour to its module-level `INK` rather than to the sheet's own ink, and
+Python's `round()` is half-to-even where Swift's `.rounded()` is
+half-away-from-zero — a channel landing on 40.5 is 40 there and 41 here.
+
+**Line weight** is one multiplier over every stroke, 0.25× to 4×, beside
+Quality. The preset owns the *relative* weights — a motorway stays the same
+multiple of a service road at every setting — and this moves only the absolute
+scale, which belongs to the medium: the weight that reads on a screen is not the
+weight that reads on a metre of paper, and a sheet exported at 24 × 36 has
+hairlines a third of a millimetre wide. Applied to the built scene, so it is
+live: moving the slider redraws without re-simplifying a quarter of a million
+features.
 
 ## The sea, which OSM does not give you
 
