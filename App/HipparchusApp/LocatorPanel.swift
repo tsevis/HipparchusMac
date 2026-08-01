@@ -108,7 +108,19 @@ final class LocatorPanelController: NSObject {
     }
 
     private func note(_ event: NSEvent, in panel: NSPanel?) {
-        guard let panel, event.window === panel, let map = handle.view else { return }
+        trace.noteEventSeen()
+        guard let map = handle.view else { return }
+        // Compared against the *map's* own window rather than the panel.
+        //
+        // `event.window === panel` was wrong, and wrong in a way that showed
+        // as nothing at all happening: an `NSHostingView`'s content does not
+        // have to sit directly in the window handed to it, so the window an
+        // event names need not be the panel even when the click landed
+        // squarely on the map. Asking the map which window it is in cannot
+        // disagree with itself.
+        guard let mapWindow = map.window, event.window === mapWindow else { return }
+        trace.noteEventInWindow()
+
         let point = map.convert(event.locationInWindow, from: nil)
         // A drag may leave the map on its way; only its start has to be on it.
         guard map.bounds.contains(point) || pressedAt != nil else { return }
@@ -221,11 +233,88 @@ private struct LocatorPanelContent: View {
                 // frame is the button stack.
                 zoomControls
                     .padding(10)
+
+                VStack {
+                    Spacer()
+                    HStack {
+                        keyLegend
+                        Spacer()
+                    }
+                }
+                .padding(10)
+                .allowsHitTesting(false)
             }
             .padding(8)
+            // The map itself cannot take key presses — it is an `MKMapView`
+            // inside an `NSViewRepresentable` — so the surrounding view holds
+            // the focus and translates them.
+            .focusable()
+            .focusEffectDisabled()
+            .onKeyPress { press in handle(press) }
 
             Divider()
             readout
+        }
+    }
+
+    // MARK: - The keyboard
+
+    /// Arrow keys to move, `+`/`-` to zoom, `0` for the whole world, `d` to
+    /// draw. Written out on the map itself — see `keyLegend` — because a
+    /// shortcut nobody is told about is a shortcut nobody uses.
+    private func handle(_ press: KeyPress) -> KeyPress.Result {
+        // Shift moves three times as far, which is the difference between
+        // nudging a coastline into view and crossing a sea.
+        let far = press.modifiers.contains(.shift) ? 3.0 : 1.0
+        switch press.key {
+        case .leftArrow: handle.pan(dx: -far, dy: 0)
+        case .rightArrow: handle.pan(dx: far, dy: 0)
+        case .upArrow: handle.pan(dx: 0, dy: far)
+        case .downArrow: handle.pan(dx: 0, dy: -far)
+        case .escape:
+            guard mode.isDrawingArea else { return .ignored }
+            mode.isDrawingArea = false
+        default:
+            switch press.characters.lowercased() {
+            case "+", "=": handle.zoom(by: Self.zoomStep)
+            case "-", "_": handle.zoom(by: 1 / Self.zoomStep)
+            case "0": handle.showWholeWorld()
+            case "d": mode.isDrawingArea.toggle()
+            default: return .ignored
+            }
+        }
+        return .handled
+    }
+
+    /// The keys, on the map, in the corner nothing else uses.
+    private var keyLegend: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            legendRow("↑ ↓ ← →", "move")
+            legendRow("⇧ + arrows", "move further")
+            legendRow("+ −", "zoom")
+            legendRow("0", "whole world")
+            legendRow("D", "draw an area")
+            legendRow("⌘↵", "render")
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6).strokeBorder(.separator, lineWidth: 0.5)
+        }
+        // Never in the way of the map it explains.
+        .allowsHitTesting(false)
+    }
+
+    private func legendRow(_ keys: String, _ what: String) -> some View {
+        HStack(spacing: 6) {
+            Text(keys)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(.primary)
+                .frame(width: 62, alignment: .leading)
+            Text(what)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
         }
     }
 

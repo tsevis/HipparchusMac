@@ -225,6 +225,7 @@ struct Locator: NSViewRepresentable {
         // MARK: - Choosing a place by clicking it
 
         @objc func handleClick(_ recognizer: NSGestureRecognizer) {
+            trace?.noteRecognizer("click")
             guard let mapView = recognizer.view as? MKMapView else { return }
             _ = selectPoint(at: recognizer.location(in: mapView), in: mapView, via: "recognizer")
         }
@@ -271,6 +272,7 @@ struct Locator: NSViewRepresentable {
         private var dragOrigin: CGPoint?
 
         @objc func handleAreaDrag(_ recognizer: NSPanGestureRecognizer) {
+            trace?.noteRecognizer("pan \(recognizer.state.rawValue)\(isDrawingArea ? "" : " off")")
             guard isDrawingArea, let mapView = recognizer.view as? MKMapView else { return }
             let point = recognizer.location(in: mapView)
 
@@ -479,6 +481,24 @@ final class LocatorHandle {
         // the user moving the map, exactly as a pinch is, and the sidebar
         // locator — where what is on screen is the area — has to hear about it.
         view.setRegion(MKCoordinateRegion(zoomed), animated: true)
+    }
+
+    /// Shift the view by a fraction of what is on screen.
+    ///
+    /// A fraction rather than a fixed number of degrees, because the arrow
+    /// keys have to be useful at both ends: a fifth of the view is a
+    /// comfortable step whether the map is showing a city or an ocean.
+    func pan(dx: Double, dy: Double) {
+        guard let view else { return }
+        let region = view.region
+        let step = 0.2
+        let centre = CLLocationCoordinate2D(
+            latitude: Swift.min(Swift.max(
+                region.center.latitude + dy * region.span.latitudeDelta * step, -85), 85),
+            longitude: Swift.min(Swift.max(
+                region.center.longitude + dx * region.span.longitudeDelta * step, -180), 180)
+        )
+        view.setRegion(MKCoordinateRegion(center: centre, span: region.span), animated: true)
     }
 
     /// Back out to the whole world, the way `Fit` on the main canvas goes back

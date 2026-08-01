@@ -10,7 +10,11 @@ import SwiftUI
 /// stacks, and the map is the product — so the map gets the room and everything else
 /// is a narrow column beside it.
 struct ContentView: View {
-    @State private var model = MapModel()
+    /// Handed in by the app, not made here: Settings is a second scene and
+    /// needs the same model.
+    @Bindable var model: MapModel
+    /// The menu bar's way in. Filled in below as the window appears.
+    let actions: AppActions
     @State private var viewport = ViewportState()
     /// A handle onto the live canvas, so Render map can ask what is actually
     /// on screen — turning the view is deliberately kept out of the requested
@@ -22,6 +26,8 @@ struct ContentView: View {
     /// The window's own undo manager, which puts ⌘Z and the Edit menu in charge
     /// of the model's history rather than inventing a parallel mechanism.
     @Environment(\.undoManager) private var undoManager
+    /// Raised by ⌘F, so Search for a Place has somewhere to land.
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         // The status bar is a sibling of the split view rather than a
@@ -40,7 +46,6 @@ struct ContentView: View {
                     SourcesPanel(model: model)
                     LayersPanel(model: model)
                     StylePicker(model: model)
-                    DerivedPanel(model: model)
                     CompositionPanel(model: model)
                 }
                 .listStyle(.sidebar)
@@ -54,6 +59,7 @@ struct ContentView: View {
         .frame(minWidth: 960, minHeight: 620)
         .task {
             model.undoManager = undoManager
+            wireUpMenuCommands()
             model.startIfRequestedOnLaunch()
             // `--locator` opens the floating Locator straight away, without
             // anyone having to find the toolbar button first. A toolbar's
@@ -120,6 +126,22 @@ struct ContentView: View {
         // can resolve to a size smaller than the pane, leaving the map
         // floating in a corner of a mostly empty column rather than filling it.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Hand the menu bar the window's verbs.
+    ///
+    /// Done once as the window appears. Each closure captures this view's
+    /// state boxes, which are stable across redraws, so the menu keeps working
+    /// without being rewired on every update.
+    private func wireUpMenuCommands() {
+        actions.renderMap = { renderMap() }
+        actions.openLocator = { locatorPanel.show(model: model, onRender: renderMap) }
+        actions.focusSearch = { isSearchFocused = true }
+        actions.zoomIn = { viewport = viewport.zoomed(by: 1.3) }
+        actions.zoomOut = { viewport = viewport.zoomed(by: 1 / 1.3) }
+        actions.fitToWindow = { viewport = ViewportState() }
+        actions.rotateLeft = { viewport = viewport.rotated(by: -15) }
+        actions.rotateRight = { viewport = viewport.rotated(by: 15) }
     }
 
     /// What Render map does, in one place.
@@ -195,7 +217,7 @@ struct ContentView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItem(placement: .navigation) {
-            PlaceSearchField(model: model)
+            PlaceSearchField(model: model, isFocused: $isSearchFocused)
         }
 
         ToolbarItem(placement: .principal) {
@@ -252,6 +274,8 @@ struct ContentView: View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 12) {
+                MakersMark()
+
                 if model.isFetching {
                     ProgressView().controlSize(.small)
                 }
@@ -342,5 +366,45 @@ private struct SourceProgressRow: View {
         case .cancelled:
             Image(systemName: "xmark.circle").foregroundStyle(.tertiary)
         }
+    }
+}
+
+
+/// Whose app this is, in the corner.
+///
+/// A vector PDF rather than a bitmap, cropped to the artwork rather than to
+/// the Illustrator canvas it was drawn on — the canvas is four times the area
+/// of the mark, so framing the uncropped file sized the empty space and left
+/// the logo a third of the height it should have been.
+private struct MakersMark: View {
+    @Environment(\.openURL) private var openURL
+
+    /// Two points taller than the source ticks beside it.
+    ///
+    /// Measured rather than guessed: the ticks are `checkmark.circle.fill` at
+    /// the system font size, and an SF Symbol's rendered height is not its
+    /// point size. Asking AppKit for the real one means this stays right if
+    /// the status bar's type ever changes.
+    private static let height: CGFloat = {
+        let symbol = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)
+        let configured = symbol?.withSymbolConfiguration(
+            NSImage.SymbolConfiguration(pointSize: NSFont.systemFontSize, weight: .regular)
+        )
+        return (configured?.size.height ?? 16) + 2
+    }()
+
+    var body: some View {
+        Button {
+            openURL(URL(string: "https://tsevis.com")!)
+        } label: {
+            Image("TVDLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(height: Self.height)
+        }
+        .buttonStyle(.plain)
+        .pointerStyle(.link)
+        .help("tsevis.com")
+        .accessibilityLabel("Charis Tsevis — tsevis.com")
     }
 }

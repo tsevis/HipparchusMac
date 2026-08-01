@@ -13,22 +13,37 @@ struct StylePicker: View {
 
     var body: some View {
         Section {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(StylePreviews.swatches()) { swatch in
-                        SwatchButton(
-                            swatch: swatch,
-                            isSelected: model.preset.name == swatch.name
-                        ) {
-                            model.preset = model.namedPreset(swatch.name)
-                        }
+            // A grid that wraps, not a strip that scrolls.
+            //
+            // This section's whole claim is *see it, don't read it*, and a
+            // horizontal strip in a sidebar this narrow showed four of sixteen
+            // — so choosing meant scrolling back and forth comparing from
+            // memory, which is reading by another name. Wrapping shows every
+            // style at once and leaves nothing to navigate. `.adaptive` rather
+            // than a fixed column count because the sidebar is resizable
+            // between 260 and 380 points, and the right number of columns is
+            // whatever fits. All sixteen, not the six that used to be
+            // "featured": with nothing to scroll there is no reason to choose
+            // for someone which looks they are allowed to see.
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 58), spacing: 8, alignment: .top)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(StylePreviews.swatches(Presets.names)) { swatch in
+                    SwatchButton(
+                        swatch: swatch,
+                        isSelected: model.preset.name == swatch.name
+                    ) {
+                        model.preset = model.namedPreset(swatch.name)
                     }
                 }
-                .padding(.vertical, 2)
             }
+            .padding(.vertical, 2)
 
-            // The featured row spans the looks the app can produce; the rest stay
-            // reachable rather than hidden.
+            // Still here, because a name is the faster way in when you already
+            // know which one you want — and because plugin and saved styles
+            // have no swatch of their own.
             Picker("All styles", selection: Binding(
                 get: { model.preset.name },
                 set: { model.preset = model.namedPreset($0) }
@@ -178,7 +193,7 @@ private struct SwatchButton: View {
         Button(action: action) {
             VStack(spacing: 3) {
                 SwatchView(swatch: swatch)
-                    .frame(width: 62, height: 44)
+                    .frame(width: 54, height: 38)
                     .clipShape(RoundedRectangle(cornerRadius: 5))
                     .overlay {
                         RoundedRectangle(cornerRadius: 5)
@@ -192,7 +207,7 @@ private struct SwatchButton: View {
                     .foregroundStyle(isSelected ? .primary : .secondary)
                     .lineLimit(1)
             }
-            .frame(width: 66)
+            .frame(width: 58)
         }
         .buttonStyle(.plain)
         .help(swatch.name)

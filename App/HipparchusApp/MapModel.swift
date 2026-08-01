@@ -28,12 +28,24 @@ final class MapModel {
     /// places list and as the way to check output against reality without typing
     /// four numbers.
     static let places: [Place] = [
+        // Santorini leads because it is the area the app opens on when there is
+        // no saved session, and a default that is not in the list reads as a
+        // place the app forgot it knew.
         Place(name: "Santorini", bbox: BoundingBox(minLon: 25.32, minLat: 36.33, maxLon: 25.50, maxLat: 36.48)),
         Place(name: "Athens", bbox: BoundingBox(minLon: 23.575, minLat: 37.816, maxLon: 23.895, maxLat: 38.136)),
+        Place(name: "Amsterdam", bbox: BoundingBox(minLon: 4.78, minLat: 52.32, maxLon: 4.98, maxLat: 52.42)),
+        Place(name: "Düsseldorf", bbox: BoundingBox(minLon: 6.72, minLat: 51.18, maxLon: 6.88, maxLat: 51.28)),
+        Place(name: "Milan", bbox: BoundingBox(minLon: 9.10, minLat: 45.40, maxLon: 9.28, maxLat: 45.53)),
+        Place(name: "Mumbai", bbox: BoundingBox(minLon: 72.78, minLat: 18.89, maxLon: 72.99, maxLat: 19.27)),
         Place(name: "San Francisco", bbox: BoundingBox(minLon: -122.53, minLat: 37.70, maxLon: -122.35, maxLat: 37.84)),
-        Place(name: "Addis Ababa", bbox: BoundingBox(minLon: 38.65, minLat: 8.90, maxLon: 38.88, maxLat: 9.10)),
-        Place(name: "Everest", bbox: BoundingBox(minLon: 86.85, minLat: 27.93, maxLon: 87.05, maxLat: 28.06)),
-        Place(name: "Myrtoan Sea", bbox: BoundingBox(minLon: 23.2, minLat: 36.3, maxLon: 24.2, maxLat: 37.1)),
+        Place(name: "Shanghai", bbox: BoundingBox(minLon: 121.35, minLat: 31.10, maxLon: 121.60, maxLat: 31.32)),
+        Place(name: "Singapore", bbox: BoundingBox(minLon: 103.60, minLat: 1.22, maxLon: 104.03, maxLat: 1.47)),
+        Place(name: "Sydney", bbox: BoundingBox(minLon: 151.13, minLat: -33.93, maxLon: 151.30, maxLat: -33.82)),
+        // The whole chain, Niʻihau to the Big Island — five and a half degrees
+        // across. Far too large for OpenStreetMap, which refuses it and says
+        // so; it is here for terrain, bathymetry and coastline, which are
+        // tiled and do not care.
+        Place(name: "Hawaii", bbox: BoundingBox(minLon: -160.30, minLat: 18.85, maxLon: -154.75, maxLat: 22.25)),
     ]
 
     var west = "25.32" { didSet { record() } }
@@ -74,12 +86,6 @@ final class MapModel {
     var preset = Presets.preset("Hypsometric Relief") {
         didSet {
             guard oldValue.name != preset.name else { return }
-            // A preset's tuned derivation sizes come with it — Fragmented Urban
-            // means 45-metre hexes, Technical Blueprint 70 — while the switches
-            // stay where the user put them. Without this the tables carried
-            // sizes nothing could ever read: `derivations` starts at the struct
-            // defaults and replaces the preset's profile wholesale.
-            adoptDerivationSizes(from: preset)
             record()
         }
     }
@@ -151,7 +157,7 @@ final class MapModel {
         }
 
         let saved = ArtisticPreset(
-            name: name, geometryProfile: derivations, styleProfile: preset.styleProfile
+            name: name, geometryProfile: preset.geometryProfile, styleProfile: preset.styleProfile
         )
         // Replacing one of the user's own by name is fine, and is how editing
         // a saved style works.
@@ -183,6 +189,51 @@ final class MapModel {
         } catch {
             isError = true
             status = "Could not delete the preset: \(error.localizedDescription)"
+        }
+    }
+
+    /// Change a preference and write it out at once.
+    ///
+    /// Saved immediately rather than on quit: there is no Apply button and no
+    /// undo for preferences, so the file has to be the truth the moment the
+    /// field loses focus, or a crash silently discards the change.
+    func updateSettings(_ change: (inout UserSettings) -> Void) {
+        var updated = settings
+        change(&updated)
+        guard updated != settings else { return }
+        settings = updated
+        do {
+            try settingsStore.save(updated)
+            isError = false
+        } catch {
+            isError = true
+            status = "Could not save the preferences: \(error.localizedDescription)"
+        }
+    }
+
+    /// The four places this app keeps things, for Settings to offer.
+    ///
+    /// All inside the sandbox container, which is why they need offering at
+    /// all: nobody is going to navigate to `~/Library/Containers/…` by hand.
+    var storageLocations: [(label: String, url: URL)] {
+        [
+            ("Preferences", SettingsStore.defaultURL()),
+            ("Saved styles", PresetStore.defaultURL()),
+            ("Plugins", PluginLoader.defaultUserPluginDirectory()),
+            ("Cache", DiskCacheStore.defaultDirectory()),
+        ]
+    }
+
+    /// Show a file or folder in Finder, making a missing folder first so there
+    /// is something to show.
+    func reveal(_ url: URL) {
+        let isFile = url.pathExtension.isEmpty == false
+        let folder = isFile ? url.deletingLastPathComponent() : url
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: url.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([folder])
         }
     }
 
@@ -227,18 +278,6 @@ final class MapModel {
         pluginPresets = registry.presets
         loadedPlugins = loader.loadedPlugins
         pluginLoadErrors = loader.loadErrors
-    }
-
-    /// Which derived layers to invent on top of the map.
-    ///
-    /// Held apart from the preset because no preset enables one — all sixteen style
-    /// the four derived layers and three tune their sizes, but every switch is off,
-    /// here and in the Python. This is the switch.
-    var derivations = GeometryPipelineProfile() { didSet { record() } }
-
-    var derivesAnything: Bool {
-        derivations.deriveVoronoi || derivations.deriveDelaunay
-            || derivations.deriveHexGrid || derivations.deriveCirclePacking
     }
 
     /// Layers the user has hidden by hand. Kept separately from the scene so a
@@ -413,8 +452,7 @@ final class MapModel {
             placeName: placeName,
             preset: preset.name,
             quality: quality.key,
-            hiddenLayers: hiddenLayers.sorted(),
-            derived: Session.Derived(derivations)
+            hiddenLayers: hiddenLayers.sorted()
         )
     }
 
@@ -443,16 +481,6 @@ final class MapModel {
         }
     }
 
-    /// Take the preset's derivation sizes without making a second undo entry:
-    /// changing preset is one action, and the sizes it brings are part of it.
-    private func adoptDerivationSizes(from preset: ArtisticPreset) {
-        let wasRestoring = isRestoringState
-        isRestoringState = true
-        defer { isRestoringState = wasRestoring }
-        derivations.hexRadius = preset.geometryProfile.hexRadius
-        derivations.circleMinRadius = preset.geometryProfile.circleMinRadius
-        derivations.circleMaxRadius = preset.geometryProfile.circleMaxRadius
-    }
 
 
     /// One `UndoManager` registration per history boundary, so ⌘Z steps map one
@@ -501,7 +529,6 @@ final class MapModel {
         preset = namedPreset(session.presetName)
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
-        session.derived.apply(to: &derivations)
         placeName = session.placeName
         west = String(session.area.west)
         south = String(session.area.south)
@@ -535,7 +562,6 @@ final class MapModel {
         preset = namedPreset(session.presetName)
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
-        session.derived.apply(to: &derivations)
         placeName = session.placeName
         west = String(session.area.west)
         south = String(session.area.south)
@@ -781,7 +807,6 @@ final class MapModel {
         let reporter = FetchReporter()
         let preset = self.preset
         let quality = self.quality
-        let derivations = derivesAnything ? self.derivations : nil
 
         task = Task { [weak self] in
             // Watch the reporter so the status bar fills in as each source answers,
@@ -796,7 +821,7 @@ final class MapModel {
             do {
                 let collection = try await manager.fetch(BBoxQuery(bbox: bbox), plan: plan, reporter: reporter)
                 let built = try SceneBuilder(options: SceneBuilder.Options(
-                    preset: preset, quality: quality, derivations: derivations
+                    preset: preset, quality: quality
                 )).build(from: collection)
 
                 await MainActor.run {
@@ -1018,19 +1043,6 @@ final class MapModel {
         if let flag = arguments.firstIndex(of: "--sources"), flag + 1 < arguments.count {
             for id in arguments[flag + 1].split(separator: ",") {
                 stack.setEnabled(String(id).trimmingCharacters(in: .whitespaces), true)
-            }
-        }
-        // `--derive voronoi,hex` — the derived layers are off in every preset, so
-        // without a switch there would be no way to look at one.
-        if let flag = arguments.firstIndex(of: "--derive"), flag + 1 < arguments.count {
-            for name in arguments[flag + 1].split(separator: ",") {
-                switch name.trimmingCharacters(in: .whitespaces).lowercased() {
-                case "voronoi": derivations.deriveVoronoi = true
-                case "delaunay": derivations.deriveDelaunay = true
-                case "hex", "hexgrid": derivations.deriveHexGrid = true
-                case "circles", "packing": derivations.deriveCirclePacking = true
-                default: continue
-                }
             }
         }
         if let flag = arguments.firstIndex(of: "--rotate"), flag + 1 < arguments.count {

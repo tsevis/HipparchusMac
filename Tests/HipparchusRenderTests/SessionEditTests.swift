@@ -71,26 +71,6 @@ final class SessionEditTests: XCTestCase {
 
     // MARK: - Derived layers
 
-    func testTurningADerivedLayerOnAndOff() {
-        XCTAssertEqual(describe { $0.derived.voronoi = true }?.action, "Turn On Voronoi Cells")
-        XCTAssertEqual(describe { $0.derived.hexGrid = true }?.action, "Turn On Hex Grid")
-
-        var on = Session()
-        on.derived.circlePacking = true
-        var off = on
-        off.derived.circlePacking = false
-        XCTAssertEqual(SessionEdit.describe(from: on, to: off)?.action, "Turn Off Circle Packing")
-    }
-
-    func testDerivedSizesAreNamedAndCoalesce() {
-        let hex = describe { $0.derived.hexRadius = 90 }
-        XCTAssertEqual(hex?.action, "Change Hex Size")
-        XCTAssertEqual(hex?.coalescingKey, "derived.hexRadius")
-
-        let circles = describe { $0.derived.circleMaxRadius = 44 }
-        XCTAssertEqual(circles?.action, "Change Circle Size")
-        XCTAssertEqual(circles?.coalescingKey, "derived.circleMaxRadius")
-    }
 
     // MARK: - Layers
 
@@ -134,7 +114,6 @@ final class SessionEditTests: XCTestCase {
     func testThePresetOutranksTheSizesItBrings() {
         var after = Session()
         after.presetName = "Fragmented Urban"
-        after.derived.hexRadius = 45
 
         XCTAssertEqual(SessionEdit.describe(from: Session(), to: after)?.action, "Change Preset")
     }

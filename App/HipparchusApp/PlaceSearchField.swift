@@ -8,7 +8,9 @@ import SwiftUI
 struct PlaceSearchField: View {
     @Bindable var model: MapModel
     @State private var showsResults = false
-    @FocusState private var isFocused: Bool
+    /// Owned by the window rather than here, so ⌘F — Search for a Place — has
+    /// somewhere to put the cursor.
+    @FocusState.Binding var isFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {

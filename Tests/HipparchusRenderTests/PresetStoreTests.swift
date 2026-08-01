@@ -28,8 +28,7 @@ final class PresetStoreTests: XCTestCase {
     private func distinctive(named name: String) -> ArtisticPreset {
         var geometry = GeometryPipelineProfile()
         geometry.smoothingIterations = 7
-        geometry.deriveHexGrid = true
-        geometry.hexRadius = 45.5
+        geometry.simplifyToleranceExport = 0.25
         geometry.maxOnScreenFeaturesPerLayer = 1234
         geometry.layerSmoothingIterations = ["roads": 3, "water": 5]
 
@@ -136,6 +135,24 @@ final class PresetStoreTests: XCTestCase {
     func testRubbishInTheFileIsAnErrorRatherThanACrash() throws {
         try "this is not json".write(to: store.url, atomically: true, encoding: .utf8)
         XCTAssertThrowsError(try store.load())
+    }
+
+    func testAPresetFromThePythonWithDerivedLayersStillLoads() throws {
+        // The four derived layers were removed from this app; the Python still
+        // has them and still writes their keys. `Codable` ignores keys it has
+        // no case for, so such a preset must load with everything else intact
+        // rather than being refused for carrying a field we stopped caring about.
+        try #"""
+        {"schema_version":1,"presets":[{"name":"From Python",
+          "geometry_profile":{"smoothing_iterations":4,"derive_voronoi":true,
+            "derive_hex_grid":true,"hex_radius":45,"circle_min_radius":8},
+          "style_profile":{"background":{"r":1,"g":2,"b":3,"a":255}}}]}
+        """#.write(to: store.url, atomically: true, encoding: .utf8)
+
+        let preset = try XCTUnwrap(try store.load().first)
+        XCTAssertEqual(preset.name, "From Python")
+        XCTAssertEqual(preset.geometryProfile.smoothingIterations, 4)
+        XCTAssertEqual(preset.styleProfile.background, RGBAColor(1, 2, 3, 255))
     }
 
     func testAPresetSavedBeforeTheseFieldsExistedStillLoads() throws {

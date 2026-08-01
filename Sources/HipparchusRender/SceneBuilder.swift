@@ -29,26 +29,15 @@ public struct SceneBuilder: Sendable {
         /// runs past the frame, because the mosaic does.
         public var clipToArea: Bool
 
-        /// Overrides the preset's geometry profile, and the only way to turn a
-        /// derived layer on.
-        ///
-        /// None of the sixteen presets enables one — not here and not in the Python,
-        /// where every preset styles the four derived layers and three tune their
-        /// sizes, but all sixty-four switches are off. So without this the machinery
-        /// would be unreachable, and a feature nothing can reach is a feature that
-        /// quietly rots. `nil` means "whatever the preset says", which is off.
-        public var derivations: GeometryPipelineProfile?
 
         public init(
             preset: ArtisticPreset = Presets.preset("Hypsometric Relief"),
             quality: QualityProfile = Quality.default,
             clipToArea: Bool = true,
-            derivations: GeometryPipelineProfile? = nil
         ) {
             self.preset = preset
             self.quality = quality
             self.clipToArea = clipToArea
-            self.derivations = derivations
         }
     }
 
@@ -257,9 +246,6 @@ public struct SceneBuilder: Sendable {
         // base layers just produced — not from the raw features. A Voronoi diagram
         // of building centroids has to be a diagram of where the buildings ended up
         // on the page, not of where they were before the frame was applied.
-        for derived in try derive(from: layers, styleProfile: styleProfile, geos: geos) {
-            layers.append(derived)
-        }
         // Name breaks the tie, matching `ordered`: Swift's sort is not stable, and
         // every unnamed layer ranks the same.
         layers.sort { first, second in
@@ -530,88 +516,6 @@ public struct SceneBuilder: Sendable {
 
     // MARK: - Derived layers
 
-    /// The layers a preset invents rather than fetches.
-    ///
-    /// Ported from `_derive_layers` and `_scene_boundary`. Every one of them is
-    /// **synthetic** — a pattern read out of the data, not a measurement of
-    /// anything — which is why the scene records that it derived them.
-    ///
-    /// Nothing here runs unless a preset asks. None of the sixteen built-in presets
-    /// does, in this port or in the Python; they all *style* the four layers, and
-    /// three of them tune the hex radius and circle sizes, but the switches are off.
-    /// Turning one on is `SceneBuilder.Options.derivations`.
-    private func derive(
-        from layers: [RenderLayer],
-        styleProfile: StyleProfile,
-        geos: GEOSContext
-    ) throws -> [RenderLayer] {
-        let profile = options.derivations ?? options.preset.geometryProfile
-        guard profile.deriveVoronoi || profile.deriveDelaunay
-            || profile.deriveHexGrid || profile.deriveCirclePacking
-        else {
-            return []
-        }
-
-        // A preview of a dense city is already a hundred thousand shapes; deriving
-        // a second structure on top of it is not what "fast preview" means.
-        let total = layers.reduce(0) { $0 + $1.geometries.count }
-        guard !(options.quality.isExport == false && total > 100_000) else { return [] }
-
-        func geometries(_ name: String) -> [Geometry] {
-            layers.first { $0.name == name }?.geometries ?? []
-        }
-        guard let boundary = try sceneBoundary(from: layers, geos: geos) else { return [] }
-
-        func layer(_ name: String, _ shapes: [Polygon]) -> RenderLayer? {
-            guard !shapes.isEmpty else { return nil }
-            var layer = RenderLayer(
-                name: name, style: styleProfile.style(for: name), rawFeatureCount: shapes.count
-            )
-            for shape in shapes { layer.append(.polygon(shape)) }
-            return layer
-        }
-
-        var derived: [RenderLayer] = []
-
-        if profile.deriveVoronoi {
-            let buildings = geometries("buildings")
-            if !buildings.isEmpty {
-                let cells = try geos.voronoiCells(around: buildings, boundary: boundary)
-                if let made = layer("voronoi_cells", cells) { derived.append(made) }
-            }
-        }
-
-        if profile.deriveDelaunay {
-            let roads = geometries("roads") + Self.roadHierarchy.flatMap(geometries)
-            if !roads.isEmpty {
-                let sites = try geos.roadIntersections(roads)
-                let mesh = try geos.delaunayTriangles(sites: sites, boundary: boundary)
-                if let made = layer("delaunay_mesh", mesh) { derived.append(made) }
-            }
-        }
-
-        if profile.deriveHexGrid {
-            let grid = try geos.hexGrid(
-                boundary: boundary,
-                options: HexGridOptions(radius: profile.hexRadius, clipToBoundary: true)
-            )
-            if let made = layer("hex_grid", grid) { derived.append(made) }
-        }
-
-        if profile.deriveCirclePacking {
-            let circles = try geos.packedCircles(in: boundary, options: CirclePackingOptions(
-                minRadius: profile.circleMinRadius,
-                maxRadius: profile.circleMaxRadius,
-                radiusStep: Swift.max(1.0, profile.circleMinRadius * 0.25),
-                sampleStep: Swift.max(4.0, profile.circleMinRadius),
-                maxCircles: 350,
-                clearance: 0.5
-            ))
-            if let made = layer("circle_packing", circles) { derived.append(made) }
-        }
-
-        return derived
-    }
 
     static let roadHierarchy = [
         "roads_motorway", "roads_trunk", "roads_primary", "roads_secondary",

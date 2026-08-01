@@ -20,13 +20,6 @@ public struct GeometryPipelineProfile: Sendable, Equatable {
     public var simplifyTolerancePreview: Double
     public var simplifyToleranceExport: Double
     public var smoothingIterations: Int
-    public var deriveVoronoi: Bool
-    public var deriveDelaunay: Bool
-    public var deriveHexGrid: Bool
-    public var deriveCirclePacking: Bool
-    public var hexRadius: Double
-    public var circleMinRadius: Double
-    public var circleMaxRadius: Double
     public var maxOnScreenFeaturesPerLayer: Int
     /// Overrides the base iteration count for named layers. `Coastal Survey` smooths
     /// its coastline three times and its water twice.
@@ -36,26 +29,12 @@ public struct GeometryPipelineProfile: Sendable, Equatable {
         simplifyTolerancePreview: Double = 1.5,
         simplifyToleranceExport: Double = 0.6,
         smoothingIterations: Int = 1,
-        deriveVoronoi: Bool = false,
-        deriveDelaunay: Bool = false,
-        deriveHexGrid: Bool = false,
-        deriveCirclePacking: Bool = false,
-        hexRadius: Double = 60.0,
-        circleMinRadius: Double = 8.0,
-        circleMaxRadius: Double = 30.0,
         maxOnScreenFeaturesPerLayer: Int = 10000,
         layerSmoothingIterations: [String: Int] = [:]
     ) {
         self.simplifyTolerancePreview = simplifyTolerancePreview
         self.simplifyToleranceExport = simplifyToleranceExport
         self.smoothingIterations = smoothingIterations
-        self.deriveVoronoi = deriveVoronoi
-        self.deriveDelaunay = deriveDelaunay
-        self.deriveHexGrid = deriveHexGrid
-        self.deriveCirclePacking = deriveCirclePacking
-        self.hexRadius = hexRadius
-        self.circleMinRadius = circleMinRadius
-        self.circleMaxRadius = circleMaxRadius
         self.maxOnScreenFeaturesPerLayer = maxOnScreenFeaturesPerLayer
         self.layerSmoothingIterations = layerSmoothingIterations
     }

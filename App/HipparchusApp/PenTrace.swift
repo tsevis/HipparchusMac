@@ -16,6 +16,16 @@ import AppKit
 @MainActor
 @Observable
 final class PenTrace {
+    /// Every mouse event the monitor was handed, before any test at all.
+    ///
+    /// Counted because the previous version of this could only say "no
+    /// presses", which conflates three different faults: the monitor never
+    /// installed, the monitor running but rejecting the events as belonging to
+    /// another window, and the events landing outside the map. Each needs a
+    /// different fix and they are indistinguishable from one number.
+    private(set) var eventsSeen = 0
+    /// Those the monitor accepted as belonging to the map's own window.
+    private(set) var eventsInWindow = 0
     /// Raw presses and releases the app received inside the map, counted
     /// before anything has had a chance to interpret them.
     private(set) var pressesSeen = 0
@@ -26,6 +36,20 @@ final class PenTrace {
     private(set) var lastRoute = "—"
     /// The last press, in the map's own coordinates.
     private(set) var lastPress: CGPoint?
+
+    /// What the gesture recognizers are doing, which is the other half of the
+    /// picture: the monitor and the recognizers are two independent routes to
+    /// the same map, and "nothing happened" has to be attributable to one.
+    private(set) var recognizerEvents = 0
+    private(set) var lastRecognizer = "—"
+
+    func noteRecognizer(_ what: String) {
+        recognizerEvents += 1
+        lastRecognizer = what
+    }
+
+    func noteEventSeen() { eventsSeen += 1 }
+    func noteEventInWindow() { eventsInWindow += 1 }
 
     func notePress(at point: CGPoint) {
         pressesSeen += 1
@@ -40,6 +64,11 @@ final class PenTrace {
     /// Short enough to sit in the corner of the readout and still be read.
     var summary: String {
         let where_ = lastPress.map { String(format: " @%.0f,%.0f", $0.x, $0.y) } ?? ""
-        return "presses \(pressesSeen)\(where_) · chosen \(selectionsMade) · via \(lastRoute)"
+        // Each number narrows it: no events at all means the monitor is not
+        // installed; events but none in the window means the window test is
+        // wrong; in the window but not on the map means the coordinates are.
+        return "evt \(eventsSeen) · win \(eventsInWindow) · map \(pressesSeen)\(where_)"
+            + " · rec \(recognizerEvents) \(lastRecognizer)"
+            + " · chosen \(selectionsMade) · via \(lastRoute)"
     }
 }

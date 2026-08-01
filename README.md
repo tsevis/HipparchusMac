@@ -250,6 +250,10 @@ expected. Every one currently matches:
 | Everest | `86.85, 27.93 → 87.05, 28.06` | 5,060 m to 8,746 m | 5060 m to 8746 m |
 | Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | −1,310 m, ~546 sub-sea contours | −1310 m, 546 |
 
+Addis Ababa, Everest and the Myrtoan Sea are verification areas rather than
+saved places — the sidebar's list is the eleven cities and island groups worth
+returning to — so reach them by `--bbox`, or by pasting the coordinates above.
+
 Athens, Addis Ababa and Everest yield no bathymetry; the Myrtoan Sea yields five
 summits rather than two dozen. Santorini's Illustrator layers come out as 178
 contours, 798 index contours, 7 bathymetry and 24 summit labels — the same counts
@@ -270,6 +274,29 @@ Regenerate them with the scripts in `Scripts/`. A diff there means one of the tw
 implementations changed; find out which before accepting it.
 
 ## Gallery
+
+The same two areas in a light preset and in Night, rendered by the app's own
+pipeline — `--bbox … --preset … --render-to`, not screenshots of a window.
+
+<table>
+  <tr>
+    <td width="50%"><img src="Docs/assets/kyiv-light.png" width="100%" alt="Kyiv in the Hypsometric Relief preset: the Dnieper and its islands, the street grid over filled elevation bands"></td>
+    <td width="50%"><img src="Docs/assets/kyiv-dark.png" width="100%" alt="The same frame of Kyiv in the Night preset: lit streets over a dark ground, the Dnieper reading as a void"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Kyiv · Hypsometric Relief · 240,403 features</em></td>
+    <td align="center"><em>Kyiv · Night · the same fetch, restyled</em></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="Docs/assets/ionian-light.png" width="100%" alt="Lefkada and Kefalonia in the Coastal Survey preset: coastline, bathymetry and relief from minus nine to 1596 metres"></td>
+    <td width="50%"><img src="Docs/assets/ionian-dark.png" width="100%" alt="The same Ionian frame in the Night preset, the islands against an unlit sea"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Lefkada &amp; Kefalonia · Coastal Survey · −9 m to 1,596 m</em></td>
+    <td align="center"><em>Lefkada &amp; Kefalonia · Night</em></td>
+  </tr>
+</table>
+
 
 Ten regions, drawn by this app, each in a different preset. They are also the
 widest test it has been put through: every one was fetched, built and rendered
@@ -418,11 +445,56 @@ right baseline — what zoom 1 actually shows — the ratio lands exactly on 2.0
 in both directions, and the same check at zoom 2.0 and zoom 0.2 lands exactly
 on 0.500× and 5.000×.
 
+## Keyboard
+
+Every shortcut drives a control that is also on screen. A shortcut for
+something with no button is a secret, not a feature.
+
+| | |
+|---|---|
+| `⌘↵` | Render map |
+| `⌘.` | Cancel a running fetch |
+| `⌘L` | Open the Locator |
+| `⌘F` | Search for a place |
+| `⇧⌘V` | Paste coordinates |
+| `⌘1`…`⌘9` | Saved places, in sidebar order |
+| `⌘E` / `⇧⌘E` / `⌥⌘E` | Export SVG / PDF / PNG |
+| `⌘+` / `⌘−` / `⌘0` | Zoom in, out, fit to window |
+| `⌘[` / `⌘]` | Turn the view |
+| `⌘Z` / `⇧⌘Z` | Undo, redo |
+| `⌘,` | Settings |
+
+The floating Locator has its own set, written on the map itself in the lower
+left so they need no looking up:
+
+| | |
+|---|---|
+| `↑` `↓` `←` `→` | Move a fifth of the view |
+| `⇧` + arrows | Move three times as far |
+| `+` / `−` | Zoom |
+| `0` | Back to the whole world |
+| `D` | Draw an area by dragging |
+| `esc` | Leave draw mode |
+| `⌘↵` | Render what is chosen |
+
+## Settings
+
+⌘, opens four preferences, kept in `settings.json` in the Python's own format
+so the file is shared between the two applications:
+
+- **Cache ceiling**, in megabytes. The oldest answers are dropped once the
+  cache passes it. Defaults to 4 GB, as the Python does.
+- **Requests a second** to shared services. Overpass runs on donated hardware
+  and asks for one; a source's own settings can still override it.
+- **Where things are kept** — the app is sandboxed, so its preferences, saved
+  styles, plugins and cache all live inside a container nobody would navigate
+  to by hand. Each has a Show button.
+
 ## Undo
 
 Everything a person can do is undoable — the area, however it was set; ticking a
-source and every inline setting; the preset and the quality; hiding a layer; the
-derived-layer switches and their sizes; and fetching a map. ⌘Z and the Edit menu
+source and every inline setting; the preset and the quality; hiding a layer;
+and fetching a map. ⌘Z and the Edit menu
 name the action they will take back: "Undo Choose Place", "Undo Change Preset",
 "Undo Fetch Map".
 
@@ -592,9 +664,8 @@ had noticed.
   the last three belong to features that are not ported.
 
 **Where this port goes further than the Python**, also on purpose: the road
-hierarchy caps each class separately, `ferry_routes` is its own layer, the
-Delaunay derivation and the derived-layer boundary both read the road hierarchy
-rather than a layer classification has already deleted, footprints are divided
+hierarchy caps each class separately, `ferry_routes` is its own layer,
+footprints are divided
 at the date line, `night_lights` and `admin_boundaries` have places in the draw
 order, and PDF and PNG export are real rather than stubs.
 
@@ -697,39 +768,24 @@ coordinate has to become the same very large unsigned integer in both languages,
 and a window landing exactly half-way between two rungs of the ladder has to
 round to even, as Python's `round` does and Swift's default does not.
 
-## Derived layers
+## The derived layers, and why they are gone
 
-Four layers are **invented from the map rather than fetched with it**: Voronoi
+The Python invents four layers from the map rather than fetching them: Voronoi
 cells around the buildings, a Delaunay mesh between road junctions, a hex grid,
-and packed circles. Each is clipped to the convex hull of what the map actually
-holds — a union of every building, road and park is full of holes and inlets, and
-a grid clipped to *that* would be lace.
+and packed circles. This port had all four, built on `GEOSVoronoiDiagram` and
+`GEOSDelaunayTriangulation`.
 
-Voronoi and Delaunay come from GEOS, which the brief settled: `GEOSVoronoiDiagram`
-and `GEOSDelaunayTriangulation` replace the SciPy usage, and with them go two
-hundred lines of the Python — a hand-rolled reconstruction of finite Voronoi
-polygons from Qhull's infinite ridges, a fallback for when SciPy will not import
-against the local NumPy ABI, and a second fallback that draws squares around each
-site and calls them cells.
+They have been **removed**. They made a mosaic of a map, which is a different
+program from this one, and every one of the sixteen presets left them switched
+off — in this port and in the Python, where nothing outside a test ever turned
+one on. Keeping a feature nobody enables costs a panel, a set of switches, a
+GEOS dependency surface and forty tests, all to produce a look this app is not
+for.
 
-**No preset turns any of them on.** All sixteen style the four layers and three
-tune the hex radius and circle sizes, but every switch is off — in this port and
-in the Python, where nothing outside a test ever sets one. So they are switched
-from the Derived section of the style column, or on launch:
-
-```bash
-Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.40,36.39,25.46,36.44 --derive voronoi,hex
-```
-
-Everything they produce is **synthetic**: a pattern read out of the data, not a
-measurement of anything, and the panel says so.
-
-Two costs are bounded rather than left to grow. Road junctions are found through
-a grid index rather than by comparing every line with every other, and capped at
-three thousand seeds. Circle packing walks a lattice that is quadratic in the
-area while its step is fixed by the smallest circle, so the lattice is capped and
-the step widens to fit: a 5 km frame at an 8 m step took seven seconds before
-that, and thirty kilometres would have taken four minutes.
+This is the port's one deliberate *subtraction* from the Python, as distinct
+from the substitutions listed above. A preset written by the Python app still
+carries `derive_voronoi` and its companions; those keys are simply ignored now,
+and such a preset still loads with everything else intact.
 
 ## Roads are eight layers
 

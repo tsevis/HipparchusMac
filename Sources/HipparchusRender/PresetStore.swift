@@ -123,17 +123,13 @@ struct StoredPreset: Codable {
     static let lightGround = RGBAColor(250, 250, 250, 255)
 }
 
+/// Note the absence of the four `derive_*` switches and their sizes. A preset
+/// written by the Python app still carries them, and still loads: `Codable`
+/// ignores keys it has no case for. They simply no longer mean anything here.
 struct StoredGeometry: Codable {
     var simplifyTolerancePreview: Double?
     var simplifyToleranceExport: Double?
     var smoothingIterations: Int?
-    var deriveVoronoi: Bool?
-    var deriveDelaunay: Bool?
-    var deriveHexGrid: Bool?
-    var deriveCirclePacking: Bool?
-    var hexRadius: Double?
-    var circleMinRadius: Double?
-    var circleMaxRadius: Double?
     var maxOnScreenFeaturesPerLayer: Int?
     var layerSmoothingIterations: [String: Int]?
 
@@ -141,13 +137,6 @@ struct StoredGeometry: Codable {
         case simplifyTolerancePreview = "simplify_tolerance_preview"
         case simplifyToleranceExport = "simplify_tolerance_export"
         case smoothingIterations = "smoothing_iterations"
-        case deriveVoronoi = "derive_voronoi"
-        case deriveDelaunay = "derive_delaunay"
-        case deriveHexGrid = "derive_hex_grid"
-        case deriveCirclePacking = "derive_circle_packing"
-        case hexRadius = "hex_radius"
-        case circleMinRadius = "circle_min_radius"
-        case circleMaxRadius = "circle_max_radius"
         case maxOnScreenFeaturesPerLayer = "max_on_screen_features_per_layer"
         case layerSmoothingIterations = "layer_smoothing_iterations"
     }
@@ -156,13 +145,6 @@ struct StoredGeometry: Codable {
         simplifyTolerancePreview = profile.simplifyTolerancePreview
         simplifyToleranceExport = profile.simplifyToleranceExport
         smoothingIterations = profile.smoothingIterations
-        deriveVoronoi = profile.deriveVoronoi
-        deriveDelaunay = profile.deriveDelaunay
-        deriveHexGrid = profile.deriveHexGrid
-        deriveCirclePacking = profile.deriveCirclePacking
-        hexRadius = profile.hexRadius
-        circleMinRadius = profile.circleMinRadius
-        circleMaxRadius = profile.circleMaxRadius
         maxOnScreenFeaturesPerLayer = profile.maxOnScreenFeaturesPerLayer
         layerSmoothingIterations = profile.layerSmoothingIterations
     }
@@ -172,13 +154,6 @@ struct StoredGeometry: Codable {
         if let simplifyTolerancePreview { result.simplifyTolerancePreview = simplifyTolerancePreview }
         if let simplifyToleranceExport { result.simplifyToleranceExport = simplifyToleranceExport }
         if let smoothingIterations { result.smoothingIterations = smoothingIterations }
-        if let deriveVoronoi { result.deriveVoronoi = deriveVoronoi }
-        if let deriveDelaunay { result.deriveDelaunay = deriveDelaunay }
-        if let deriveHexGrid { result.deriveHexGrid = deriveHexGrid }
-        if let deriveCirclePacking { result.deriveCirclePacking = deriveCirclePacking }
-        if let hexRadius { result.hexRadius = hexRadius }
-        if let circleMinRadius { result.circleMinRadius = circleMinRadius }
-        if let circleMaxRadius { result.circleMaxRadius = circleMaxRadius }
         if let maxOnScreenFeaturesPerLayer { result.maxOnScreenFeaturesPerLayer = maxOnScreenFeaturesPerLayer }
         if let layerSmoothingIterations { result.layerSmoothingIterations = layerSmoothingIterations }
         return result

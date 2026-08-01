@@ -49,9 +49,6 @@ public enum SessionEdit {
         if before.qualityKey != after.qualityKey {
             return Description(action: "Change Quality")
         }
-        if let edit = derivedEdit(from: before.derived, to: after.derived) {
-            return edit
-        }
         if let edit = layerEdit(from: before.hiddenLayers, to: after.hiddenLayers) {
             return edit
         }
@@ -114,29 +111,6 @@ public enum SessionEdit {
         return Description(action: "Change \(label)", coalescingKey: "stack.\(id).\(key)")
     }
 
-    private static func derivedEdit(
-        from before: Session.Derived, to after: Session.Derived
-    ) -> Description? {
-        func switched(_ on: Bool, _ layer: String) -> Description {
-            Description(action: on ? "Turn On \(layer)" : "Turn Off \(layer)")
-        }
-        if before.voronoi != after.voronoi { return switched(after.voronoi, "Voronoi Cells") }
-        if before.delaunay != after.delaunay { return switched(after.delaunay, "Delaunay Mesh") }
-        if before.hexGrid != after.hexGrid { return switched(after.hexGrid, "Hex Grid") }
-        if before.circlePacking != after.circlePacking {
-            return switched(after.circlePacking, "Circle Packing")
-        }
-        if before.hexRadius != after.hexRadius {
-            return Description(action: "Change Hex Size", coalescingKey: "derived.hexRadius")
-        }
-        if before.circleMinRadius != after.circleMinRadius {
-            return Description(action: "Change Circle Size", coalescingKey: "derived.circleMinRadius")
-        }
-        if before.circleMaxRadius != after.circleMaxRadius {
-            return Description(action: "Change Circle Size", coalescingKey: "derived.circleMaxRadius")
-        }
-        return nil
-    }
 
     private static func layerEdit(from before: [String], to after: [String]) -> Description? {
         let wasHidden = Set(before)

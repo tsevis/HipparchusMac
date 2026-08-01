@@ -103,7 +103,6 @@ extension Presets {
             geometryProfile: GeometryPipelineProfile(
                 simplifyTolerancePreview: 0.0,
                 simplifyToleranceExport: 0.0,
-                hexRadius: 45.0,
                 maxOnScreenFeaturesPerLayer: 200000
             ),
             styleProfile: StyleProfile(
@@ -154,8 +153,6 @@ extension Presets {
             geometryProfile: GeometryPipelineProfile(
                 simplifyTolerancePreview: 0.0,
                 simplifyToleranceExport: 0.0,
-                circleMinRadius: 10.0,
-                circleMaxRadius: 36.0,
                 maxOnScreenFeaturesPerLayer: 200000
             ),
             styleProfile: StyleProfile(
@@ -206,7 +203,6 @@ extension Presets {
             geometryProfile: GeometryPipelineProfile(
                 simplifyTolerancePreview: 0.0,
                 simplifyToleranceExport: 0.0,
-                hexRadius: 70.0,
                 maxOnScreenFeaturesPerLayer: 200000
             ),
             styleProfile: StyleProfile(
@@ -394,7 +390,6 @@ extension Presets {
             geometryProfile: GeometryPipelineProfile(
                 simplifyTolerancePreview: 0.15,
                 simplifyToleranceExport: 0.03,
-                hexRadius: 70.0,
                 maxOnScreenFeaturesPerLayer: 220000
             ),
             styleProfile: StyleProfile(
