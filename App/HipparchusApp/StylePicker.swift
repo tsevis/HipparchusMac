@@ -75,6 +75,21 @@ struct StylePicker: View {
 
             savedStyles
 
+            Picker("Palette", selection: $model.paletteName) {
+                ForEach(Palette.names, id: \.self) { name in
+                    Text(name).tag(name)
+                }
+            }
+            .controlSize(.small)
+            .help("""
+            Colour, separate from the style. A preset is a whole sheet — \
+            geometry, weights and colour together — so the same map in other \
+            colours was not a thing you could ask for. A palette replaces the \
+            colour and keeps the geometry. Takes effect on the next Render map, \
+            as a preset does; the fetch behind it is cached, so it costs no \
+            network.
+            """)
+
             Picker("Quality", selection: Binding(
                 get: { model.quality.key },
                 set: { model.quality = Quality.profile($0) }

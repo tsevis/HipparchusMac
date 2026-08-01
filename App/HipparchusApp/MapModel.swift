@@ -105,6 +105,28 @@ final class MapModel {
         }
     }
 
+    /// Colour, as an axis separate from the preset.
+    ///
+    /// A preset is a whole sheet — geometry, weights and colour together — so
+    /// "the same map in other colours" was not a thing that could be asked for.
+    /// A palette replaces the colour and leaves the geometry, which is what a
+    /// preset still is once colour is lifted out of it. `Palette.presetOwnName`
+    /// means leave it alone, and is the default.
+    /// Takes effect on the next Render map, exactly as choosing a preset does —
+    /// the scene is styled where it is built. The fetch behind it is disk-cached,
+    /// so redrawing in another palette costs no network.
+    var paletteName = Palette.presetOwnName {
+        didSet {
+            guard oldValue != paletteName else { return }
+            record()
+        }
+    }
+
+    /// The preset actually drawn: the chosen one, in the chosen palette.
+    var effectivePreset: ArtisticPreset {
+        preset.recoloured(with: Palette.named(paletteName))
+    }
+
     // MARK: - Presets beyond the sixteen
 
     /// Styles the user saved. Read once at launch and rewritten whenever one
@@ -488,6 +510,7 @@ final class MapModel {
             area: Session.Area(bbox),
             placeName: placeName,
             preset: preset.name,
+            palette: paletteName,
             quality: quality.key,
             hiddenLayers: hiddenLayers.sorted()
         )
@@ -564,6 +587,8 @@ final class MapModel {
         let session = snapshot.session
         stack = session.stack()
         preset = namedPreset(session.presetName)
+        paletteName = Palette.names.contains(session.paletteName)
+            ? session.paletteName : Palette.presetOwnName
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
         placeName = session.placeName
@@ -597,6 +622,8 @@ final class MapModel {
         let session = Session.read(from: sessionURL)
         stack = session.stack()
         preset = namedPreset(session.presetName)
+        paletteName = Palette.names.contains(session.paletteName)
+            ? session.paletteName : Palette.presetOwnName
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
         placeName = session.placeName
@@ -860,7 +887,9 @@ final class MapModel {
 
         let manager = self.manager()
         let reporter = FetchReporter()
-        let preset = self.preset
+        // The chosen preset in the chosen palette: colour is an axis of its own
+        // now, and the scene is styled where it is built.
+        let preset = self.effectivePreset
         let quality = self.quality
 
         task = Task { [weak self] in
@@ -1341,7 +1370,8 @@ final class MapModel {
         stack.setEnabled(SourceID.naturalEarth, true)
         let session = Session(
             stack: stack, area: Session.Area(BoundingBox(minLon: 0, minLat: 0, maxLon: 1, maxLat: 1)),
-            placeName: "", preset: preset.name, quality: quality.key, hiddenLayers: []
+            placeName: "", preset: preset.name, palette: paletteName,
+            quality: quality.key, hiddenLayers: []
         )
         guard let encoded = try? JSONEncoder().encode(session),
               let decoded = try? JSONDecoder().decode(Session.self, from: encoded)

@@ -65,6 +65,10 @@ public struct Session: Codable, Sendable, Equatable {
     public var sourceSettings: [String: Double]
     public var sourceChoices: [String: String]
     public var presetName: String
+    /// Colour, chosen apart from the preset. `Palette.presetOwnName` — the
+    /// default, and what every session written before palettes existed decodes
+    /// to — means the preset's own colours.
+    public var paletteName: String
     public var qualityKey: String
     public var hiddenLayers: [String]
 
@@ -84,6 +88,7 @@ public struct Session: Codable, Sendable, Equatable {
         self.sourceSettings = try container.decodeIfPresent([String: Double].self, forKey: .sourceSettings) ?? [:]
         self.sourceChoices = try container.decodeIfPresent([String: String].self, forKey: .sourceChoices) ?? [:]
         self.presetName = try container.decodeIfPresent(String.self, forKey: .presetName) ?? defaults.presetName
+        self.paletteName = try container.decodeIfPresent(String.self, forKey: .paletteName) ?? defaults.paletteName
         self.qualityKey = try container.decodeIfPresent(String.self, forKey: .qualityKey) ?? defaults.qualityKey
         self.hiddenLayers = try container.decodeIfPresent([String].self, forKey: .hiddenLayers) ?? []
     }
@@ -103,6 +108,7 @@ public struct Session: Codable, Sendable, Equatable {
         sourceSettings: [String: Double] = [:],
         sourceChoices: [String: String] = [:],
         presetName: String = "Hypsometric Relief",
+        paletteName: String = Palette.presetOwnName,
         qualityKey: String = Quality.default.key,
         hiddenLayers: [String] = [],
     ) {
@@ -114,6 +120,7 @@ public struct Session: Codable, Sendable, Equatable {
         self.sourceSettings = sourceSettings
         self.sourceChoices = sourceChoices
         self.presetName = presetName
+        self.paletteName = paletteName
         self.qualityKey = qualityKey
         self.hiddenLayers = hiddenLayers
     }
@@ -123,6 +130,7 @@ public struct Session: Codable, Sendable, Equatable {
     /// Capture a stack, keeping only what the user actually changed.
     public init(
         stack: SourceStack, area: Area, placeName: String, preset: String,
+        palette: String = Palette.presetOwnName,
         quality: String, hiddenLayers: [String]
     ) {
         var paths: [String: String] = [:]
@@ -158,6 +166,7 @@ public struct Session: Codable, Sendable, Equatable {
             sourceSettings: numbers,
             sourceChoices: choices,
             presetName: preset,
+            paletteName: palette,
             qualityKey: quality,
             hiddenLayers: hiddenLayers,
         )

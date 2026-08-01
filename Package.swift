@@ -62,6 +62,10 @@ let package = Package(
             dependencies: ["HipparchusData"],
             resources: [.process("Fixtures")]
         ),
-        .testTarget(name: "HipparchusRenderTests", dependencies: ["HipparchusRender"]),
+        .testTarget(
+            name: "HipparchusRenderTests",
+            dependencies: ["HipparchusRender"],
+            resources: [.process("Fixtures")]
+        ),
     ]
 )

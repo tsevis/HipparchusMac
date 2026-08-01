@@ -88,6 +88,8 @@ func usage() -> Never {
       --paper <name>     sheet for every export: \(PaperSize.names.joined(separator: ", "))
       --dpi <n>          resolution for the raster and the SVG viewport
       --line-weight <x>  multiply every stroke (default: 1)
+      --palette <name>   recolour the preset without restyling it
+      --list-palettes    print the palette names and exit
       --portrait         turn the sheet (default: landscape)
       --furniture        title, scale bar, north arrow and legend on the SVG, A4
       --no-files         measure only, write nothing
@@ -111,6 +113,7 @@ struct Options {
     var furniture = false
     var page = PageSpec()
     var lineWeight = 1.0
+    var palette: Palette?
     var hillshade = false
     var streets = false
     var sun = SunPosition()
@@ -185,6 +188,19 @@ while argumentIndex < arguments.count {
         options.page.dpi = value
     case "--portrait":
         options.page.orientation = "Portrait"
+    case "--list-palettes":
+        for name in Palette.names { print(name) }
+        exit(0)
+    case "--palette":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        let wanted = arguments[argumentIndex]
+        guard wanted != Palette.presetOwnName else { break }
+        guard let found = Palette.named(wanted) else {
+            print("error: no palette '\(wanted)'. One of: \(Palette.names.joined(separator: ", "))")
+            exit(2)
+        }
+        options.palette = found
     case "--line-weight":
         argumentIndex += 1
         guard argumentIndex < arguments.count,
@@ -366,7 +382,7 @@ func run(_ place: Place, options: Options) async throws {
     ))
 
     let scene = try SceneBuilder(options: SceneBuilder.Options(
-        preset: options.preset, quality: options.quality
+        preset: options.preset.recoloured(with: options.palette), quality: options.quality
     )).build(from: collection).scalingLineWeights(by: options.lineWeight)
     print("  \(scene.summary)   fetched in \(fetched.formattedSeconds)")
     print("  \(options.preset.name) · \(options.quality.label)")
