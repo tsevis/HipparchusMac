@@ -113,6 +113,8 @@ final class MapModel {
     /// Styles contributed by plugins. Read-only here: a plugin's preset is
     /// changed by editing the plugin, not by the app writing over it.
     private(set) var pluginPresets: [ArtisticPreset] = []
+    /// Areas contributed by plugins, on top of the sixteen built in.
+    private(set) var pluginPlaces: [Place] = []
     private(set) var loadedPlugins: [LoadedPlugin] = []
     /// One line per plugin that did not load, kept so a broken plugin is
     /// visible rather than merely absent.
@@ -123,6 +125,11 @@ final class MapModel {
     /// Preferences that belong to neither a map nor a session — the cache
     /// ceiling and the shared-service rate limit. Read once at launch.
     private(set) var settings = UserSettings()
+
+    /// Every area that can be chosen, built-in first. The sidebar and the
+    /// Map menu both read this rather than `places`, so a plugin's areas
+    /// appear wherever the app's own do.
+    var availablePlaces: [Place] { Self.places + pluginPlaces }
 
     /// Every style that can be chosen, built-in first.
     var availablePresetNames: [String] {
@@ -282,9 +289,14 @@ final class MapModel {
             status = "Your saved presets could not be read: \(error.localizedDescription)"
         }
 
-        let loader = PluginLoader(userPluginDirectory: PluginLoader.defaultUserPluginDirectory())
+        let loader = PluginLoader(
+            userPluginDirectory: PluginLoader.defaultUserPluginDirectory(),
+            // So a plugin cannot quietly redefine an area the app ships.
+            reservedPlaceNames: Set(Self.places.map(\.name))
+        )
         let registry = loader.loadAll()
         pluginPresets = registry.presets
+        pluginPlaces = registry.places.map { Place(name: $0.name, bbox: $0.bbox) }
         loadedPlugins = loader.loadedPlugins
         pluginLoadErrors = loader.loadErrors
     }
@@ -648,7 +660,7 @@ final class MapModel {
     // MARK: - Actions
 
     func select(_ name: String) {
-        guard let place = Self.places.first(where: { $0.name == name }) else { return }
+        guard let place = availablePlaces.first(where: { $0.name == name }) else { return }
         pendingAction = ("Choose Place", "area")
         placeName = name
         west = String(place.bbox.minLon)
@@ -1178,6 +1190,12 @@ final class MapModel {
             for preset in pluginPresets { print("  \(preset.name)") }
             print("saved styles (\(customPresets.count)):")
             for preset in customPresets { print("  \(preset.name)") }
+            print("plugin places (\(pluginPlaces.count)):")
+            for place in pluginPlaces {
+                print(String(format: "  %@  %.3f,%.3f -> %.3f,%.3f", place.name,
+                             place.bbox.minLon, place.bbox.minLat,
+                             place.bbox.maxLon, place.bbox.maxLat))
+            }
             print("")
             print("plugins loaded (\(loadedPlugins.count)):")
             for plugin in loadedPlugins { print("  \(plugin.id) — \(plugin.name)  [\(plugin.origin)]") }

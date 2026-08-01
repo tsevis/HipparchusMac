@@ -23,8 +23,69 @@ final class PluginLoaderTests: XCTestCase {
         try json.write(to: url.appendingPathComponent("plugin.json"), atomically: true, encoding: .utf8)
     }
 
-    private func loader(builtins: [any Plugin] = []) -> PluginLoader {
-        PluginLoader(builtins: builtins, userPluginDirectory: directory)
+    private func loader(
+        builtins: [any Plugin] = [], reserved: Set<String> = ["Santorini"]
+    ) -> PluginLoader {
+        PluginLoader(
+            builtins: builtins, userPluginDirectory: directory, reservedPlaceNames: reserved
+        )
+    }
+
+    // MARK: - Places
+
+    func testAPluginCanContributePlaces() throws {
+        try writePlugin("islands", #"""
+        {"id": "com.example.islands", "name": "Greek Islands", "places": [
+          {"name": "Lefkada", "west": 20.53, "south": 38.56, "east": 20.80, "north": 38.86},
+          {"name": "Kefalonia", "west": 20.35, "south": 38.05, "east": 20.80, "north": 38.50}
+        ]}
+        """#)
+        let registry = loader().loadAll()
+        XCTAssertEqual(registry.places.map(\.name), ["Lefkada", "Kefalonia"])
+        let lefkada = try XCTUnwrap(registry.places.first)
+        XCTAssertEqual(lefkada.bbox.minLon, 20.53, accuracy: 1e-9)
+        XCTAssertEqual(lefkada.bbox.maxLat, 38.86, accuracy: 1e-9)
+    }
+
+    func testAPlaceThatIsNotAnAreaIsRefused() throws {
+        // West east of east. Refused rather than corrected: swapping them
+        // silently hides whatever produced the file.
+        try writePlugin("backwards", #"""
+        {"id": "com.example.backwards", "name": "Backwards", "places": [
+          {"name": "Nowhere", "west": 25.0, "south": 36.0, "east": 24.0, "north": 37.0}
+        ]}
+        """#)
+        let loader = loader()
+        _ = loader.loadAll()
+        XCTAssertTrue(loader.loadedPlugins.isEmpty)
+        XCTAssertEqual(loader.loadErrors.count, 1)
+        XCTAssertTrue(loader.loadErrors[0].contains("Nowhere"), loader.loadErrors[0])
+    }
+
+    func testAPluginCannotShadowABuiltInPlace() throws {
+        try writePlugin("cuckoo", #"""
+        {"id": "com.example.cuckoo", "name": "Cuckoo", "places": [
+          {"name": "Santorini", "west": 1.0, "south": 1.0, "east": 2.0, "north": 2.0}
+        ]}
+        """#)
+        let registry = loader(reserved: ["Santorini"]).loadAll()
+        XCTAssertTrue(registry.places.isEmpty, "a plugin must not redefine a place the app ships")
+    }
+
+    func testOneBadPlaceDoesNotCostTheWholePlugin_sPresets() throws {
+        // A plugin is all-or-nothing on purpose: registration happens against
+        // a copy, so a plugin that throws part way leaves nothing behind
+        // rather than half of itself.
+        try writePlugin("mixed", #"""
+        {"id": "com.example.mixed", "name": "Mixed",
+         "presets": [{"name": "Mixed Style"}],
+         "places": [{"name": "Broken", "west": 5.0, "south": 5.0, "east": 4.0, "north": 6.0}]}
+        """#)
+        let loader = loader()
+        let registry = loader.loadAll()
+        XCTAssertTrue(registry.presets.isEmpty, "the preset must not survive its plugin failing")
+        XCTAssertTrue(registry.places.isEmpty)
+        XCTAssertEqual(loader.loadErrors.count, 1)
     }
 
     // MARK: - Loading

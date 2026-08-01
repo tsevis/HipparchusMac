@@ -73,15 +73,9 @@ Reachable from **Style → Plugins → Show plugins folder**.
   Bold". `Scripts/artwork/plugins/README.md` explains installing them
   temporarily.
 
-## Known rough edge
+## Checking a style
 
-**Tsevis Daylight reads more turquoise than blue.** The park, field and forest
-fills are tinted toward turquoise, so a green city like Amsterdam comes out
-turquoise-dominant with blue buildings, rather than turquoise water against
-blue land. Rebalancing that is a good first task — and a good way to learn the
-preset format before inventing new ones.
-
-Check it by rendering, not by reasoning:
+By rendering it and looking, never by reasoning about the numbers:
 
 ```bash
 Hipparchus.app/Contents/MacOS/Hipparchus \
@@ -92,23 +86,37 @@ Hipparchus.app/Contents/MacOS/Hipparchus \
 Output lands in the app's sandboxed `Documents`. Read the PNG back and look
 at it — that is the only way to judge a style.
 
-## Suggested work
+## What shipped
 
-Ordered by how much each earns its keep.
+All five items from the first version of this handoff are done.
 
-1. **Rebalance Tsevis Daylight**, above.
-2. **A nautical chart pack.** Depth-first: bathymetry heavy, land reduced to a
-   flat tint, contours labelled. The renderer already has bathymetry, summits
-   and elevation bands, so this is a style, not a feature.
-3. **A duotone print pack** — two inks and paper, the risograph look. It suits
-   the export path, which already writes clean SVG with real layers.
-4. **A high-contrast accessibility preset.** None of the sixteen is built for
-   low vision, and it is the one gap in the set that is not a matter of taste.
-5. **Let a plugin contribute more than presets.** `PluginRegistry` currently
-   holds only `presets`. Saved *places* would be the obvious next thing — a
-   plugin that adds "the Greek islands" or "European capitals" — and the
-   registry, the loader and its fault isolation already exist. This is the
-   only item on the list that is real engineering rather than styling.
+- `Scripts/build-style-packs.py` generates every pack. Each preset *derives*
+  all thirty-seven layer styles from a handful of named colours rather than
+  choosing them one by one — a palette picked layer by layer drifts, and one
+  derived by mixing cannot. Change a colour, re-run, reinstall.
+- **Tsevis Palette** — Daylight and Nocturne, plus five Ionian islands, which
+  is what proves a plugin can carry places as well as styles.
+- **Nautical** — Admiralty Chart. The inversion of every other preset: the sea
+  carries the information, the land is what is left over.
+- **Duotone Press** — two riso pairs. Nothing is a shade of anything; every
+  colour is one of the two inks or one of them let down toward the paper.
+- **High Contrast** — light and dark, built for legibility rather than taste.
+  Roads at 1.8×, and the fills that make a map pretty deleted, because they
+  are what reduce contrast between the things that matter.
+
+Daylight's first version read turquoise rather than blue, because the
+vegetation was tinted toward turquoise and a green city then swamped it. The
+vegetation is a desaturated blue-green now, so the two brand colours are the
+only saturated things on the sheet.
+
+## What is still open
+
+- Nothing in the plugin system itself. `PluginRegistry` carries presets and
+  places; anything further is a new capability rather than a gap.
+- The packs have been rendered over Amsterdam and nowhere else. A style that
+  works on canals may not work on a mountain or a desert — Everest, Hawaii and
+  the Dominican Republic are in the saved places for exactly this.
+- Nobody has seen any of them in the window, only as PNGs.
 
 ## How to verify anything here
 

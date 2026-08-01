@@ -68,7 +68,7 @@ struct HipparchusApp: App {
             Divider()
 
             Menu("Saved Places") {
-                ForEach(Array(MapModel.places.enumerated()), id: \.element.id) { index, place in
+                ForEach(Array(model.availablePlaces.enumerated()), id: \.element.id) { index, place in
                     savedPlace(place, at: index)
                 }
             }

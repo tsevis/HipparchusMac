@@ -1,0 +1,747 @@
+{
+  "id": "com.tsevis.nautical",
+  "name": "Nautical",
+  "presets": [
+    {
+      "name": "Admiralty Chart",
+      "geometry_profile": {
+        "smoothing_iterations": 2,
+        "simplify_tolerance_preview": 1.2,
+        "simplify_tolerance_export": 0.5
+      },
+      "style_profile": {
+        "background": {
+          "r": 247,
+          "g": 241,
+          "b": 224,
+          "a": 255
+        },
+        "layer_styles": {
+          "roads_motorway": {
+            "stroke_width": 1.7600000000000002,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 2.8600000000000003,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "roads_trunk": {
+            "stroke_width": 1.54,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 2.64,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "roads_primary": {
+            "stroke_width": 1.265,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 2.365,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "roads_secondary": {
+            "stroke_width": 0.9900000000000001,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 2.0900000000000003,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "roads_tertiary": {
+            "stroke_width": 0.7150000000000001,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 1.8150000000000002,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "roads_residential": {
+            "stroke_width": 0.49500000000000005,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 1.5950000000000002,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "roads_service": {
+            "stroke_width": 0.33,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 1.4300000000000002,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "roads_other": {
+            "stroke_width": 0.275,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 1.375,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "roads": {
+            "stroke_width": 0.55,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 1.6500000000000001,
+            "fill_enabled": false,
+            "casing_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 255
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "water": {
+            "stroke_width": 0.6,
+            "stroke_color": {
+              "r": 138,
+              "g": 175,
+              "b": 188,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 176,
+              "g": 214,
+              "b": 224,
+              "a": 255
+            }
+          },
+          "coastline": {
+            "stroke_width": 2.2,
+            "stroke_color": {
+              "r": 26,
+              "g": 58,
+              "b": 82,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "bathymetry": {
+            "stroke_width": 0.75,
+            "stroke_color": {
+              "r": 94,
+              "g": 128,
+              "b": 146,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "buildings": {
+            "stroke_width": 0.2,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 0.8,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 225,
+              "g": 223,
+              "b": 210,
+              "a": 255
+            }
+          },
+          "parks": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 239,
+              "g": 235,
+              "b": 215,
+              "a": 255
+            }
+          },
+          "forests": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 236,
+              "g": 232,
+              "b": 212,
+              "a": 255
+            }
+          },
+          "fields": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 243,
+              "g": 238,
+              "b": 219,
+              "a": 255
+            }
+          },
+          "natural": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 241,
+              "g": 236,
+              "b": 218,
+              "a": 255
+            }
+          },
+          "landuse": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 245,
+              "g": 239,
+              "b": 221,
+              "a": 255
+            }
+          },
+          "railways": {
+            "stroke_width": 0.7,
+            "stroke_color": {
+              "r": 113,
+              "g": 127,
+              "b": 127,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "butt",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "ferry_routes": {
+            "stroke_width": 0.6,
+            "stroke_color": {
+              "r": 146,
+              "g": 183,
+              "b": 196,
+              "a": 255
+            },
+            "opacity": 0.7,
+            "line_cap": "butt",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "barriers": {
+            "stroke_width": 0.4,
+            "stroke_color": {
+              "r": 170,
+              "g": 177,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 0.7,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "power": {
+            "stroke_width": 0.4,
+            "stroke_color": {
+              "r": 181,
+              "g": 186,
+              "b": 181,
+              "a": 255
+            },
+            "opacity": 0.6,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "elevation_bands": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 0.6,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 235,
+              "g": 231,
+              "b": 216,
+              "a": 255
+            }
+          },
+          "terrain_contours": {
+            "stroke_width": 0.48,
+            "stroke_color": {
+              "r": 181,
+              "g": 186,
+              "b": 181,
+              "a": 255
+            },
+            "opacity": 0.7,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "terrain_index_contours": {
+            "stroke_width": 1.1199999999999999,
+            "stroke_color": {
+              "r": 134,
+              "g": 148,
+              "b": 151,
+              "a": 255
+            },
+            "opacity": 0.9,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "summits": {
+            "stroke_width": 0.6,
+            "stroke_color": {
+              "r": 26,
+              "g": 58,
+              "b": 82,
+              "a": 255
+            },
+            "opacity": 0.9,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "admin_boundaries": {
+            "stroke_width": 0.8,
+            "stroke_color": {
+              "r": 191,
+              "g": 188,
+              "b": 168,
+              "a": 255
+            },
+            "opacity": 0.55,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "night_lights": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 0.5,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 26,
+              "g": 175,
+              "b": 165,
+              "a": 90
+            }
+          },
+          "places": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 26,
+              "g": 58,
+              "b": 82,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "street_names": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 81,
+              "g": 104,
+              "b": 118,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "amenities": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 181,
+              "g": 180,
+              "b": 163,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "shops": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 181,
+              "g": 180,
+              "b": 163,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 247,
+              "g": 241,
+              "b": 224,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "earthquakes_shallow": {
+            "stroke_width": 1.0,
+            "stroke_color": {
+              "r": 26,
+              "g": 175,
+              "b": 165,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "earthquakes_intermediate": {
+            "stroke_width": 1.0,
+            "stroke_color": {
+              "r": 40,
+              "g": 136,
+              "b": 162,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "earthquakes_deep": {
+            "stroke_width": 1.0,
+            "stroke_color": {
+              "r": 55,
+              "g": 97,
+              "b": 160,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "satellite_tracks": {
+            "stroke_width": 0.6,
+            "stroke_color": {
+              "r": 114,
+              "g": 131,
+              "b": 139,
+              "a": 255
+            },
+            "opacity": 0.8,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "satellite_footprints": {
+            "stroke_width": 0.4,
+            "stroke_color": {
+              "r": 136,
+              "g": 150,
+              "b": 153,
+              "a": 255
+            },
+            "opacity": 0.5,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 26,
+              "g": 58,
+              "b": 82,
+              "a": 30
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import Foundation
+import HipparchusGeometry
 
 /// Plugins: capabilities added to the app without changing the app.
 ///
@@ -32,8 +33,26 @@ import Foundation
 public struct PluginRegistry: Sendable {
     /// Styles contributed by plugins, on top of the sixteen built in.
     public private(set) var presets: [ArtisticPreset] = []
+    /// Areas contributed by plugins, on top of the ones built in.
+    ///
+    /// A pack of places is the other obvious thing to hand round — "the Greek
+    /// islands", "European capitals" — and it needs no new machinery: the
+    /// loader, the fault isolation and the name checking are already here.
+    public private(set) var places: [SavedPlace] = []
 
     public init() {}
+
+    /// Refuses a name already taken, on the same grounds as a preset: two
+    /// plugins fighting over one name is worse than one of them not loading.
+    public mutating func add(_ place: SavedPlace, reservedNames: Set<String>) throws {
+        guard !reservedNames.contains(place.name) else {
+            throw PluginError.placeNameTaken(place.name, by: "a built-in place")
+        }
+        guard !places.contains(where: { $0.name == place.name }) else {
+            throw PluginError.placeNameTaken(place.name, by: "another plugin")
+        }
+        places.append(place)
+    }
 
     /// Refuses a name already taken. A plugin silently redefining a built-in
     /// style is how a map comes to look different for a reason nobody can
@@ -46,6 +65,22 @@ public struct PluginRegistry: Sendable {
             throw PluginError.presetNameTaken(preset.name, by: "another plugin")
         }
         presets.append(preset)
+    }
+}
+
+/// An area worth returning to, by name.
+///
+/// Deliberately not the app's own `Place`: that lives beside the window, and
+/// a plugin is read down here where there is no window.
+public struct SavedPlace: Sendable, Equatable, Identifiable {
+    public let name: String
+    public let bbox: BoundingBox
+
+    public var id: String { name }
+
+    public init(name: String, bbox: BoundingBox) {
+        self.name = name
+        self.bbox = bbox
     }
 }
 
@@ -78,6 +113,8 @@ public enum PluginError: Error, CustomStringConvertible {
     case noIdentifier
     case duplicateIdentifier(String)
     case presetNameTaken(String, by: String)
+    case placeNameTaken(String, by: String)
+    case notAnArea(String)
 
     public var description: String {
         switch self {
@@ -85,6 +122,8 @@ public enum PluginError: Error, CustomStringConvertible {
         case .noIdentifier: "the manifest has no id"
         case .duplicateIdentifier(let id): "another plugin already claims the id \(id)"
         case .presetNameTaken(let name, let holder): "the preset name “\(name)” is already used by \(holder)"
+        case .placeNameTaken(let name, let holder): "the place name “\(name)” is already used by \(holder)"
+        case .notAnArea(let name): "“\(name)” is not an area: west must be less than east, south less than north"
         }
     }
 }
@@ -101,10 +140,19 @@ public final class PluginLoader: @unchecked Sendable {
     public private(set) var loadedPlugins: [LoadedPlugin] = []
     public private(set) var loadErrors: [String] = []
 
-    public init(builtins: [any Plugin] = PluginLoader.defaultBuiltins, userPluginDirectory: URL) {
+    /// - Parameter reservedPlaceNames: the areas the app already ships, so a
+    ///   plugin adding one of those names is refused rather than shadowing it.
+    public init(
+        builtins: [any Plugin] = PluginLoader.defaultBuiltins,
+        userPluginDirectory: URL,
+        reservedPlaceNames: Set<String> = []
+    ) {
         self.builtins = builtins
         self.userPluginDirectory = userPluginDirectory
+        self.reservedPlaceNames = reservedPlaceNames
     }
+
+    public let reservedPlaceNames: Set<String>
 
     /// Where a user drops a plugin folder. Beside the presets and the session,
     /// for the same reason: somewhere findable in Finder.
@@ -209,7 +257,9 @@ public final class PluginLoader: @unchecked Sendable {
         }
         do {
             let decoded = try JSONDecoder().decode(Manifest.self, from: try Data(contentsOf: manifest))
-            return .loaded(ManifestPlugin(manifest: decoded, origin: folder.path))
+            return .loaded(ManifestPlugin(
+                manifest: decoded, origin: folder.path, reservedPlaceNames: reservedPlaceNames
+            ))
         } catch {
             return .failed("\(name): \(error.localizedDescription)")
         }
@@ -233,11 +283,41 @@ private struct Manifest: Decodable {
     /// re-declared, so a style saved from the app can be dropped into a plugin
     /// folder unchanged, and so the two readers cannot drift apart.
     let presets: [StoredPreset]?
+    let places: [StoredPlace]?
+}
+
+/// One area as a plugin states it — the same four numbers, in the same order,
+/// as this app's own `--bbox` and every saved session.
+private struct StoredPlace: Decodable {
+    let name: String
+    let west: Double
+    let south: Double
+    let east: Double
+    let north: Double
+
+    /// `nil` when the numbers do not describe an area. Refused rather than
+    /// corrected: a box with west east of east is a mistake in the file, and
+    /// silently swapping them hides whatever produced it.
+    var place: SavedPlace? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, west < east, south < north,
+              (-180...180).contains(west), (-180...180).contains(east),
+              (-90...90).contains(south), (-90...90).contains(north)
+        else {
+            return nil
+        }
+        return SavedPlace(
+            name: trimmed,
+            bbox: BoundingBox(minLon: west, minLat: south, maxLon: east, maxLat: north)
+        )
+    }
 }
 
 private struct ManifestPlugin: Plugin {
     let manifest: Manifest
     let origin: String
+    /// Names the app already uses, so a plugin cannot quietly redefine one.
+    let reservedPlaceNames: Set<String>
 
     var id: String { manifest.id }
     var name: String { manifest.name ?? manifest.id }
@@ -246,6 +326,12 @@ private struct ManifestPlugin: Plugin {
         for stored in manifest.presets ?? [] {
             guard let preset = stored.preset else { continue }
             try registry.add(preset)
+        }
+        for stored in manifest.places ?? [] {
+            guard let place = stored.place else {
+                throw PluginError.notAnArea(stored.name)
+            }
+            try registry.add(place, reservedNames: reservedPlaceNames)
         }
     }
 }

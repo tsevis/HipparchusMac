@@ -93,7 +93,7 @@ struct FramePanel: View {
             }
 
             Section("Saved places") {
-                ForEach(MapModel.places) { place in
+                ForEach(model.availablePlaces) { place in
                     Button {
                         model.select(place.name)
                     } label: {
