@@ -461,8 +461,17 @@ final class MapModel {
         // without re-simplifying a quarter of a million features. Everything
         // downstream — canvas, PNG, SVG, PDF — reads this same scene, so what is
         // on screen is what lands in the file.
-        return scene.scalingLineWeights(by: lineWeight)
+        let weighted = scene.scalingLineWeights(by: lineWeight)
+        return reliefOverBuildings ? weighted.raisingReliefOverTheBuiltEnvironment() : weighted
     }
+
+    /// Whether relief shading is drawn over the built environment or under it.
+    ///
+    /// Under it is correct — relief is ground and buildings sit on it — and in a
+    /// dense city it means the shading is almost entirely hidden behind twenty
+    /// thousand opaque building fills. Which one you want is a question about
+    /// the drawing, so it is a switch.
+    var reliefOverBuildings = false
 
     /// One multiplier over every stroke on the sheet, live.
     ///
@@ -1052,6 +1061,17 @@ final class MapModel {
             case SourceID.simulatedTerrain:
                 var settings = TerrainFieldSettings()
                 if let seed = overrides["seed"]?.intValue { settings.seed = seed }
+                // Read the same way the real elevation source reads them, so the
+                // two behave alike: only a setting the user actually changed
+                // arrives here, and the shading stays off until asked for.
+                settings.emitHillshade = overrides["emitHillshade"]?.stringValue == "on"
+                settings.sun = SunPosition(
+                    azimuthDegrees: overrides["sunAzimuth"]?.doubleValue ?? settings.sun.azimuthDegrees,
+                    altitudeDegrees: overrides["sunAltitude"]?.doubleValue ?? settings.sun.altitudeDegrees
+                )
+                if let stretch = overrides["hillshadeExaggeration"]?.doubleValue, stretch > 0 {
+                    settings.hillshadeExaggeration = stretch
+                }
                 providers.append(SimulatedFieldProvider(settings: settings))
 
             case SourceID.localOSMPBF, SourceID.vectorTiles,

@@ -16,6 +16,75 @@ final class SimulatedFieldProviderTests: XCTestCase {
         return SimulatedFieldProvider(settings: settings)
     }
 
+    // MARK: - Relief shading
+
+    /// The generated field is the one place where shading costs no network and
+    /// no tiles, so it is the cheapest way to see what the sun controls do — and
+    /// it was the last source that made relief and could not shade it.
+    func testItShadesItsOwnFieldWhenAsked() async throws {
+        let shaded = try await provider { $0.emitHillshade = true }.fetch(santorini)
+        let tones = shaded.features(in: TerrainLayer.hillshade)
+
+        XCTAssertFalse(tones.isEmpty, "a generated mountain came back unshaded")
+        XCTAssertGreaterThanOrEqual(tones.count, 2, "one tone is a tint, not relief")
+
+        for feature in tones {
+            XCTAssertEqual(feature.provenance, .synthetic, "invented ground must say so")
+            XCTAssertTrue(feature.geometry.hasArea, "a tone is a filled region")
+            let index = try XCTUnwrap(feature.property("band_index")?.doubleValue)
+            let count = try XCTUnwrap(feature.property("band_count")?.doubleValue)
+            XCTAssertTrue((0..<count).contains(index))
+            XCTAssertEqual(feature.property("sun_azimuth")?.doubleValue, defaultSunAzimuth)
+        }
+    }
+
+    func testShadingIsOffUntilItIsAskedFor() async throws {
+        let plain = try await provider().fetch(santorini)
+        XCTAssertTrue(
+            plain.features(in: TerrainLayer.hillshade).isEmpty,
+            "shading changes the look of every sheet, so it is asked for rather than assumed"
+        )
+        // The row still exists, so the layer panel can say "none here" rather
+        // than the layer vanishing.
+        XCTAssertNotNil(plain.featuresByLayer[TerrainLayer.hillshade])
+    }
+
+    /// The tones have to land on the ground they describe. A mapper that
+    /// transposed rows and columns, or forgot that row zero is north, would
+    /// still produce a plausible-looking sheet somewhere else entirely.
+    func testTheTonesLieInsideTheAreaThatWasAskedFor() async throws {
+        let shaded = try await provider { $0.emitHillshade = true }.fetch(santorini)
+        let area = santorini.bbox
+        let slack = 1e-6
+
+        for feature in shaded.features(in: TerrainLayer.hillshade) {
+            let bounds = try XCTUnwrap(feature.geometry.bounds)
+            XCTAssertGreaterThanOrEqual(bounds.minX, area.minLon - slack)
+            XCTAssertLessThanOrEqual(bounds.maxX, area.maxLon + slack)
+            XCTAssertGreaterThanOrEqual(bounds.minY, area.minLat - slack)
+            XCTAssertLessThanOrEqual(bounds.maxY, area.maxLat + slack)
+        }
+    }
+
+    /// Moving the sun has to move the shadows. Both fields come from the same
+    /// seed, so the ground is identical and only the light differs.
+    func testMovingTheSunChangesWhatIsInShadow() async throws {
+        func darkest(azimuth: Double) async throws -> Geometry? {
+            let collection = try await provider {
+                $0.emitHillshade = true
+                $0.sun = SunPosition(azimuthDegrees: azimuth, altitudeDegrees: 45)
+            }.fetch(santorini)
+            return collection.features(in: TerrainLayer.hillshade)
+                .min { ($0.property("band_index")?.doubleValue ?? 0) < ($1.property("band_index")?.doubleValue ?? 0) }?
+                .geometry
+        }
+
+        let northWest = try await darkest(azimuth: 315)
+        let southEast = try await darkest(azimuth: 135)
+        XCTAssertNotNil(northWest)
+        XCTAssertNotEqual(northWest, southEast, "the sun moved and the shadows did not")
+    }
+
     // MARK: - What it produces
 
     func testItContoursItsOwnFieldWithoutTouchingAnything() async throws {

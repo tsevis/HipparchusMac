@@ -46,6 +46,7 @@ public struct SimulatedFieldProvider: MapProvider {
         var featuresByLayer: [String: [Feature]] = [
             TerrainLayer.minorContours: [],
             TerrainLayer.indexContours: [],
+            TerrainLayer.hillshade: [],
         ]
 
         let probe = probeStep(grid: grid, bounds: bounds)
@@ -88,6 +89,38 @@ public struct SimulatedFieldProvider: MapProvider {
             }
         }
 
+        if settings.emitHillshade {
+            // Synthetic ground, shaded the same way real ground is. The relief
+            // is invented, so the metres are too — but the *shape* of the light
+            // is the thing being drawn, and it is wrong at any scale if the cell
+            // size is not real. This grid is uniform in degrees rather than in
+            // Mercator pixels, so the two axes genuinely differ; their mean is
+            // the least wrong single number, and on a field that is not a
+            // measurement of anywhere the difference is aesthetic.
+            let centreLatitude = (bounds.minLat + bounds.maxLat) / 2.0
+            let metresPerDegreeLon = 111_320.0 * cos(centreLatitude * .pi / 180.0)
+            let acrossMetres = abs(bounds.lonSpan) * metresPerDegreeLon / Double(max(1, grid.columns))
+            let downMetres = abs(bounds.latSpan) * 110_540.0 / Double(max(1, grid.rows))
+
+            featuresByLayer[TerrainLayer.hillshade] = try shadeBandFeatures(
+                grid: grid,
+                cellMetres: (acrossMetres + downMetres) / 2.0,
+                sun: settings.sun,
+                exaggeration: settings.hillshadeExaggeration,
+                bandCount: settings.hillshadeBandCount,
+                maxPixels: settings.hillshadeGridMaxPixels,
+                smoothingPasses: settings.hillshadeSmoothingPasses,
+                source: providerID,
+                provenance: .synthetic
+            ) { point in
+                // The grid spans the bounds evenly, north at row zero.
+                Coordinate(
+                    lon: bounds.minLon + bounds.lonSpan * (point.column / Double(max(1, grid.columns - 1))),
+                    lat: bounds.maxLat - abs(bounds.latSpan) * (point.row / Double(max(1, grid.rows - 1)))
+                )
+            }
+        }
+
         return FeatureCollection(
             featuresByLayer: featuresByLayer,
             metadata: [
@@ -103,6 +136,7 @@ public struct SimulatedFieldProvider: MapProvider {
                 "elevation_max_metres": .double(highest),
                 "grid_size": .int(settings.gridSize),
                 "elevation_model": .string("generated"),
+                "hillshade_band_count": .int(featuresByLayer[TerrainLayer.hillshade]?.count ?? 0),
             ],
             bbox: bounds,
             provenance: .synthetic

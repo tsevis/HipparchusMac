@@ -58,6 +58,20 @@ public struct TerrainFieldSettings: Sendable, Equatable {
     /// resolve and break into sub-cell specks. Measured in grid cells.
     public var minContourLengthCells = 3.0
 
+    /// Relief shading, on the same terms the real elevation source offers it.
+    ///
+    /// This field is invented, so its metres are invented too — but the *shape*
+    /// of the light is what is being drawn, and it is wrong at any scale if the
+    /// cell size is not real, so the shading works from the ground the window
+    /// actually covers. Off by default, for the same reason as the real source:
+    /// shading lands under the contours and changes the look of every sheet.
+    public var emitHillshade = false
+    public var sun = SunPosition()
+    public var hillshadeExaggeration = 1.0
+    public var hillshadeBandCount = 7
+    public var hillshadeGridMaxPixels = 420
+    public var hillshadeSmoothingPasses = 2
+
     public init() {}
 
     /// The dense hairline sheet: hundreds of levels on a fine grid and no accented

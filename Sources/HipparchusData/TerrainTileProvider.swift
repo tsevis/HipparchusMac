@@ -412,75 +412,29 @@ public struct TerrainTileProvider: MapProvider {
         zoom: Int,
         bounds: BoundingBox
     ) throws -> [Feature] {
-        guard settings.hillshadeBandCount >= 2 else { return [] }
-
-        let step = max(1, Int(ceil(
-            Double(max(grid.rows, grid.columns)) / Double(max(16, settings.hillshadeGridMaxPixels))
-        )))
-        let coarse = grid.decimated(step: step)
-        guard coarse.rows >= 3, coarse.columns >= 3 else { return [] }
-
         // Mercator is conformal, so one resolution covers both directions; it is
         // taken at the middle of the area because it varies with latitude across
-        // a large one, and the middle is the least wrong single answer.
+        // a large one, and the middle is the least wrong single answer. Without
+        // it the slope would be metres per pixel, and the same mountain would
+        // harden every time the zoom stepped up.
         let centreLatitude = (bounds.minLat + bounds.maxLat) / 2.0
-        let cellMetres = WebMercator.groundResolution(latitude: centreLatitude, zoom: zoom) * Double(step)
-
-        let shaded = hillshade(
-            coarse,
+        return try shadeBandFeatures(
+            grid: grid,
+            cellMetres: WebMercator.groundResolution(latitude: centreLatitude, zoom: zoom),
             sun: settings.sun,
-            cellSizeMetres: cellMetres,
-            exaggeration: settings.hillshadeExaggeration
-        ).smoothed(passes: settings.hillshadeSmoothingPasses)
-        guard let range = shaded.finiteRange, range.maximum > range.minimum else { return [] }
-
-        let toneCount = settings.hillshadeBandCount
-        let geos = GEOSContext()
-        let bands = try elevationBands(
-            shaded,
-            boundaries: bandBoundaries(minimum: 0.0, maximum: 1.0, count: toneCount),
-            using: geos
-        )
-        // One tone is not shading, it is a tint. Ground that lands in a single
-        // band has no relief to show, and drawing it dulls the sheet to say so.
-        guard bands.count >= 2 else { return [] }
-
-        var features: [Feature] = []
-        for band in bands {
-            // The band's place on the *fixed* scale, not its place in this list.
-            // Compacting the index would put gentle ground that only reaches two
-            // adjacent tones at the ramp's two extremes — full shadow against
-            // nothing — which is the stretching this just stopped doing, moved
-            // one step downstream.
-            let index = Int((band.lower * Double(toneCount)).rounded())
-            let geometry = mapIndexSpaceToLonLat(band.geometry) { point in
-                WebMercator.lonLatForPixel(
-                    x: Double(window.left) + point.column * Double(step),
-                    y: Double(window.top) + point.row * Double(step),
-                    zoom: zoom
-                )
-            }
-            if geometry.isEmpty { continue }
-            features.append(Feature(
-                id: "\(providerID)/\(TerrainLayer.hillshade)/\(index)",
-                layer: TerrainLayer.hillshade,
-                source: providerID,
-                geometry: geometry,
-                provenance: .measured,
-                properties: [
-                    "shade_low": .double(band.lower),
-                    "shade_high": .double(band.upper),
-                    "band_index": .int(index),
-                    // The whole scale, not how much of it this sheet used, so
-                    // the ramp keeps its meaning: two tones out of seven has to
-                    // read as gentle ground, not as maximum contrast.
-                    "band_count": .int(toneCount),
-                    "sun_azimuth": .double(settings.sun.azimuthDegrees),
-                    "sun_altitude": .double(settings.sun.altitudeDegrees),
-                ]
-            ))
+            exaggeration: settings.hillshadeExaggeration,
+            bandCount: settings.hillshadeBandCount,
+            maxPixels: settings.hillshadeGridMaxPixels,
+            smoothingPasses: settings.hillshadeSmoothingPasses,
+            source: providerID,
+            provenance: .measured
+        ) { point in
+            WebMercator.lonLatForPixel(
+                x: Double(window.left) + point.column,
+                y: Double(window.top) + point.row,
+                zoom: zoom
+            )
         }
-        return features
     }
 
     /// Label the highest ground, with the height actually measured there.

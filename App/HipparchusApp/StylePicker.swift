@@ -124,6 +124,18 @@ struct StylePicker: View {
             scale, which belongs to the medium: the weight that reads on a \
             screen is not the weight that reads on a metre of paper.
             """)
+
+            Toggle("Relief over buildings", isOn: $model.reliefOverBuildings)
+                .toggleStyle(.checkbox)
+                .controlSize(.small)
+                .help("""
+                Relief is ground and buildings sit on it, so shading is drawn \
+                underneath them. In open country that is simply right. In a \
+                dense city it means the shading is almost entirely hidden \
+                behind the building fills, showing in the parks and the street \
+                corridors and nowhere else. Switch this on to lift it over the \
+                whole sheet instead. Labels stay on top either way.
+                """)
         } header: {
             HStack {
                 Text("Style")

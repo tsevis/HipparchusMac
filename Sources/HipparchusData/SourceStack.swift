@@ -292,10 +292,22 @@ public struct SourceStack: Sendable, Equatable {
         SourceDefinition(
             id: SourceID.simulatedTerrain,
             label: "Simulated terrain",
-            subtitle: "generated field, offline",
+            subtitle: "generated field, shaded, offline",
             provenance: .synthetic,
             settings: [
                 SourceSetting("seed", "Seed", .number, .integer(1729), attribute: "seed"),
+                // The same three knobs the real elevation source offers, on the
+                // same terms. A generated field is the one place where relief
+                // shading costs no network and no tiles, so it is the cheapest
+                // way to see what the sun controls actually do.
+                SourceSetting("shading", "Relief shading", .choice, .text("off"),
+                              choices: [.text("off"), .text("on")], attribute: "emitHillshade"),
+                SourceSetting("sun", "Sun bearing", .number, .number(defaultSunAzimuth),
+                              suffix: "°", attribute: "sunAzimuth"),
+                SourceSetting("sunheight", "Sun height", .number, .number(defaultSunAltitude),
+                              suffix: "°", attribute: "sunAltitude"),
+                SourceSetting("relief", "Relief stretch", .number, .number(1), suffix: "×",
+                              attribute: "hillshadeExaggeration"),
             ]
         ),
         SourceDefinition(

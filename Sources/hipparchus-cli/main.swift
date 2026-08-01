@@ -80,6 +80,8 @@ func usage() -> Never {
       --sun <az,alt>     where the light comes from (default: 315,45)
       --exaggeration <x> stretch the relief before lighting it (default: 1)
       --shade-bands <n>  tones between shadow and light (default: 7)
+      --relief-on-top    draw the shading over the buildings rather than under
+                         them, for a city dense enough to bury it
       --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
       --quality <key>    \(Quality.keys.joined(separator: ", "))
       --list-presets     print the preset names and exit
@@ -115,6 +117,7 @@ struct Options {
     var lineWeight = 1.0
     var palette: Palette?
     var hillshade = false
+    var reliefOnTop = false
     var streets = false
     var sun = SunPosition()
     var exaggeration = 1.0
@@ -209,6 +212,9 @@ while argumentIndex < arguments.count {
     case "--streets":
         options.streets = true
     case "--hillshade":
+        options.hillshade = true
+    case "--relief-on-top":
+        options.reliefOnTop = true
         options.hillshade = true
     case "--sun":
         argumentIndex += 1
@@ -381,9 +387,10 @@ func run(_ place: Place, options: Options) async throws {
         low, high, interval, zoom, columns, rows, collection.provenance?.rawValue ?? "unknown"
     ))
 
-    let scene = try SceneBuilder(options: SceneBuilder.Options(
+    let built = try SceneBuilder(options: SceneBuilder.Options(
         preset: options.preset.recoloured(with: options.palette), quality: options.quality
     )).build(from: collection).scalingLineWeights(by: options.lineWeight)
+    let scene = options.reliefOnTop ? built.raisingReliefOverTheBuiltEnvironment() : built
     print("  \(scene.summary)   fetched in \(fetched.formattedSeconds)")
     print("  \(options.preset.name) · \(options.quality.label)")
     if options.hillshade {

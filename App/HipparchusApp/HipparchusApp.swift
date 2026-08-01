@@ -87,14 +87,24 @@ struct HipparchusApp: App {
         }
     }
 
-    /// ⌘1…⌘9 for the first nine places, and no shortcut past that: nine is
-    /// where the conventional run of number keys stops, and inventing a tenth
-    /// would collide with something.
+    /// ⌘1…⌘9 for the first nine places, then ⌥⌘1…⌥⌘7 for the rest.
+    ///
+    /// Sixteen places shipped and nine of them could be reached, which made the
+    /// last seven look like a different kind of thing than the first nine. The
+    /// obvious tenth key is ⌘0, and it is taken — Fit to Window, where every
+    /// Mac application puts it — so the run continues on the option key rather
+    /// than stealing a shortcut people already know.
+    ///
+    /// Bounded at sixteen because that is what the second run of digits holds.
+    /// A seventeenth place would be unreachable, and silently so; that is worth
+    /// knowing about before it happens.
     @ViewBuilder
     private func savedPlace(_ place: MapModel.Place, at index: Int) -> some View {
         let button = Button(place.name) { model.select(place.name) }
         if index < 9, let key = "\(index + 1)".first {
             button.keyboardShortcut(KeyEquivalent(key), modifiers: .command)
+        } else if index < 16, let key = "\(index - 8)".first {
+            button.keyboardShortcut(KeyEquivalent(key), modifiers: [.command, .option])
         } else {
             button
         }

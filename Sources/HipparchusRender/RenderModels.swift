@@ -285,6 +285,37 @@ public struct RenderScene: Sendable {
         layers.filter { $0.style.visible }
     }
 
+    /// The same scene with the relief lifted over the built environment.
+    ///
+    /// Relief is ground and buildings sit on it, so shading belongs underneath
+    /// them and that is where the draw order puts it. In open country that is
+    /// simply right. In a dense city it means the shading is almost entirely
+    /// hidden: twenty thousand opaque building fills over a street grid leave it
+    /// showing in the parks, the water and the street corridors and nowhere
+    /// else — most of the work, invisible.
+    ///
+    /// Which of those you want is a question about the drawing rather than about
+    /// the ground, so it is a switch and not a rule. Lifted, the shading becomes
+    /// a wash over the whole sheet, buildings included; it is a transparent ramp,
+    /// so the city reads through it and the hills read through the city.
+    ///
+    /// Labels stay on top either way. Nothing is worth burying a place name for.
+    ///
+    /// Applied to the built scene, so the switch is live and costs a redraw
+    /// rather than a rebuild.
+    public func raisingReliefOverTheBuiltEnvironment() -> RenderScene {
+        guard let from = layers.firstIndex(where: { $0.name == TerrainLayer.hillshade }) else {
+            return self
+        }
+        var copy = self
+        let relief = copy.layers.remove(at: from)
+        // Just under the first label layer, which is as high as anything drawn
+        // gets before the type starts.
+        let firstLabel = copy.layers.firstIndex { SceneBuilder.labelLayers.contains($0.name) }
+        copy.layers.insert(relief, at: firstLabel ?? copy.layers.count)
+        return copy
+    }
+
     /// The same scene with every stroke multiplied.
     ///
     /// **No Python counterpart.** There, and here until now, line weight is

@@ -118,6 +118,49 @@ final class LineWeightTests: XCTestCase {
         XCTAssertEqual(after.layers.count, 1)
     }
 
+    // MARK: - Relief over the built environment
+
+    private func ordered(_ names: [String]) -> RenderScene {
+        RenderScene(layers: names.map { RenderLayer(name: $0, style: LayerStyle()) })
+    }
+
+    /// Lifted, the shading sits above everything structural and below the type.
+    /// Nothing is worth burying a place name for.
+    func testRaisingReliefPutsItAboveTheBuildingsAndBelowTheLabels() {
+        let scene = ordered([
+            "water", "elevation_bands", "terrain_hillshade", "terrain_contours",
+            "buildings", "roads_primary", "railways", "places", "street_names",
+        ])
+        let names = scene.raisingReliefOverTheBuiltEnvironment().layers.map(\.name)
+
+        let relief = try? XCTUnwrap(names.firstIndex(of: "terrain_hillshade"))
+        let buildings = try? XCTUnwrap(names.firstIndex(of: "buildings"))
+        let roads = try? XCTUnwrap(names.firstIndex(of: "roads_primary"))
+        let places = try? XCTUnwrap(names.firstIndex(of: "places"))
+
+        XCTAssertGreaterThan(relief ?? 0, buildings ?? 0, "relief should be over the buildings")
+        XCTAssertGreaterThan(relief ?? 0, roads ?? 0, "relief should be over the roads")
+        XCTAssertLessThan(relief ?? 0, places ?? 0, "labels stay on top")
+        XCTAssertEqual(Set(names), Set(scene.layers.map(\.name)), "no layer was lost or duplicated")
+        XCTAssertEqual(names.count, scene.layers.count)
+    }
+
+    /// A sheet with no labels at all still has to place the relief, rather than
+    /// leaving it where it was because it found nothing to sit under.
+    func testWithNoLabelsTheReliefGoesOnTop() {
+        let names = ordered(["elevation_bands", "terrain_hillshade", "buildings", "roads"])
+            .raisingReliefOverTheBuiltEnvironment().layers.map(\.name)
+        XCTAssertEqual(names.last, "terrain_hillshade")
+    }
+
+    /// Most sheets have no shading on them at all; that must not disturb the
+    /// order of everything else.
+    func testASceneWithNoReliefIsUntouched() {
+        let before = ordered(["water", "buildings", "roads", "places"])
+        let after = before.raisingReliefOverTheBuiltEnvironment()
+        XCTAssertEqual(after.layers.map(\.name), before.layers.map(\.name))
+    }
+
     /// The scaled scene is what both the canvas and every exporter read, so a
     /// hairline that reads on screen is a hairline that lands in the file.
     func testTheScaledSceneIsWhatTheExportersSee() throws {
