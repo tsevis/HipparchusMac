@@ -504,6 +504,32 @@
               "a": 255
             }
           },
+          "terrain_hillshade": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 34,
+              "g": 62,
+              "b": 100,
+              "a": 0
+            },
+            "fill_enabled": true,
+            "visible": true,
+            "line_cap": "round",
+            "casing_width": 0.0,
+            "opacity": 0.55,
+            "fill_color": {
+              "r": 34,
+              "g": 62,
+              "b": 100,
+              "a": 140
+            },
+            "fill_color_high": {
+              "r": 34,
+              "g": 62,
+              "b": 100,
+              "a": 0
+            }
+          },
           "terrain_contours": {
             "stroke_width": 0.3,
             "stroke_color": {
@@ -1243,6 +1269,32 @@
               "g": 66,
               "b": 98,
               "a": 255
+            }
+          },
+          "terrain_hillshade": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 186,
+              "g": 231,
+              "b": 228,
+              "a": 0
+            },
+            "fill_enabled": true,
+            "visible": true,
+            "line_cap": "round",
+            "casing_width": 0.0,
+            "opacity": 0.55,
+            "fill_color": {
+              "r": 186,
+              "g": 231,
+              "b": 228,
+              "a": 0
+            },
+            "fill_color_high": {
+              "r": 186,
+              "g": 231,
+              "b": 228,
+              "a": 105
             }
           },
           "terrain_contours": {

@@ -48,6 +48,49 @@ def mix(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int
     return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 
+def luma(colour: tuple[int, int, int]) -> float:
+    """Rec. 601, the cheap standard answer to "is this light or dark"."""
+    return (299 * colour[0] + 587 * colour[1] + 114 * colour[2]) / 255_000.0
+
+
+def hillshade(ground: tuple[int, int, int], ink: tuple[int, int, int]) -> dict:
+    """Relief shading in the pack's own ink.
+
+    The application derives a hillshade for any preset that stays silent about
+    it, and derives it in neutral black or white — which is right for a sheet
+    whose colours it cannot know, and wrong here. A grey wash over a duotone is
+    the one thing a duotone is not: on press those sheets carry two inks and
+    paper, nothing else, and a third neutral tone reads as a photograph of a
+    screen. Every pack states its own shade so it stays inside its palette.
+
+    The mechanics are the derived style's, because they are not a matter of
+    taste. Shading is drawn over the ground rather than instead of it, so the
+    untouched end of the ramp is transparent — band 0 is the deepest shadow and
+    the last band is the brightest, and *which* end is untouched depends on
+    whether the sheet is dark or pale. Pale paper takes shadow; dark paper takes
+    light, because its shadows are already dark.
+    """
+    dark_sheet = luma(ground) < 0.5
+    # Bands share their edges, so a stroke would draw every seam between tones.
+    out = {
+        "stroke_width": 0.0,
+        "stroke_color": rgba(ink, 0),
+        "fill_enabled": True,
+        "visible": True,
+        "line_cap": "round",
+        "casing_width": 0.0,
+        # Under the linework, never over it: relief is what a map is drawn on.
+        "opacity": 0.55,
+    }
+    if dark_sheet:
+        out["fill_color"] = rgba(ink, 0)
+        out["fill_color_high"] = rgba(ink, 105)
+    else:
+        out["fill_color"] = rgba(ink, 140)
+        out["fill_color_high"] = rgba(ink, 0)
+    return out
+
+
 def style(**kwargs) -> dict:
     """One layer, with only what it needs stated."""
     out = {
@@ -96,6 +139,7 @@ def sheet(
         "barriers": style(stroke=0.4, strokeColor=mix(ground, ink, 0.35), opacity=0.7),
         "power": style(stroke=0.4, strokeColor=mix(ground, ink, 0.30), opacity=0.6),
         "elevation_bands": style(fill=mix(ground, contour, 0.18), opacity=0.6),
+        "terrain_hillshade": hillshade(ground, ink),
         "terrain_contours": style(stroke=0.3 * contourWeight, strokeColor=contour, opacity=0.7),
         "terrain_index_contours": style(stroke=0.7 * contourWeight,
                                         strokeColor=mix(contour, ink, 0.3), opacity=0.9),

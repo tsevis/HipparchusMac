@@ -504,6 +504,32 @@
               "a": 255
             }
           },
+          "terrain_hillshade": {
+            "stroke_width": 0.0,
+            "stroke_color": {
+              "r": 26,
+              "g": 58,
+              "b": 82,
+              "a": 0
+            },
+            "fill_enabled": true,
+            "visible": true,
+            "line_cap": "round",
+            "casing_width": 0.0,
+            "opacity": 0.55,
+            "fill_color": {
+              "r": 26,
+              "g": 58,
+              "b": 82,
+              "a": 140
+            },
+            "fill_color_high": {
+              "r": 26,
+              "g": 58,
+              "b": 82,
+              "a": 0
+            }
+          },
           "terrain_contours": {
             "stroke_width": 0.48,
             "stroke_color": {
