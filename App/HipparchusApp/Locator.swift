@@ -196,6 +196,11 @@ struct Locator: NSViewRepresentable {
         /// back through the model is recognised as an echo rather than as
         /// somewhere new to fly to.
         var selectedByClick: BoundingBox?
+        /// The pin itself. Zooming works about this rather than about the
+        /// middle of the view once a place has been chosen — having aimed at
+        /// something, the obvious thing to do next is get closer to *it*, and
+        /// a zoom about the view centre walks it off the screen instead.
+        var pin: CLLocationCoordinate2D?
 
         init(onRegionChanged: ((BoundingBox) -> Void)?) {
             self.onRegionChanged = onRegionChanged
@@ -248,6 +253,7 @@ struct Locator: NSViewRepresentable {
             guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
 
             trace?.noteSelection(via: route)
+            pin = coordinate
             selectedByClick = LocatorSelection.area(
                 around: coordinate.latitude, lon: coordinate.longitude
             )
@@ -329,6 +335,10 @@ struct Locator: NSViewRepresentable {
             // about to arrive back through the model, and the map must not
             // fly to it and throw away the view it was drawn on.
             selectedByClick = area
+            pin = CLLocationCoordinate2D(
+                latitude: (area.minLat + area.maxLat) / 2,
+                longitude: (area.minLon + area.maxLon) / 2
+            )
             // The marker belongs to a point, not to a rectangle.
             mapView.removeAnnotations(mapView.annotations)
             trace?.noteSelection(via: "drag")
@@ -477,10 +487,18 @@ final class LocatorHandle {
     func zoom(by factor: Double) {
         guard let view else { return }
         let zoomed = LocatorSelection.zoomed(BoundingBox(view.region), by: factor)
+        // About the pin when there is one, about the view when there is not.
+        //
+        // Having clicked a place, the next thing anyone wants is to get closer
+        // to *that* — and a zoom about the middle of the view walks the chosen
+        // place towards the edge and then off it, so each press moves further
+        // from what was aimed at.
+        let centre = coordinator?.pin ?? MKCoordinateRegion(zoomed).center
+        let span = MKCoordinateRegion(zoomed).span
         // Deliberately *not* marked as programmatic: pressing the button is
         // the user moving the map, exactly as a pinch is, and the sidebar
         // locator — where what is on screen is the area — has to hear about it.
-        view.setRegion(MKCoordinateRegion(zoomed), animated: true)
+        view.setRegion(MKCoordinateRegion(center: centre, span: span), animated: true)
     }
 
     /// Shift the view by a fraction of what is on screen.
@@ -507,6 +525,9 @@ final class LocatorHandle {
     /// rather than suppressed, because a button is the user moving the map.
     func showWholeWorld() {
         guard let view else { return }
+        // Back to the whole world is a fresh start, so the pin stops steering
+        // the zoom — otherwise the next press would fly straight back to it.
+        coordinator?.pin = nil
         view.setVisibleMapRect(.world, animated: true)
     }
 }

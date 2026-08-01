@@ -28,17 +28,25 @@ except ImportError:                                    # pragma: no cover
     sys.exit("needs Pillow and numpy: pip install Pillow numpy")
 
 ROOT = Path(__file__).resolve().parents[1]
+#: Two drawings of the same coast, at two weights.
+#:
+#: Apple ships different artwork per size for exactly this reason. A 3pt
+#: coastline is the drawing anyone would want at 512 points and measures
+#: nothing at all by 16: scaled by 64, a hairline is a fifth of a pixel. The
+#: bold render draws the same coast at 22pt with only its index contours
+#: under it, which is what survives being 32 pixels across.
 SOURCE = ROOT / "Scripts/artwork/AppIcon-source.png"
+SOURCE_BOLD = ROOT / "Scripts/artwork/AppIcon-source-bold.png"
+
+#: Which weight each pixel size is cut from. The catalogue uses 16/32/64 only
+#: for the 16pt and 32pt slots, so those are the ones that have to carry.
+BOLD_SIZES = {16, 32, 64}
 ICONSET = (ROOT / "App/HipparchusApp/Resources/Assets.xcassets/AppIcon.appiconset")
 
-#: Square region of the render to keep, in source pixels.
-#:
-#: Every edge is inside the frame the renderer draws around the map. That
-#: frame is a white rule, and one edge of it in shot reads as a line ruling
-#: off the sea — which is exactly what it did in the first two attempts. The
-#: bounds are found in the image below rather than written down here, because
-#: they move whenever the export size or the area changes.
-CROP = (260, 120, 1260, 1120)
+#: How far inside the renderer's frame to start, in source pixels. The frame
+#: is a thin white rectangle around the map area; a couple of pixels of margin
+#: keeps its antialiasing out of the crop as well as its core.
+FRAME_MARGIN = 12
 
 #: The canvas, and how much of it the rounded square occupies. Apple's macOS
 #: icon grid leaves roughly a tenth of the canvas clear on each side.
@@ -51,38 +59,59 @@ CORNER = 0.225
 SIZES = [16, 32, 64, 128, 256, 512, 1024]
 
 
-def verify_inside_frame(image: Image.Image) -> None:
-    """Refuse a crop that would put the renderer's own frame in the icon.
+def squareInside(image: Image.Image) -> tuple[int, int, int, int]:
+    """The largest square of map, with none of the frame around it.
 
-    The frame is a thin white rectangle around the map area. Cropping across
-    one of its edges leaves a bright rule down the side of the icon that looks
-    like a border someone drew on purpose, and it is easy to reintroduce by
-    nudging the crop a few pixels. Checked rather than remembered.
+    The renderer draws a thin rectangle around the map area, and one edge of it
+    in shot reads as a rule ruled across the icon on purpose. It got in three
+    times: hand-written crops that were a few pixels out, and then a detector
+    that looked for near-white rows and columns. That detector was wrong twice
+    over — a bold near-vertical coastline is white enough down a column to look
+    like a frame, and the frame's own horizontal rule spans only the map's
+    width, so it reads about 0.67 where the vertical one reads 0.89. No single
+    whiteness threshold separates those.
+
+    So the frame is found by shape instead of by colour. The renderer fills the
+    whole canvas with the background and draws the map inside it, so everything
+    that differs from the background is the map — and the outermost thing in it
+    *is* the frame. Its bounding box, inset, is the usable region, whatever
+    colour anything happens to be.
     """
     pixels = np.asarray(image).astype(int)
     height, width, _ = pixels.shape
-    white = pixels.min(axis=2) > 235
-    columns = [x for x in range(width) if white[:, x].mean() > 0.30]
-    rows = [y for y in range(height) if white[y, :].mean() > 0.30]
+    background = pixels[1, 1]
+    drawn = np.abs(pixels - background).sum(axis=2) > 24
 
-    for x in columns:
-        if CROP[0] <= x <= CROP[2]:
-            sys.exit(f"crop {CROP} crosses the frame's vertical rule at x={x}")
-    for y in rows:
-        if CROP[1] <= y <= CROP[3]:
-            sys.exit(f"crop {CROP} crosses the frame's horizontal rule at y={y}")
+    rows = np.nonzero(drawn.any(axis=1))[0]
+    columns = np.nonzero(drawn.any(axis=0))[0]
+    if rows.size == 0 or columns.size == 0:
+        sys.exit("the render is blank — nothing was drawn")
+
+    left = int(columns[0]) + FRAME_MARGIN
+    right = int(columns[-1]) - FRAME_MARGIN
+    top = int(rows[0]) + FRAME_MARGIN
+    bottom = int(rows[-1]) - FRAME_MARGIN
+
+    side = min(right - left, bottom - top)
+    if side < 64:
+        sys.exit(f"no usable square inside the frame: x {left}..{right}, y {top}..{bottom}")
+    cx, cy = (left + right) // 2, (top + bottom) // 2
+    return (cx - side // 2, cy - side // 2, cx + side // 2, cy + side // 2)
 
 
 def main() -> int:
     if not SOURCE.exists():
         sys.exit(f"no source artwork at {SOURCE}")
 
-    whole = Image.open(SOURCE).convert("RGB")
-    verify_inside_frame(whole)
+    if not SOURCE_BOLD.exists():
+        sys.exit(f"no bold artwork at {SOURCE_BOLD}")
 
-    art = Image.open(SOURCE).convert("RGB").crop(CROP)
     side = CANVAS - 2 * SHAPE_INSET
-    art = art.resize((side, side), Image.LANCZOS)
+    faces, crops = {}, {}
+    for weight, path in (("thin", SOURCE), ("bold", SOURCE_BOLD)):
+        whole = Image.open(path).convert("RGB")
+        crops[weight] = squareInside(whole)
+        faces[weight] = whole.crop(crops[weight]).resize((side, side), Image.LANCZOS)
 
     # The rounded square, drawn at 4x and downsampled: a mask drawn straight
     # at the final size has visibly stepped corners at 512 and above.
@@ -95,16 +124,23 @@ def main() -> int:
     )
     mask = mask.resize((side, side), Image.LANCZOS)
 
-    canvas = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
-    canvas.paste(art, (SHAPE_INSET, SHAPE_INSET), mask)
+    canvases = {}
+    for weight, face in faces.items():
+        canvas = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
+        canvas.paste(face, (SHAPE_INSET, SHAPE_INSET), mask)
+        canvases[weight] = canvas
 
     ICONSET.mkdir(parents=True, exist_ok=True)
     for size in SIZES:
-        out = canvas.resize((size, size), Image.LANCZOS)
-        out.save(ICONSET / f"icon_{size}.png")
+        weight = "bold" if size in BOLD_SIZES else "thin"
+        canvases[weight].resize((size, size), Image.LANCZOS).save(ICONSET / f"icon_{size}.png")
 
+    small = ", ".join(str(s) for s in sorted(BOLD_SIZES))
     print(f"wrote {len(SIZES)} sizes into {ICONSET.relative_to(ROOT)}")
-    print(f"  crop {CROP}  shape {side}px in {CANVAS}px  radius {CORNER:.3f}")
+    for weight, crop in crops.items():
+        print(f"  {weight:>4}: crop {crop}")
+    print(f"  shape {side}px in {CANVAS}px  radius {CORNER:.3f}")
+    print(f"  bold at {small}; thin above")
     return 0
 
 

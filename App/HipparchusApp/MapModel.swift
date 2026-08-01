@@ -30,22 +30,28 @@ final class MapModel {
     static let places: [Place] = [
         // Santorini leads because it is the area the app opens on when there is
         // no saved session, and a default that is not in the list reads as a
-        // place the app forgot it knew.
+        // place the app forgot it knew. Athens and Kyiv follow it; the rest are
+        // alphabetical, so a list this long stays scannable.
         Place(name: "Santorini", bbox: BoundingBox(minLon: 25.32, minLat: 36.33, maxLon: 25.50, maxLat: 36.48)),
         Place(name: "Athens", bbox: BoundingBox(minLon: 23.575, minLat: 37.816, maxLon: 23.895, maxLat: 38.136)),
+        Place(name: "Kyiv", bbox: BoundingBox(minLon: 30.40, minLat: 50.36, maxLon: 30.70, maxLat: 50.53)),
+
+        Place(name: "Accra", bbox: BoundingBox(minLon: -0.28, minLat: 5.52, maxLon: -0.05, maxLat: 5.68)),
+        Place(name: "Addis Ababa", bbox: BoundingBox(minLon: 38.65, minLat: 8.90, maxLon: 38.88, maxLat: 9.10)),
         Place(name: "Amsterdam", bbox: BoundingBox(minLon: 4.78, minLat: 52.32, maxLon: 4.98, maxLat: 52.42)),
+        // The whole island of Hispaniola's eastern two thirds — nearly four
+        // degrees across, so OpenStreetMap will decline it and terrain will not.
+        Place(name: "Dominican Republic", bbox: BoundingBox(minLon: -72.01, minLat: 17.47, maxLon: -68.32, maxLat: 19.98)),
         Place(name: "Düsseldorf", bbox: BoundingBox(minLon: 6.72, minLat: 51.18, maxLon: 6.88, maxLat: 51.28)),
+        // Niʻihau to the Big Island, five and a half degrees of it.
+        Place(name: "Hawaii", bbox: BoundingBox(minLon: -160.30, minLat: 18.85, maxLon: -154.75, maxLat: 22.25)),
         Place(name: "Milan", bbox: BoundingBox(minLon: 9.10, minLat: 45.40, maxLon: 9.28, maxLat: 45.53)),
         Place(name: "Mumbai", bbox: BoundingBox(minLon: 72.78, minLat: 18.89, maxLon: 72.99, maxLat: 19.27)),
+        Place(name: "Paphos", bbox: BoundingBox(minLon: 32.36, minLat: 34.72, maxLon: 32.48, maxLat: 34.81)),
         Place(name: "San Francisco", bbox: BoundingBox(minLon: -122.53, minLat: 37.70, maxLon: -122.35, maxLat: 37.84)),
         Place(name: "Shanghai", bbox: BoundingBox(minLon: 121.35, minLat: 31.10, maxLon: 121.60, maxLat: 31.32)),
         Place(name: "Singapore", bbox: BoundingBox(minLon: 103.60, minLat: 1.22, maxLon: 104.03, maxLat: 1.47)),
         Place(name: "Sydney", bbox: BoundingBox(minLon: 151.13, minLat: -33.93, maxLon: 151.30, maxLat: -33.82)),
-        // The whole chain, Niʻihau to the Big Island — five and a half degrees
-        // across. Far too large for OpenStreetMap, which refuses it and says
-        // so; it is here for terrain, bathymetry and coastline, which are
-        // tiled and do not care.
-        Place(name: "Hawaii", bbox: BoundingBox(minLon: -160.30, minLat: 18.85, maxLon: -154.75, maxLat: 22.25)),
     ]
 
     // The whole earth, matching `Session`'s own default — these are what the

@@ -50,7 +50,11 @@ OUTPUT = (1280, 500)
 #: Gamma applied to darken the sea. Greater than 1 pulls the midtones down
 #: while leaving 255 at 255, so the white coastline and contours stay white
 #: and gain contrast rather than going grey with everything else.
-GAMMA = 2.0
+#:
+#: Gentler than it was: the ground is now a 30% turquoise rather than a pale
+#: grey-blue, and 2.0 took that to a mid teal dark enough to stop reading as
+#: light. 1.35 keeps the type legible without losing the tint.
+GAMMA = 1.35
 
 
 def main() -> int:
