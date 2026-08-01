@@ -4,6 +4,8 @@ A native macOS rewrite of [Hipparchus](https://github.com/tsevis/Hipparchus):
 choose an area of the world, fetch map data from public sources, and export
 layered, Illustrator-editable SVG.
 
+<img src="Docs/assets/interface.png" width="100%" alt="The Hipparchus window: the Ambracian Gulf and Lefkada in the Tsevis Nocturne style, turquoise linework on a dark ground. Left, the locator, the frame and the saved places; centre, the map; right, the layer list, the style picker open on twenty-three styles, and the page controls. The floating Locator window shows the same ground on Apple Maps. The status bar reads 29 layers, 26,642 features, -8 m to 1,426 m.">
+
 <table>
   <tr>
     <td width="50%"><img src="Docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands under relief shading, Mauna Kea and Mauna Loa reading as shields with the rift zones and the sea floor around them, from real elevation data"></td>
@@ -15,16 +17,38 @@ The Python application is the specification. It is finished, it works, and its
 454 tests are an executable description of the behaviour being ported. Anything
 here that disagrees with it is a bug here.
 
-**Status: the app is built, and the window has never been looked at.** Every
-online source, the composing source stack, the sixteen presets, illuminated
-contours, relief shading, the three-column interface and the exports are in,
-with 721 tests and the output checked against real ground.
+**Status: the app is built and running.** Every online source, the composing
+source stack, the sixteen presets, illuminated contours, relief shading, the
+three-column interface and the exports are in, with 721 tests and the output
+checked against real ground.
 
-Every claim here is backed by a test or by a render someone can open. **None of
-them is a claim about the interface**, because this environment has no Screen
-Recording permission and no window of any application can be captured. The model
-behind the window is verified; the layout is not, and "Verifying the app itself"
-below is as close as anything headless gets.
+Every claim here is backed by a test or by a render someone can open. **Almost
+none of them is a claim about the interface.** The window at the top of this
+page was photographed by the author on his own Mac; it is not something the
+build can produce, because the environment this was written in has no Screen
+Recording permission and cannot capture any window. The model behind the window
+is verified continuously, the layout is not, and "Verifying the app itself"
+below is as close as anything headless gets to it.
+
+## Download
+
+[**Hipparchus 0.2.3**](https://github.com/tsevis/HipparchusMac/releases/latest)
+— a disk image, on the releases page. Drag the app to Applications.
+
+The build is **signed ad-hoc: no Developer ID, no notarisation.** It opens on
+the machine that built it. On any other Mac, Gatekeeper refuses it, because a
+downloaded image carries a quarantine flag and macOS cannot verify an ad-hoc
+signature. Right-click the app and choose **Open**, or clear the flag:
+
+```
+xattr -dr com.apple.quarantine /Applications/Hipparchus.app
+```
+
+That is a reasonable thing to ask of yourself and an unreasonable thing to ask
+of anyone else. Proper distribution needs an Apple Developer account, a
+Developer ID certificate and `notarytool`; this repository does none of that,
+and says so rather than shipping something that looks distributable and is not.
+Building from source, below, has none of these problems.
 
 What this port deliberately does not have is listed under "What is not here",
 which distinguishes decided-against from overlooked.
