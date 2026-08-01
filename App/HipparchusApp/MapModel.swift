@@ -324,6 +324,11 @@ final class MapModel {
     /// as the Python keeps them: furniture is asked for per export, not
     /// remembered as map state — which is also why none of this is undoable.
     var svgComposition = SVGExporter.Composition()
+    /// The page every export shares: a sheet in inches, which way up, and how
+    /// finely to draw it. One description rather than three — SVG had paper and
+    /// PNG and PDF had nothing, so the Page section used to govern one file
+    /// format out of three.
+    var page = PageSpec()
     /// Paint the ground in the export. Off gives a transparent SVG for
     /// compositing; dark presets need it on to be legible.
     var svgIncludeBackground = true
@@ -1803,11 +1808,15 @@ final class MapModel {
         // six decimals, Clean Export four. Until this was wired the profile made
         // no difference to the file at all.
         options.precision = quality.svgPrecision
-        let size = svgComposition.exportSize(
-            canvasWidth: options.width, canvasHeight: options.height
-        )
+        // An SVG viewport is pixels, so the sheet is converted at the chosen
+        // resolution like the bitmap — but nothing is rasterised, so a 600 dpi
+        // 24 × 36 costs a larger viewBox and not a gigabyte.
+        let size = page.pixelSize(canvasWidth: options.width, canvasHeight: options.height)
         options.width = size.width
         options.height = size.height
+        // So the file can say which sheet it was drawn for.
+        options.composition.paperPreset = page.paperName
+        options.composition.orientation = page.orientation
         export(type: .svg, extension: "svg") { [weak self] scene, url in
             let diagnostics = try SVGExporter(options: options).write(scene, to: url)
             // The diagnostics belong beside the file, as the Python writes them:
@@ -1828,17 +1837,46 @@ final class MapModel {
     private var sidecarNote = ""
 
     func exportPDF() {
+        // A PDF carries physical size rather than a resolution: 72 points to the
+        // inch, by definition, so a 24 × 36 sheet prints at 24 × 36 on any device
+        // and the dpi setting does not enter into it.
+        var options = PDFExporter.Options()
+        let size = page.pointSize(canvasWidth: Self.canvasExportPixels.width,
+                                  canvasHeight: Self.canvasExportPixels.height)
+        options.width = size.width
+        options.height = size.height
         export(type: .pdf, extension: "pdf") { scene, url in
-            try PDFExporter().write(scene, to: url)
+            try PDFExporter(options: options).write(scene, to: url)
         }
     }
 
+    /// What "Canvas" means for a file, as opposed to for the window: the size
+    /// PNG export was hardcoded to before there were page controls at all.
+    static let canvasExportPixels = (width: 2400, height: 1800)
+
     func exportPNG() {
+        let canvas = Self.canvasExportPixels
+        let size = page.pixelSize(canvasWidth: canvas.width, canvasHeight: canvas.height)
+        let cost = page.bitmapCost(canvasWidth: canvas.width, canvasHeight: canvas.height)
+        guard !page.exceedsBitmapLimit(canvasWidth: canvas.width, canvasHeight: canvas.height) else {
+            isError = true
+            status = String(
+                format: "%@ at %.0f dpi is %.0f megapixels (%.1f GB). Lower the resolution, "
+                    + "or export SVG or PDF, which have no pixels to run out of.",
+                page.paperName, page.dpi, cost.megapixels, cost.megabytes / 1000.0
+            )
+            return
+        }
         export(type: .png, extension: "png") { scene, url in
             guard let image = CoreGraphicsRenderer().image(
-                of: scene, size: CGSize(width: 2400, height: 1800)
+                of: scene, size: CGSize(width: size.width, height: size.height)
             ) else {
-                throw ExportFailure.couldNotRender
+                // Reached when the allocation fails under the limit rather than
+                // over it, so it says what was asked for instead of "could not
+                // render" and nothing else.
+                throw ExportFailure.couldNotAllocate(
+                    width: size.width, height: size.height, megabytes: cost.megabytes
+                )
             }
             guard let destination = CGImageDestinationCreateWithURL(
                 url as CFURL, "public.png" as CFString, 1, nil
@@ -1850,7 +1888,20 @@ final class MapModel {
         }
     }
 
-    enum ExportFailure: Error { case couldNotRender }
+    enum ExportFailure: Error, CustomStringConvertible {
+        case couldNotRender
+        case couldNotAllocate(width: Int, height: Int, megabytes: Double)
+
+        var description: String {
+            switch self {
+            case .couldNotRender:
+                return "the image could not be written"
+            case .couldNotAllocate(let width, let height, let megabytes):
+                return String(format: "%d × %d pixels (%.0f MB) could not be allocated",
+                              width, height, megabytes)
+            }
+        }
+    }
 
     private func export(
         type: UTType,

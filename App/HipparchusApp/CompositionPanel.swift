@@ -1,31 +1,62 @@
 import HipparchusRender
 import SwiftUI
 
-/// Page composition for the SVG export: paper, margins and map furniture.
+/// The page every export shares: paper, resolution, and the map furniture.
 ///
-/// The Python keeps these as checkboxes in its export options, transient and all
-/// off by default, and this keeps both properties: the map is the product, and a
-/// scale bar or a title block is asked for per export rather than remembered as
-/// map state. Nothing here changes the map — which is why none of it lands in
-/// the undo history or the session.
+/// Paper used to govern the SVG alone — PNG was hardcoded to 2400 × 1800 and PDF
+/// to A4 in points, whichever sheet was chosen here. One page spec now drives
+/// all three, so a sheet asked for at 24 × 36 is that sheet in every format.
+///
+/// The Python keeps the furniture as checkboxes in its export options, transient
+/// and all off by default, and this keeps both properties: the map is the
+/// product, and a scale bar or a title block is asked for per export rather than
+/// remembered as map state. Nothing here changes the map — which is why none of
+/// it lands in the undo history or the session.
 struct CompositionPanel: View {
     @Bindable var model: MapModel
 
+    /// What the current page comes to, so the cost of a 24 × 36 at 600 dpi is
+    /// visible before the export refuses it rather than after.
+    private var pageSummary: String {
+        let canvas = MapModel.canvasExportPixels
+        let pixels = model.page.pixelSize(canvasWidth: canvas.width, canvasHeight: canvas.height)
+        let cost = model.page.bitmapCost(canvasWidth: canvas.width, canvasHeight: canvas.height)
+        let inches = model.page.inches(canvasAspect: 1)
+        let sheet = inches.map { String(format: "%.3g × %.3g in · ", $0.width, $0.height) } ?? ""
+        return String(format: "%@%d × %d px · %.0f MP", sheet, pixels.width, pixels.height, cost.megapixels)
+    }
+
     var body: some View {
         Section {
-            Picker("Paper", selection: $model.svgComposition.paperPreset) {
-                ForEach(SVGExporter.Composition.paperPresets, id: \.name) { preset in
-                    if preset.width > 0 {
-                        Text("\(preset.name) · \(preset.width)×\(preset.height)").tag(preset.name)
+            Picker("Paper", selection: $model.page.paperName) {
+                ForEach(PaperSize.all, id: \.name) { paper in
+                    if paper.isCanvas {
+                        Text(paper.name).tag(paper.name)
                     } else {
-                        Text(preset.name).tag(preset.name)
+                        Text(paper.name).tag(paper.name)
                     }
                 }
             }
-            Picker("Orientation", selection: $model.svgComposition.orientation) {
-                ForEach(SVGExporter.Composition.orientations, id: \.self) { orientation in
+            Picker("Orientation", selection: $model.page.orientation) {
+                ForEach(PageSpec.orientations, id: \.self) { orientation in
                     Text(orientation).tag(orientation)
                 }
+            }
+            Picker("Resolution", selection: $model.page.dpi) {
+                ForEach(Resolution.all, id: \.self) { dpi in
+                    Text(Resolution.label(dpi)).tag(dpi)
+                }
+            }
+            HStack {
+                Spacer()
+                Text(pageSummary)
+                    .font(.caption)
+                    .foregroundStyle(
+                        model.page.exceedsBitmapLimit(
+                            canvasWidth: MapModel.canvasExportPixels.width,
+                            canvasHeight: MapModel.canvasExportPixels.height
+                        ) ? .red : .secondary
+                    )
             }
 
             Toggle("Title block", isOn: $model.svgComposition.includeTitle)

@@ -85,6 +85,9 @@ func usage() -> Never {
       --list-presets     print the preset names and exit
       --plugins <dir>    also load style packs from a plugin folder, so their
                          presets and places can be named like the built-in ones
+      --paper <name>     sheet for every export: \(PaperSize.names.joined(separator: ", "))
+      --dpi <n>          resolution for the raster and the SVG viewport
+      --portrait         turn the sheet (default: landscape)
       --furniture        title, scale bar, north arrow and legend on the SVG, A4
       --no-files         measure only, write nothing
 
@@ -105,6 +108,7 @@ struct Options {
     var preset = SceneBuilder.Options().preset
     var quality = Quality.default
     var furniture = false
+    var page = PageSpec()
     var hillshade = false
     var streets = false
     var sun = SunPosition()
@@ -162,6 +166,23 @@ while argumentIndex < arguments.count {
         options.targetPixels = value
     case "--no-files":
         options.writeFiles = false
+    case "--paper":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        let requested = arguments[argumentIndex]
+        // An unknown sheet silently becomes Canvas, which is a 2400-pixel file
+        // where a poster was asked for. Say so.
+        guard PaperSize.names.contains(requested) else {
+            print("error: no paper '\(requested)'. One of: \(PaperSize.names.joined(separator: ", "))")
+            exit(2)
+        }
+        options.page.paperName = requested
+    case "--dpi":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count, let value = Double(arguments[argumentIndex]), value > 0 else { usage() }
+        options.page.dpi = value
+    case "--portrait":
+        options.page.orientation = "Portrait"
     case "--streets":
         options.streets = true
     case "--hillshade":
@@ -375,11 +396,36 @@ func run(_ place: Place, options: Options) async throws {
     try FileManager.default.createDirectory(at: options.outputDirectory, withIntermediateDirectories: true)
     let base = options.outputDirectory.appendingPathComponent(slug(place.name))
 
-    if let image = CoreGraphicsRenderer().image(of: scene, size: CGSize(width: 1600, height: 1200)) {
-        try writePNG(image, to: base.appendingPathExtension("png"))
+    // Canvas keeps the 1600 × 1200 these runs have always written; a named sheet
+    // is inches × dpi, and is the same sheet in all three formats below.
+    let raster = options.page.pixelSize(canvasWidth: 1600, canvasHeight: 1200)
+    let cost = options.page.bitmapCost(canvasWidth: 1600, canvasHeight: 1200)
+    if options.page.exceedsBitmapLimit(canvasWidth: 1600, canvasHeight: 1200) {
+        print(String(format: "  skipping PNG: %d x %d is %.0f MP (%.1f GB)",
+                     raster.width, raster.height, cost.megapixels, cost.megabytes / 1000.0))
+    } else {
+        let started = ContinuousClock.now
+        if let image = CoreGraphicsRenderer().image(
+            of: scene, size: CGSize(width: raster.width, height: raster.height)
+        ) {
+            try writePNG(image, to: base.appendingPathExtension("png"))
+            if cost.megapixels > 8 {
+                print(String(format: "  PNG %d x %d  %.0f MP  drawn in %@",
+                             raster.width, raster.height, cost.megapixels,
+                             (ContinuousClock.now - started).formattedSeconds))
+            }
+        } else {
+            print(String(format: "  PNG failed: %d x %d (%.0f MB) could not be allocated",
+                         raster.width, raster.height, cost.megabytes))
+        }
     }
     var svgOptions = SVGExporter.Options()
     svgOptions.precision = options.quality.svgPrecision
+    let svgSize = options.page.pixelSize(canvasWidth: svgOptions.width, canvasHeight: svgOptions.height)
+    svgOptions.width = svgSize.width
+    svgOptions.height = svgSize.height
+    svgOptions.composition.paperPreset = options.page.paperName
+    svgOptions.composition.orientation = options.page.orientation
     if options.furniture {
         svgOptions.composition.title = place.name == "custom" ? "Hipparchus" : place.name.capitalized
         svgOptions.composition.subtitle = String(
@@ -398,7 +444,11 @@ func run(_ place: Place, options: Options) async throws {
         svgOptions.height = size.height
     }
     let diagnostics = try SVGExporter(options: svgOptions).write(scene, to: base.appendingPathExtension("svg"))
-    try PDFExporter().write(scene, to: base.appendingPathExtension("pdf"))
+    var pdfOptions = PDFExporter.Options()
+    let points = options.page.pointSize(canvasWidth: 1600, canvasHeight: 1200)
+    pdfOptions.width = points.width
+    pdfOptions.height = points.height
+    try PDFExporter(options: pdfOptions).write(scene, to: base.appendingPathExtension("pdf"))
     try diagnostics.jsonData().write(to: base.appendingPathExtension("diagnostics.json"))
 
     print("  wrote \(slug(place.name)).{png,svg,pdf,diagnostics.json} into \(options.outputDirectory.path)")
