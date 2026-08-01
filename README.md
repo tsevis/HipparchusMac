@@ -18,9 +18,10 @@ The Python application is the specification. It is finished, it works, and its
 here that disagrees with it is a bug here.
 
 **Status: the app is built and running.** Every online source, the composing
-source stack, the sixteen presets, illuminated contours, relief shading, the
-three-column interface and the exports are in, with 721 tests and the output
-checked against real ground.
+source stack, the sixteen presets, ten palettes over any of them, illuminated
+contours, relief shading, an adjustable line weight, the three-column interface
+and export at a real printed size are in, with 757 tests and the output checked
+against real ground.
 
 Every claim here is backed by a test or by a render someone can open. **Almost
 none of them is a claim about the interface.** The window at the top of this

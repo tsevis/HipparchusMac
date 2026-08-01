@@ -82,6 +82,8 @@ func usage() -> Never {
       --shade-bands <n>  tones between shadow and light (default: 7)
       --relief-on-top    draw the shading over the buildings rather than under
                          them, for a city dense enough to bury it
+      --simulated        a generated field instead of measured elevation. Needs
+                         no network and is not a measurement of anywhere.
       --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
       --quality <key>    \(Quality.keys.joined(separator: ", "))
       --list-presets     print the preset names and exit
@@ -118,6 +120,7 @@ struct Options {
     var palette: Palette?
     var hillshade = false
     var reliefOnTop = false
+    var simulated = false
     var streets = false
     var sun = SunPosition()
     var exaggeration = 1.0
@@ -216,6 +219,8 @@ while argumentIndex < arguments.count {
     case "--relief-on-top":
         options.reliefOnTop = true
         options.hillshade = true
+    case "--simulated":
+        options.simulated = true
     case "--sun":
         argumentIndex += 1
         guard argumentIndex < arguments.count else { usage() }
@@ -347,7 +352,16 @@ func run(_ place: Place, options: Options) async throws {
     let started = ContinuousClock.now
     let terrain = TerrainTileProvider(settings: settings)
     let collection: FeatureCollection
-    if options.streets {
+    if options.simulated {
+        // Nothing measured, and nothing fetched. The one source that can draw a
+        // mountain on a train.
+        var field = TerrainFieldSettings()
+        field.emitHillshade = options.hillshade
+        field.sun = options.sun
+        field.hillshadeExaggeration = options.exaggeration
+        field.hillshadeBandCount = options.shadeBands
+        collection = try await SimulatedFieldProvider(settings: field).fetch(BBoxQuery(bbox: place.bbox))
+    } else if options.streets {
         // The same manager the app fetches through, so the merge, the layer
         // precedence and the weakest-provenance-wins rule are the shipped ones
         // rather than a second implementation written for a flag.
