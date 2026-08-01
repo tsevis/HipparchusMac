@@ -22,13 +22,15 @@ struct StylePicker: View {
             // style at once and leaves nothing to navigate. `.adaptive` rather
             // than a fixed column count because the sidebar is resizable
             // between 260 and 380 points, and the right number of columns is
-            // whatever fits. All sixteen, not the six that used to be
-            // "featured": with nothing to scroll there is no reason to choose
-            // for someone which looks they are allowed to see.
+            // Four columns exactly, so the sixteen fall into a 4×4 block: a
+            // grid that reads as a complete set rather than as a row that ran
+            // out. All sixteen, not the six that used to be "featured" —
+            // with nothing to scroll there is no reason to decide for someone
+            // which looks they are allowed to see.
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 58), spacing: 8, alignment: .top)],
+                columns: Array(repeating: GridItem(.flexible(), spacing: 6, alignment: .top), count: 4),
                 alignment: .leading,
-                spacing: 8
+                spacing: 6
             ) {
                 ForEach(StylePreviews.swatches(Presets.names)) { swatch in
                     SwatchButton(
@@ -191,23 +193,27 @@ private struct SwatchButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 3) {
+            VStack(spacing: 2) {
                 SwatchView(swatch: swatch)
-                    .frame(width: 54, height: 38)
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    // 16:9 rather than nearly square: a map is a landscape,
+                    // and a wide thumbnail of one carries more of its look in
+                    // less height than a tall one does.
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     .overlay {
-                        RoundedRectangle(cornerRadius: 5)
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .strokeBorder(
-                                isSelected ? Color.accentColor : Color.secondary.opacity(0.35),
+                                isSelected ? Color.accentColor : Color.primary.opacity(0.12),
                                 lineWidth: isSelected ? 2 : 0.5
                             )
                     }
                 Text(shortName)
-                    .font(.caption2)
+                    .font(.system(size: 9))
                     .foregroundStyle(isSelected ? .primary : .secondary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
             }
-            .frame(width: 58)
+            .frame(maxWidth: .infinity)
         }
         .buttonStyle(.plain)
         .help(swatch.name)

@@ -1035,7 +1035,12 @@ final class MapModel {
 
         let arguments = ProcessInfo.processInfo.arguments
         if let flag = arguments.firstIndex(of: "--preset"), flag + 1 < arguments.count {
-            preset = namedPreset(Presets.resolveName(arguments[flag + 1]))
+            // Across every style, not only the sixteen built in: a saved or
+            // plugin style named here used to resolve to the default and
+            // render as something else entirely, silently.
+            preset = namedPreset(
+                Presets.resolveName(arguments[flag + 1], available: availablePresetNames)
+            )
         }
         // Tick extra sources on launch, so the composition can be checked from a
         // terminal: `--sources terrain_tiles` must *add* contours to the streets

@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Camino's blue, but flat-lit the way Big Sur icons are rather than
+         glassy the way 2004 was. -->
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0"   stop-color="#5FC4F5"/>
+      <stop offset="0.45" stop-color="#2E86D8"/>
+      <stop offset="1"   stop-color="#12459A"/>
+    </linearGradient>
+
+    <!-- The sphere: lit from above left, as Camino's was. -->
+    <radialGradient id="globe" cx="0.36" cy="0.30" r="0.85">
+      <stop offset="0"   stop-color="#EAF7FF"/>
+      <stop offset="0.32" stop-color="#8FD2F6"/>
+      <stop offset="0.72" stop-color="#2C79C8"/>
+      <stop offset="1"   stop-color="#0E3E86"/>
+    </radialGradient>
+
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <clipPath id="sphere">
+      <circle cx="512" cy="506" r="268"/>
+    </clipPath>
+  </defs>
+
+  <!-- The squircle. macOS draws its own mask, so this is only the face. -->
+  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#face)"/>
+
+  <!-- The globe. -->
+  <circle cx="512" cy="506" r="268" fill="url(#globe)"/>
+
+  <!-- Hipparchus's own contribution: the grid. Parallels and meridians, drawn
+       as ellipses so the sphere reads as a sphere rather than a disc. -->
+  <g clip-path="url(#sphere)" fill="none" stroke="#ffffff" stroke-opacity="0.34" stroke-width="7">
+    <ellipse cx="512" cy="506" rx="268" ry="88"/>
+    <ellipse cx="512" cy="506" rx="268" ry="182"/>
+    <ellipse cx="512" cy="506" rx="88"  ry="268"/>
+    <ellipse cx="512" cy="506" rx="182" ry="268"/>
+    <line x1="244" y1="506" x2="780" y2="506"/>
+    <line x1="512" y1="238" x2="512" y2="774"/>
+  </g>
+
+  <!-- The compass star, Camino's signature: four points, long on the vertical,
+       with each arm split light and dark so it reads as folded metal. -->
+  <g>
+    <!-- Soft shadow so the star sits above the globe rather than on it. -->
+    <g opacity="0.28" transform="translate(0,10)">
+      <path d="M512 168 L560 458 L512 506 L464 458 Z" fill="#000"/>
+      <path d="M512 844 L560 554 L512 506 L464 554 Z" fill="#000"/>
+      <path d="M196 506 L474 458 L512 506 L474 554 Z" fill="#000"/>
+      <path d="M828 506 L550 458 L512 506 L550 554 Z" fill="#000"/>
+    </g>
+
+    <!-- North: the bright arm. -->
+    <path d="M512 168 L560 458 L512 506 Z" fill="#FFFFFF"/>
+    <path d="M512 168 L464 458 L512 506 Z" fill="#D7E7F5"/>
+    <!-- South -->
+    <path d="M512 844 L560 554 L512 506 Z" fill="#C3D7EA"/>
+    <path d="M512 844 L464 554 L512 506 Z" fill="#EDF5FC"/>
+    <!-- West -->
+    <path d="M196 506 L474 458 L512 506 Z" fill="#EDF5FC"/>
+    <path d="M196 506 L474 554 L512 506 Z" fill="#C3D7EA"/>
+    <!-- East -->
+    <path d="M828 506 L550 458 L512 506 Z" fill="#FFFFFF"/>
+    <path d="M828 506 L550 554 L512 506 Z" fill="#D7E7F5"/>
+  </g>
+
+  <!-- One highlight across the top, which is all the gloss a modern icon takes. -->
+  <path d="M0 0 H1024 V300 Q512 470 0 300 Z" fill="url(#sheen)" opacity="0.5"/>
+</svg>

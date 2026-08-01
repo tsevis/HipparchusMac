@@ -21,105 +21,125 @@ struct AboutView: View {
         .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
 
     var body: some View {
-        ZStack {
-            backdrop
-            content
+        VStack(spacing: 0) {
+            keyArt
+            body(of: Self.about)
+            Spacer(minLength: 0)
+            footer
         }
-        .frame(width: 560, height: 620)
+        .frame(width: 640, height: 580)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
-    // MARK: - The island
+    // MARK: - The island, full bleed
 
-    private var backdrop: some View {
-        VStack {
+    /// Key art across the top with the name over it, rather than an icon
+    /// centred above a paragraph. The map is the product, so it goes first and
+    /// at full width; the type sits in it rather than beside it.
+    private var keyArt: some View {
+        ZStack(alignment: .bottomLeading) {
             Image("CyprusAbout")
                 .resizable()
-                .scaledToFit()
-                // Behind the words rather than beside them, and faint enough
-                // that the words win. It is a backdrop, not an illustration.
-                .opacity(0.30)
-                .padding(.top, 150)
-                .padding(.horizontal, 24)
-            Spacer(minLength: 0)
+                .scaledToFill()
+                .frame(height: 250)
+                .clipped()
+
+            // A short scrim, so white type stays legible over the palest part
+            // of the sea without dimming the whole image.
+            LinearGradient(
+                colors: [.black.opacity(0.0), .black.opacity(0.30)],
+                startPoint: .center, endPoint: .bottom
+            )
+            .frame(height: 250)
+
+            HStack(alignment: .bottom, spacing: 12) {
+                Image("TVDLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 34)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Hipparchus")
+                        .font(.system(size: 36, weight: .semibold))
+                        .tracking(-0.6)
+                    Text("Maps built from sources that stack")
+                        .font(.system(size: 13, weight: .regular))
+                        .opacity(0.85)
+                }
+                Spacer()
+                Text(Self.version)
+                    .font(.system(size: 11, weight: .medium))
+                    .monospacedDigit()
+                    .opacity(0.7)
+                    .padding(.bottom, 3)
+            }
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.35), radius: 6, y: 1)
+            .padding(.horizontal, 26)
+            .padding(.bottom, 20)
         }
-        .allowsHitTesting(false)
+        .frame(height: 250)
     }
 
     // MARK: - The words
 
-    private var content: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 10) {
-                Image("TVDLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 46)
-
-                Text("Hipparchus")
-                    .font(.system(size: 34, weight: .light, design: .serif))
-                    .tracking(2)
-
-                Text("Maps built from sources that stack")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                Text("Version \(Self.version)")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.top, 30)
-
-            Spacer(minLength: 12)
-
-            VStack(alignment: .leading, spacing: 12) {
-                Text(Self.about)
-                    .font(.callout)
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(Self.legal)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .multilineTextAlignment(.leading)
-            .padding(.horizontal, 34)
-
-            Spacer(minLength: 12)
-
-            credits
-                .padding(.bottom, 22)
-        }
+    private func body(of text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12.5))
+            .foregroundStyle(.primary)
+            .lineSpacing(2)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 26)
+            .padding(.top, 20)
     }
 
-    private var credits: some View {
-        VStack(spacing: 10) {
-            Text("Created by Charis Tsevis, with the help of Claude Code.")
-                .font(.callout)
-                .foregroundStyle(.primary)
+    private var footer: some View {
+        VStack(spacing: 0) {
+            DisclosureGroup {
+                Text(Self.legal)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(1.5)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 6)
+            } label: {
+                Text("Data, licences and credits")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 26)
+            .padding(.bottom, 14)
+
+            Divider()
 
             HStack(spacing: 14) {
-                link("tsevis.com", "https://tsevis.com", symbol: "safari")
-                link("github.com/tsevis", "https://github.com/tsevis", symbol: "chevron.left.forwardslash.chevron.right")
-            }
+                Text("Created by Charis Tsevis, with the help of Claude Code.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
 
-            Button("Continue", action: close)
-                .keyboardShortcut(.defaultAction)
-                .controlSize(.large)
-                .padding(.top, 4)
+                link("tsevis.com", "https://tsevis.com")
+                link("github.com/tsevis", "https://github.com/tsevis")
+
+                Spacer()
+
+                Button("Continue", action: close)
+                    .keyboardShortcut(.defaultAction)
+            }
+            .padding(.horizontal, 26)
+            .padding(.vertical, 14)
         }
+        .background(.bar)
     }
 
-    private func link(_ label: String, _ address: String, symbol: String) -> some View {
-        Button {
+    private func link(_ label: String, _ address: String) -> some View {
+        Button(label) {
             guard let url = URL(string: address) else { return }
             openURL(url)
-        } label: {
-            Label(label, systemImage: symbol)
-                .font(.callout)
         }
         .buttonStyle(.link)
+        .font(.system(size: 11))
         .pointerStyle(.link)
     }
 
@@ -128,27 +148,26 @@ struct AboutView: View {
     private static let about = """
     Hipparchus of Nicaea worked out how to put a grid on the world. Around \
     130 BC he fixed places by latitude and longitude, built the first star \
-    catalogue, and argued that maps should be drawn from measurements rather \
+    catalogue, and argued that maps should be drawn from measurement rather \
     than from travellers' impressions — an argument that took seventeen \
     centuries to win.
 
-    This is a small tribute to that idea. It draws maps from data that was \
-    measured: elevation from terrain tiles, coastline and streets from \
-    OpenStreetMap, seismicity from the USGS. Sources stack rather than \
-    replace, nothing is invented without saying so, and every layer carries \
-    its provenance into the exported file — because a generated map must \
-    never be mistaken for a survey.
+    This is a small tribute to that idea. Elevation from terrain tiles, \
+    coastline and streets from OpenStreetMap, seismicity from the USGS. \
+    Sources stack rather than replace, nothing is invented without saying so, \
+    and every layer carries its provenance into the exported file — because a \
+    generated map must never be mistaken for a survey.
     """
 
     private static let legal = """
-    Map data © OpenStreetMap contributors, available under the Open Database \
-    License (ODbL). Elevation from Mapzen/AWS Terrain Tiles. Imagery from \
-    NASA GIBS. Earthquake data from the U.S. Geological Survey. Satellite \
-    elements from CelesTrak. Geocoding by Nominatim and Apple MapKit; \
-    basemap in the Locator © Apple. Rendered with GEOS.
+    Map data © OpenStreetMap contributors, under the Open Database License \
+    (ODbL). Elevation from Mapzen/AWS Terrain Tiles. Imagery from NASA GIBS. \
+    Earthquakes from the U.S. Geological Survey. Satellite elements from \
+    CelesTrak. Geocoding by Nominatim and Apple MapKit; Locator basemap © \
+    Apple. Rendered with GEOS.
 
-    Maps produced by this application are yours. The attributions above \
-    travel with anything you publish from them.
+    Maps you make are yours. The attributions above travel with anything you \
+    publish from them.
     """
 }
 
