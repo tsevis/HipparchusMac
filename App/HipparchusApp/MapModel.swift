@@ -104,6 +104,10 @@ final class MapModel {
     private(set) var pluginLoadErrors: [String] = []
 
     private let presetStore = PresetStore(url: PresetStore.defaultURL())
+    private let settingsStore = SettingsStore(url: SettingsStore.defaultURL())
+    /// Preferences that belong to neither a map nor a session — the cache
+    /// ceiling and the shared-service rate limit. Read once at launch.
+    private(set) var settings = UserSettings()
 
     /// Every style that can be chosen, built-in first.
     var availablePresetNames: [String] {
@@ -206,6 +210,10 @@ final class MapModel {
     /// parse and a plugin that will not load are both reported in the status
     /// line and then stepped over.
     private func loadPresetsAndPlugins() {
+        // Never throws: a corrupt preferences file falls back to the defaults
+        // rather than being a reason the app will not open.
+        settings = settingsStore.load()
+
         do {
             customPresets = try presetStore.load()
         } catch {
@@ -873,19 +881,23 @@ final class MapModel {
             let overrides = stack.providerOverrides(for: id)
             switch id {
             case SourceID.overpass:
-                var settings = OverpassSettings()
+                var overpass = OverpassSettings()
+                // The preference is the floor; the per-source knob overrides
+                // it. Overpass is a shared service run on donated hardware, so
+                // the rate this asks at is a setting rather than a constant.
+                overpass.requestsPerSecond = settings.providerRPSLimit
                 if let timeout = overrides["timeoutSeconds"]?.doubleValue, timeout > 0 {
-                    settings.timeoutSeconds = timeout
+                    overpass.timeoutSeconds = timeout
                 }
                 if let rate = overrides["requestsPerSecond"]?.doubleValue, rate > 0 {
-                    settings.requestsPerSecond = rate
+                    overpass.requestsPerSecond = rate
                 }
                 if let endpoint = overrides["endpoint"]?.stringValue, !endpoint.isEmpty {
                     // Chosen first, the rest still tried after it: a mirror that
                     // is refusing today should not become a dead end.
-                    settings.endpoint = endpoint
+                    overpass.endpoint = endpoint
                 }
-                providers.append(OverpassProvider(settings: settings, cache: cache))
+                providers.append(OverpassProvider(settings: overpass, cache: cache))
 
             case SourceID.terrainTiles:
                 var settings = TerrainTileSettings()
@@ -949,7 +961,7 @@ final class MapModel {
         // after every fetch and at launch. Expiry alone never bounded it: an
         // entry is only found stale when it is asked for again, so anything
         // never wanted again stayed for ever and the cache only grew.
-        let evicted = await cache.enforceSizeLimit()
+        let evicted = await cache.enforceSizeLimit(maximumBytes: settings.cacheSizeLimitBytes)
         let bytes = await cache.totalBytes()
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useGB]
@@ -1100,6 +1112,12 @@ final class MapModel {
         // for the same reason the others do: a sidebar nobody can screenshot
         // is a poor place to find out a plugin never loaded.
         if arguments.contains("--plugins") {
+            print("settings:       \(SettingsStore.defaultURL().path)")
+            print(String(
+                format: "  cache limit %d MB · %.2f requests/second · preview tolerance %.2f",
+                settings.cacheSizeLimitMB, settings.providerRPSLimit,
+                settings.performancePreviewTolerance
+            ))
             print("preset store:   \(PresetStore.defaultURL().path)")
             print("plugin folder:  \(PluginLoader.defaultUserPluginDirectory().path)")
             print("")
