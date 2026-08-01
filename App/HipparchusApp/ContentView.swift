@@ -12,9 +12,9 @@ import SwiftUI
 struct ContentView: View {
     @State private var model = MapModel()
     @State private var viewport = ViewportState()
-    /// A handle onto the live canvas, so Update map can ask what is actually
+    /// A handle onto the live canvas, so Render map can ask what is actually
     /// on screen — turning the view is deliberately kept out of the requested
-    /// area, so without this, zooming out and pressing Update map re-fetches
+    /// area, so without this, zooming out and pressing Render map re-fetches
     /// the same old bbox while the screen still shows the wider one.
     @State private var canvasHandle = MapCanvasHandle()
     @State private var columnVisibility = NavigationSplitViewVisibility.all
@@ -30,7 +30,7 @@ struct ContentView: View {
         // directly.
         VStack(spacing: 0) {
             NavigationSplitView(columnVisibility: $columnVisibility) {
-                FramePanel(model: model)
+                FramePanel(model: model, openLocator: { locatorPanel.show(model: model, onRender: renderMap) })
                     .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
             } content: {
                 map
@@ -55,6 +55,15 @@ struct ContentView: View {
         .task {
             model.undoManager = undoManager
             model.startIfRequestedOnLaunch()
+            // `--locator` opens the floating Locator straight away, without
+            // anyone having to find the toolbar button first. A toolbar's
+            // trailing items are the first thing macOS folds away into an
+            // overflow menu when a window is narrow, so "the button is not
+            // there" and "the window does not work" look identical from the
+            // outside — this tells them apart.
+            if ProcessInfo.processInfo.arguments.contains("--locator") {
+                locatorPanel.show(model: model, onRender: renderMap)
+            }
         }
         .onAppear { model.undoManager = undoManager }
         .onDisappear { model.save() }
@@ -113,6 +122,27 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// What Render map does, in one place.
+    ///
+    /// The toolbar button and the button on the floating Locator both call
+    /// this rather than each doing it themselves: they are the same action,
+    /// and two copies of it would be two behaviours within a release or two.
+    private func renderMap() {
+        // Fetch what is actually on screen, not whatever was last typed —
+        // turning the view (pan, zoom, rotation) stays out of the requested
+        // area everywhere else, but pressing this button is asking the app to
+        // act on what it is showing.
+        if let visible = canvasHandle.visibleArea() {
+            model.syncAreaToVisibleView(visible)
+            viewport = ViewportState()
+        }
+        // Then shape it to the window — always, whatever the area came from
+        // and whether or not anything is drawn yet. It only ever grows the
+        // area, and an area already the right shape comes back untouched.
+        model.shapeAreaToWindow(aspect: canvasHandle.canvasAspect())
+        model.update()
+    }
+
     private var zoomControls: some View {
         VStack(spacing: 0) {
             Button { viewport = viewport.zoomed(by: 1.3) } label: {
@@ -168,30 +198,11 @@ struct ContentView: View {
             PlaceSearchField(model: model)
         }
 
-        ToolbarItem(placement: .navigation) {
-            Button {
-                locatorPanel.show(model: model)
-            } label: {
-                Image(systemName: "map")
-            }
-            .help("Open the Locator in its own floating window")
-        }
-
         ToolbarItem(placement: .principal) {
-            // Cancel appears beside Update map while a fetch runs — where the eye
+            // Cancel appears beside Render map while a fetch runs — where the eye
             // already is — as well as in the status bar next to the progress.
             HStack(spacing: 8) {
-                Button("Update map") {
-                    // Fetch what is actually on screen, not whatever was last
-                    // typed — turning the view (pan, zoom, rotation) stays out
-                    // of the requested area everywhere else, but pressing this
-                    // button is asking the app to act on what it is showing.
-                    if let visible = canvasHandle.visibleArea() {
-                        model.syncAreaToVisibleView(visible)
-                        viewport = ViewportState()
-                    }
-                    model.update()
-                }
+                Button("Render map") { renderMap() }
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(model.isFetching || model.bbox == nil)
                 if model.isFetching {
@@ -206,6 +217,15 @@ struct ContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+        }
+
+        ToolbarItem(placement: .primaryAction) {
+            Button {
+                locatorPanel.show(model: model, onRender: renderMap)
+            } label: {
+                Image(systemName: "map")
+            }
+            .help("Open the Locator in its own floating window")
         }
 
         ToolbarItem(placement: .primaryAction) {

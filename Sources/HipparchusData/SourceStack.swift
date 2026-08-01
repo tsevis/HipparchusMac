@@ -314,6 +314,13 @@ public struct SourceStack: Sendable, Equatable {
     public let definitions: [SourceDefinition]
     private var enabled: [String]
     private var paths: [String: String]
+    /// What each chosen file turned out to be, decided once when it was
+    /// chosen. See `fileStatus`.
+    private var fileStatuses: [String: FileSourceProvider.Availability] = [:]
+    /// A security-scoped bookmark per file-backed source, so the permission
+    /// granted when the file was chosen survives a relaunch. See the app's
+    /// `SecurityScopedAccess` for why a path alone does not.
+    private var bookmarks: [String: Data] = [:]
     private var overrides: [String: [String: SourceSetting.Value]]
 
     public init(definitions: [SourceDefinition] = SourceStack.defaultDefinitions) {
@@ -332,9 +339,46 @@ public struct SourceStack: Sendable, Equatable {
     public func isEnabled(_ id: String) -> Bool { enabled.contains(id) }
 
     /// A source needing a file is only usable once one is configured.
+    /// A source needing a file is usable once one is configured.
+    ///
+    /// Deliberately only that, as in the Python. Whether the file still exists
+    /// and whether its format can be read are *different* questions with
+    /// different answers over time — a path on a volume that is not mounted
+    /// today should not silently untick tomorrow — so they are asked by
+    /// `fileStatus`, shown beside the source, and left out of this.
     public func isAvailable(_ id: String) -> Bool {
         guard let definition = definition(id) else { return false }
         return definition.needsPath ? !(paths[id] ?? "").isEmpty : true
+    }
+
+    /// What a file-backed source can say about the file it has been given —
+    /// `nil` for the sources that need no file at all.
+    ///
+    /// Advice, not permission: this is what the sidebar shows under the
+    /// source so an unreadable file says so before a fetch rather than after
+    /// one. `isAvailable` is what decides whether the tick works.
+    ///
+    /// Consulted rather than recomputed: `FileSourceProvider` already decides
+    /// what a file is and whether it can be read, including the one format
+    /// that cannot be and the command that converts it. Asking a second
+    /// question here, in a second place, is how a sidebar comes to say a file
+    /// is fine and a fetch comes to say it is not.
+    ///
+    /// Cached at the moment the path is set rather than computed on demand:
+    /// this is read on every redraw of the sidebar, and deciding a format can
+    /// mean listing a directory.
+    public func fileStatus(_ id: String) -> FileSourceProvider.Availability? {
+        guard let definition = definition(id), definition.needsPath else { return nil }
+        return fileStatuses[id] ?? Self.status(of: paths[id] ?? "", label: definition.label)
+    }
+
+    static func status(of path: String, label: String) -> FileSourceProvider.Availability {
+        guard !path.isEmpty else {
+            return FileSourceProvider.Availability(isAvailable: false, detail: "No file chosen")
+        }
+        return FileSourceProvider(
+            providerID: "", label: label, path: URL(fileURLWithPath: path)
+        ).availability
     }
 
     /// Ticked sources, in sidebar order rather than click order — so the same set of
@@ -364,18 +408,34 @@ public struct SourceStack: Sendable, Equatable {
 
     // MARK: - Per-source configuration
 
-    public mutating func setPath(_ id: String, _ path: String) {
+    /// - Parameter bookmark: a security-scoped bookmark for the file, minted
+    ///   by the caller while it still holds access. Optional: without one the
+    ///   path works for this session and is refused after a relaunch, which is
+    ///   the behaviour this replaced.
+    public mutating func setPath(_ id: String, _ path: String, bookmark: Data? = nil) {
         let cleaned = path.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned.isEmpty {
             paths.removeValue(forKey: id)
+            fileStatuses.removeValue(forKey: id)
+            bookmarks.removeValue(forKey: id)
             // A source that lost its file cannot stay ticked.
             setEnabled(id, false)
         } else {
             paths[id] = cleaned
+            // Decided once, here, rather than on every redraw of the sidebar:
+            // working out what a file is can mean listing a directory.
+            fileStatuses[id] = Self.status(of: cleaned, label: definition(id)?.label ?? id)
+            if let bookmark { bookmarks[id] = bookmark }
         }
     }
 
     public func path(_ id: String) -> String { paths[id] ?? "" }
+
+    /// The stored permission token for a source, if it has one.
+    public func bookmark(_ id: String) -> Data? { bookmarks[id] }
+
+    /// Every source that has one, for saving.
+    public var bookmarksByID: [String: Data] { bookmarks }
 
     public mutating func setSetting(_ id: String, _ key: String, _ value: SourceSetting.Value) {
         guard let definition = definition(id), definition.setting(key) != nil else { return }

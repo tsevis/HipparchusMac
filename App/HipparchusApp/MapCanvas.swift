@@ -12,7 +12,7 @@ import SwiftUI
 ///
 /// The map is the product, so it gets the room: drag to pan, scroll to zoom,
 /// Option-drag to draw a new area.
-/// A weak handle onto the live canvas, so "Update map" can ask it what is on
+/// A weak handle onto the live canvas, so "Render map" can ask it what is on
 /// screen right now.
 ///
 /// `MapCanvas` is a value type recreated on every body evaluation, so a parent
@@ -27,6 +27,16 @@ final class MapCanvasHandle {
     /// `nil` before anything has ever been drawn.
     func visibleArea() -> BoundingBox? {
         view?.visibleArea()
+    }
+
+    /// How wide the canvas is relative to its height. Available before
+    /// anything has been drawn, unlike `visibleArea()`, which is the whole
+    /// point of it: the *first* fetch needs to know the window's shape too,
+    /// and until now it could not, so the first map ever drawn was always the
+    /// wrong shape for the window it appeared in.
+    func canvasAspect() -> Double? {
+        guard let view, view.bounds.height > 0, view.bounds.width > 0 else { return nil }
+        return view.bounds.width / view.bounds.height
     }
 }
 
@@ -73,7 +83,7 @@ final class MapCanvasView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     /// What this canvas is showing right now, in real coordinates — what
-    /// "Update map" fetches instead of whatever was last typed, so zooming
+    /// "Render map" fetches instead of whatever was last typed, so zooming
     /// out (or in, or panning) and pressing it gets what is actually being
     /// looked at.
     ///
@@ -82,13 +92,36 @@ final class MapCanvasView: NSView {
     /// on screen.
     func visibleArea() -> BoundingBox? {
         guard let scene, let transform else { return nil }
-        let world = transform.visibleWorldBounds(canvasSize: bounds.size)
-        let southWest = scene.projection.unproject(Coordinate(x: world.minX, y: world.minY))
-        let northEast = scene.projection.unproject(Coordinate(x: world.maxX, y: world.maxY))
-        return BoundingBox(
-            minLon: min(southWest.lon, northEast.lon), minLat: min(southWest.lat, northEast.lat),
-            maxLon: max(southWest.lon, northEast.lon), maxLat: max(southWest.lat, northEast.lat)
-        )
+
+        // Inset by the same margin the fit leaves around the map, rather than
+        // taking the canvas corners raw.
+        //
+        // The map is drawn inside the canvas less a margin, so the raw corners
+        // describe an area about an eighth larger than the one on show. Fetch
+        // that, fit it with a margin again, fetch that — and every press of
+        // Render map walks the area outwards a little, which reads as the map
+        // slowly zooming out on its own. Insetting makes the round trip a
+        // fixed point: what is drawn is what is asked for next time.
+        let margin = CanvasTransform.margin(width: bounds.width, height: bounds.height)
+        let drawn = bounds.insetBy(dx: margin, dy: margin)
+        guard drawn.width > 0, drawn.height > 0 else { return nil }
+
+        // All four corners, not two: with the view turned, the corners of the
+        // rectangle on screen are not the corners of the area underneath it.
+        let corners = [
+            CGPoint(x: drawn.minX, y: drawn.minY), CGPoint(x: drawn.maxX, y: drawn.minY),
+            CGPoint(x: drawn.maxX, y: drawn.maxY), CGPoint(x: drawn.minX, y: drawn.maxY),
+        ]
+        .map { scene.projection.unproject(transform.screenToWorld($0)) }
+
+        let lons = corners.map(\.lon)
+        let lats = corners.map(\.lat)
+        guard let minLon = lons.min(), let maxLon = lons.max(),
+              let minLat = lats.min(), let maxLat = lats.max()
+        else {
+            return nil
+        }
+        return BoundingBox(minLon: minLon, minLat: minLat, maxLon: maxLon, maxLat: maxLat)
     }
 
     // MARK: - Drawing

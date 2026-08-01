@@ -118,6 +118,12 @@ public struct Session: Codable, Sendable, Equatable {
     public var enabledSources: [String]
     /// Per-source file paths, for the file-backed sources.
     public var sourcePaths: [String: String]
+    /// Per-source security-scoped bookmarks, base64. The app is sandboxed, so
+    /// a path alone is only permission to read the file during the run in
+    /// which it was chosen; this is what carries that permission forward.
+    /// Base64 because this file is meant to be readable, and raw `Data` in
+    /// JSON is neither readable nor smaller.
+    public var sourceBookmarks: [String: String] = [:]
     /// Per-source setting overrides, as `sourceID.settingKey` → value. Flattened
     /// because a nested dictionary of an enum is a lot of `Codable` for a file whose
     /// whole job is to be readable.
@@ -138,6 +144,9 @@ public struct Session: Codable, Sendable, Equatable {
         self.placeName = try container.decodeIfPresent(String.self, forKey: .placeName) ?? defaults.placeName
         self.enabledSources = try container.decodeIfPresent([String].self, forKey: .enabledSources) ?? defaults.enabledSources
         self.sourcePaths = try container.decodeIfPresent([String: String].self, forKey: .sourcePaths) ?? [:]
+        // Absent in every session written before bookmarks existed, which is
+        // simply a session whose files must be chosen again.
+        self.sourceBookmarks = try container.decodeIfPresent([String: String].self, forKey: .sourceBookmarks) ?? [:]
         self.sourceSettings = try container.decodeIfPresent([String: Double].self, forKey: .sourceSettings) ?? [:]
         self.sourceChoices = try container.decodeIfPresent([String: String].self, forKey: .sourceChoices) ?? [:]
         self.presetName = try container.decodeIfPresent(String.self, forKey: .presetName) ?? defaults.presetName
@@ -151,6 +160,7 @@ public struct Session: Codable, Sendable, Equatable {
         placeName: String = "Santorini",
         enabledSources: [String] = [SourceID.overpass],
         sourcePaths: [String: String] = [:],
+        sourceBookmarks: [String: String] = [:],
         sourceSettings: [String: Double] = [:],
         sourceChoices: [String: String] = [:],
         presetName: String = "Hypsometric Relief",
@@ -162,6 +172,7 @@ public struct Session: Codable, Sendable, Equatable {
         self.placeName = placeName
         self.enabledSources = enabledSources
         self.sourcePaths = sourcePaths
+        self.sourceBookmarks = sourceBookmarks
         self.sourceSettings = sourceSettings
         self.sourceChoices = sourceChoices
         self.presetName = presetName
@@ -178,12 +189,16 @@ public struct Session: Codable, Sendable, Equatable {
         quality: String, hiddenLayers: [String], derived: Derived = Derived()
     ) {
         var paths: [String: String] = [:]
+        var bookmarks: [String: String] = [:]
         var numbers: [String: Double] = [:]
         var choices: [String: String] = [:]
 
         for definition in stack.definitions {
             let path = stack.path(definition.id)
             if !path.isEmpty { paths[definition.id] = path }
+            if let bookmark = stack.bookmark(definition.id) {
+                bookmarks[definition.id] = bookmark.base64EncodedString()
+            }
 
             // By setting key, not by provider target: this file is read back through
             // `setSetting`, which speaks keys.
@@ -202,6 +217,7 @@ public struct Session: Codable, Sendable, Equatable {
             placeName: placeName,
             enabledSources: stack.enabledIDs,
             sourcePaths: paths,
+            sourceBookmarks: bookmarks,
             sourceSettings: numbers,
             sourceChoices: choices,
             presetName: preset,
@@ -219,7 +235,9 @@ public struct Session: Codable, Sendable, Equatable {
     public func stack() -> SourceStack {
         var stack = SourceStack()
 
-        for (id, path) in sourcePaths { stack.setPath(id, path) }
+        for (id, path) in sourcePaths {
+            stack.setPath(id, path, bookmark: sourceBookmarks[id].flatMap { Data(base64Encoded: $0) })
+        }
 
         for definition in stack.definitions {
             stack.setEnabled(definition.id, enabledSources.contains(definition.id))

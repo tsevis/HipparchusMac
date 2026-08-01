@@ -122,6 +122,55 @@ public actor DiskCacheStore: CacheStoring {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    /// How large the cache may get before the oldest entries are dropped.
+    ///
+    /// A gigabyte: several sessions of large areas, and small enough to be a
+    /// limit. Expiry alone was never one — an entry is only checked for
+    /// staleness when it is *asked for*, so anything never wanted again stayed
+    /// for ever, and the cache only ever grew.
+    public static let defaultMaximumBytes = 1_073_741_824
+
+    /// Drop the oldest entries until the cache fits, and say how many went.
+    ///
+    /// Ported from `cache/housekeeping.py`'s `enforce_size_limit`. Oldest
+    /// first by modification time, stopping the moment it is under the limit
+    /// rather than clearing wholesale — the point is to bound the cache, not
+    /// to throw away work that still fits.
+    @discardableResult
+    public func enforceSizeLimit(maximumBytes: Int = DiskCacheStore.defaultMaximumBytes) -> Int {
+        // A nonsense limit must not become a way to silently delete
+        // everything; zero is a real answer and means "keep nothing".
+        guard maximumBytes >= 0 else { return 0 }
+
+        let keys: [URLResourceKey] = [.fileSizeKey, .contentModificationDateKey]
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: keys
+        ) else {
+            // No cache directory yet is not a fault.
+            return 0
+        }
+
+        let entries = contents
+            .compactMap { url -> (url: URL, size: Int, modified: Date)? in
+                guard let values = try? url.resourceValues(forKeys: Set(keys)),
+                      let size = values.fileSize,
+                      let modified = values.contentModificationDate
+                else { return nil }
+                return (url, size, modified)
+            }
+            .sorted { $0.modified < $1.modified }
+
+        var total = entries.reduce(0) { $0 + $1.size }
+        var removed = 0
+        for entry in entries {
+            guard total > maximumBytes else { break }
+            try? FileManager.default.removeItem(at: entry.url)
+            total -= entry.size
+            removed += 1
+        }
+        return removed
+    }
+
     /// What the cache is costing, for the interface to show and offer to clear.
     public func totalBytes() -> Int {
         let contents = (try? FileManager.default.contentsOfDirectory(

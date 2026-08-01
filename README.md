@@ -120,7 +120,7 @@ Logic that grows here should move down rather than settle.
 ## Running it
 
 The app opens on an empty canvas. Type a place into the search box — "Santorini",
-"Twin Peaks San Francisco" — pick from what comes back, and press Update map. The
+"Twin Peaks San Francisco" — pick from what comes back, and press Render map. The
 results show the frame each one would give before you commit to it, and the
 coordinate boxes are still there, one disclosure away, for saying exactly which
 frame you want.
@@ -171,7 +171,7 @@ its own floating window, is a fourth way in: a real, live map of the whole
 world, to drag and pinch rather than search or type. It starts at world scale
 regardless of whatever area is already requested — a mirror of the main canvas
 would put you back where you started — and every pan or zoom becomes the
-requested area, the same one Update map then fetches. The area can also change
+requested area, the same one Render map then fetches. The area can also change
 from elsewhere — a search result, a saved place, typed coordinates, a pasted
 clipboard — and the Locator moves to show that too, without that reflected move
 being mistaken for a fresh drag and bouncing back out to the requested area a
@@ -216,7 +216,7 @@ as a second, unmarked change and failing every run. That was a bug in the
 check, not in the Locator, which never calls the delegate itself.
 
 A locator that starts at world scale makes it an easy accident to drag out to
-the whole planet and press Update map. Past a few hundred square degrees —
+the whole planet and press Render map. Past a few hundred square degrees —
 comfortably more than a large country — OpenStreetMap is refused outright
 rather than merely warned about: `FetchCost`'s own linear time estimate would
 otherwise answer with something like "3,366,000 minutes," which reads as
@@ -379,11 +379,11 @@ Hipparchus.app/Contents/MacOS/Hipparchus --bbox 25.32,36.33,25.50,36.48 --rotate
 ```
 
 **One deliberate exception.** Pan and zoom stay out of the requested area right
-up until the moment **Update map** is pressed — that button is asking the app
+up until the moment **Render map** is pressed — that button is asking the app
 to act on what is actually on screen, so it reads the canvas's current pan,
 zoom and rotation, sets the area to whatever ground that implies, and resets
 the view to a plain fit before fetching. Without this, zooming out and pressing
-Update map re-fetched the same area as before while the screen still showed the
+Render map re-fetched the same area as before while the screen still showed the
 wider view, and looked exactly like nothing had happened. `CanvasTransform` does
 the measuring — reading all four corners of the canvas rather than two opposite
 ones, since a turned viewport's visible ground is a turned rectangle and only
@@ -431,7 +431,7 @@ one action, because it was one intention. And **undo of a fetch restores the
 previous scene from a bounded store rather than re-fetching** — undo must never
 cost minutes of Overpass time to take back something that cost minutes of
 Overpass time. Only the newest few scenes are kept, so undoing very far back can
-reach a map that was let go; the status bar says so, and Update map redraws it —
+reach a map that was let go; the status bar says so, and Render map redraws it —
 nothing ever re-fetches silently.
 
 The history itself is `SessionHistory`, a value type over `Session` snapshots,

@@ -96,7 +96,11 @@ public enum CoordinateImport {
         return (a, b)
     }
 
-    private static func padded(lat: Double, lon: Double) -> BoundingBox {
+    /// The area a bare point stands for. Public because a point clicked on the
+    /// locator is the same problem as a point pasted off a map, and answering
+    /// it twice would be how the two quietly come to disagree — see
+    /// `LocatorSelection.area(around:lon:)`.
+    public static func padded(lat: Double, lon: Double) -> BoundingBox {
         // Longitude is corrected for latitude, or a point near the poles pads
         // into a box far wider than it is tall.
         let cosine = Swift.max(0.02, cos(lat * .pi / 180))

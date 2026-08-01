@@ -8,6 +8,8 @@ import SwiftUI
 /// cannot advertise a look it no longer has.
 struct StylePicker: View {
     @Bindable var model: MapModel
+    @State private var isNamingPreset = false
+    @State private var newPresetName = ""
 
     var body: some View {
         Section {
@@ -18,7 +20,7 @@ struct StylePicker: View {
                             swatch: swatch,
                             isSelected: model.preset.name == swatch.name
                         ) {
-                            model.preset = Presets.preset(swatch.name)
+                            model.preset = model.namedPreset(swatch.name)
                         }
                     }
                 }
@@ -29,13 +31,30 @@ struct StylePicker: View {
             // reachable rather than hidden.
             Picker("All styles", selection: Binding(
                 get: { model.preset.name },
-                set: { model.preset = Presets.preset($0) }
+                set: { model.preset = model.namedPreset($0) }
             )) {
+                // Built-in, then anything plugins brought, then the user's own
+                // — grouped, because "which of these can I delete?" is a
+                // question the list should answer without being asked.
                 ForEach(Presets.names, id: \.self) { name in
                     Text(name).tag(name)
                 }
+                if !model.pluginPresets.isEmpty {
+                    Divider()
+                    ForEach(model.pluginPresets.map(\.name), id: \.self) { name in
+                        Text(name).tag(name)
+                    }
+                }
+                if !model.customPresets.isEmpty {
+                    Divider()
+                    ForEach(model.customPresets.map(\.name), id: \.self) { name in
+                        Text(name).tag(name)
+                    }
+                }
             }
             .controlSize(.small)
+
+            savedStyles
 
             Picker("Quality", selection: Binding(
                 get: { model.quality.key },
@@ -55,6 +74,97 @@ struct StylePicker: View {
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
+        }
+    }
+
+    // MARK: - Styles of your own
+
+    /// Keeping a tuned style, and letting go of one.
+    ///
+    /// The sixteen built-in presets are code and cannot be edited. Everything
+    /// the eye is actually for — nudging a colour, turning the illumination up
+    /// — was previously lost at the next launch, which made the tuning pointless.
+    @ViewBuilder
+    private var savedStyles: some View {
+        Button {
+            // Seeded with the current style's name plus a suffix, because the
+            // commonest save is a variation on the one being looked at.
+            newPresetName = model.isCustomPreset(model.preset.name)
+                ? model.preset.name
+                : "\(model.preset.name) (mine)"
+            isNamingPreset = true
+        } label: {
+            Label("Save this style…", systemImage: "square.and.arrow.down")
+                .font(.caption)
+        }
+        .buttonStyle(.borderless)
+        .help("Keep the current style, with its derivation sizes, under a name of your own.")
+        .alert("Save this style", isPresented: $isNamingPreset) {
+            TextField("Name", text: $newPresetName)
+            Button("Save") { model.saveCurrentStyleAsPreset(named: newPresetName) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("It will appear in All styles, and in the Python app — the two share this file.")
+        }
+
+        if model.isCustomPreset(model.preset.name) {
+            Button(role: .destructive) {
+                model.deleteCustomPreset(named: model.preset.name)
+            } label: {
+                Label("Delete “\(model.preset.name)”", systemImage: "trash")
+                    .font(.caption)
+            }
+            .buttonStyle(.borderless)
+        }
+
+        if !model.loadedPlugins.isEmpty || !model.pluginLoadErrors.isEmpty {
+            pluginSummary
+        }
+    }
+
+    /// What loaded, and what did not. A plugin that failed silently is
+    /// indistinguishable from one that was never installed.
+    private var pluginSummary: some View {
+        DisclosureGroup {
+            ForEach(model.loadedPlugins) { plugin in
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(plugin.name).font(.caption)
+                        Text(plugin.origin)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                }
+            }
+            ForEach(model.pluginLoadErrors, id: \.self) { note in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(note)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            // The folder is inside the sandbox container, which nobody is
+            // going to find by hand — so the app opens it, and creates it the
+            // first time so there is something to open.
+            Button {
+                model.revealPluginFolder()
+            } label: {
+                Label("Show plugins folder", systemImage: "folder")
+                    .font(.caption2)
+            }
+            .buttonStyle(.borderless)
+        } label: {
+            Text("Plugins (\(model.loadedPlugins.count))")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

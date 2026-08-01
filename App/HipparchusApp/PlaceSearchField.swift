@@ -107,7 +107,7 @@ struct PlaceSearchField: View {
                             }
                             // What the frame will be, before committing to it: a
                             // search that would fetch half a country is worth
-                            // seeing before Update map is pressed.
+                            // seeing before Render map is pressed.
                             Text(String(
                                 format: "%.2f° × %.2f°",
                                 abs(result.bbox.lonSpan), abs(result.bbox.latSpan)

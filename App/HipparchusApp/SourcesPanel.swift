@@ -92,13 +92,65 @@ struct SourcesPanel: View {
                 }
             }
 
+            // A file-backed source shows its file, and the way to choose one,
+            // without being expanded first.
+            //
+            // Behind the chevron, the only control that makes the row usable
+            // was invisible: four permanently greyed-out rows with no stated
+            // reason and no visible way out read as four broken features. The
+            // row is greyed because it has no file — so the row should say so,
+            // where the greying is.
+            if definition.needsPath {
+                filePicker(for: definition)
+                    .padding(.leading, 22)
+            }
+
             if expanded.contains(definition.id) {
                 inlineSettings(for: definition, settings: settings)
                     .padding(.leading, 22)
             }
         }
         .padding(.vertical, 2)
+        // The label dims to say "not ready", but the control that fixes that
+        // must not dim with it — a faded button reads as a disabled one.
         .opacity(isAvailable ? 1 : 0.55)
+    }
+
+    /// The chosen file, why it is or is not usable, and the way to change it.
+    private func filePicker(for definition: SourceDefinition) -> some View {
+        let status = model.stack.fileStatus(definition.id)
+        let path = model.stack.path(definition.id)
+
+        return HStack(alignment: .firstTextBaseline, spacing: 6) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(path.isEmpty ? "No file chosen" : (path as NSString).lastPathComponent)
+                    .font(.caption)
+                    .foregroundStyle(path.isEmpty ? .tertiary : .secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
+                // The reason, when there is one worth giving. GeoParquet's
+                // answer carries the command that converts it — computed all
+                // along, and until now shown nowhere, which left the one
+                // format this cannot read looking like a format it silently
+                // ignored.
+                if let status, !status.isAvailable, !path.isEmpty {
+                    Text(status.detail)
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                        .lineLimit(3)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 4)
+
+            Button(path.isEmpty ? "Choose…" : "Change…") { chooseFile(for: definition) }
+                .controlSize(.small)
+                // Never dimmed with the row: this is the control that undims it.
+                .opacity(1)
+        }
     }
 
     @ViewBuilder
@@ -107,21 +159,6 @@ struct SourcesPanel: View {
         settings: [SourceSetting]
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            if definition.needsPath {
-                HStack(spacing: 6) {
-                    Text(model.stack.path(definition.id).isEmpty
-                        ? "No file chosen"
-                        : (model.stack.path(definition.id) as NSString).lastPathComponent)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Spacer()
-                    Button("Choose…") { chooseFile(for: definition) }
-                        .controlSize(.small)
-                }
-            }
-
             ForEach(settings) { setting in
                 HStack(spacing: 6) {
                     Text(setting.label)
@@ -190,10 +227,22 @@ struct SourcesPanel: View {
     private func chooseFile(for definition: SourceDefinition) {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
-        panel.canChooseDirectories = false
+        // Directories too, because two of the formats genuinely are one: a
+        // shapefile is a set of sidecar files that travel together, and a
+        // converted extract usually arrives as a folder of GeoJSON, one file
+        // per layer. `FileFormat.of` has always understood both; the picker
+        // simply would not let anyone choose one.
+        panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
+        panel.message = "Choose the file or folder for \(definition.label)."
+        panel.prompt = "Use"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.stack.setPath(definition.id, url.path)
+        // Minted here, while the open panel's grant is still held — this is
+        // the only moment a token for this file can be made. Without it the
+        // path is readable this run and refused after a relaunch.
+        model.stack.setPath(
+            definition.id, url.path, bookmark: SecurityScopedAccess.bookmark(for: url)
+        )
     }
 }
 

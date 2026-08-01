@@ -103,7 +103,7 @@ public struct CanvasTransform: Sendable, Equatable {
     /// The world-space rectangle a canvas of `size` is currently showing,
     /// accounting for pan, zoom and rotation.
     ///
-    /// This is what "Update map" reads instead of whatever was last typed:
+    /// This is what "Render map" reads instead of whatever was last typed:
     /// zoom and pan are view state, kept deliberately out of the requested
     /// area, so without this a zoomed-out view and a freshly re-fetched one
     /// disagree — the button re-fetches the old area, the screen still shows

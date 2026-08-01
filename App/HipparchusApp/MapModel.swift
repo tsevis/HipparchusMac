@@ -2,6 +2,7 @@ import AppKit
 import HipparchusData
 import HipparchusGeometry
 import HipparchusRender
+import MapKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -41,7 +42,7 @@ final class MapModel {
     var north = "36.48" { didSet { record() } }
     var placeName = "Santorini" { didSet { record() } }
 
-    /// The area currently drawn, which is not the area in the boxes until Update map
+    /// The area currently drawn, which is not the area in the boxes until Render map
     /// is pressed. Keeping them apart is what lets the boxes be edited without the
     /// map flickering through half-typed coordinates.
     private(set) var drawnBBox: BoundingBox?
@@ -89,6 +90,137 @@ final class MapModel {
         }
     }
 
+    // MARK: - Presets beyond the sixteen
+
+    /// Styles the user saved. Read once at launch and rewritten whenever one
+    /// is added or removed — there are a handful of them and they are tiny.
+    private(set) var customPresets: [ArtisticPreset] = []
+    /// Styles contributed by plugins. Read-only here: a plugin's preset is
+    /// changed by editing the plugin, not by the app writing over it.
+    private(set) var pluginPresets: [ArtisticPreset] = []
+    private(set) var loadedPlugins: [LoadedPlugin] = []
+    /// One line per plugin that did not load, kept so a broken plugin is
+    /// visible rather than merely absent.
+    private(set) var pluginLoadErrors: [String] = []
+
+    private let presetStore = PresetStore(url: PresetStore.defaultURL())
+
+    /// Every style that can be chosen, built-in first.
+    var availablePresetNames: [String] {
+        Presets.names + pluginPresets.map(\.name) + customPresets.map(\.name)
+    }
+
+    /// Resolve a name across all three sources.
+    ///
+    /// Everywhere that used `Presets.preset(_:)` has to come through here
+    /// instead, or a session saved under a custom preset reopens as the
+    /// default and quietly loses the style it was drawn with.
+    func namedPreset(_ name: String) -> ArtisticPreset {
+        if let custom = customPresets.first(where: { $0.name == name }) { return custom }
+        if let contributed = pluginPresets.first(where: { $0.name == name }) { return contributed }
+        return Presets.preset(name)
+    }
+
+    /// Whether a name belongs to a style the user can delete. Built-in and
+    /// plugin styles are not the app's to remove.
+    func isCustomPreset(_ name: String) -> Bool {
+        customPresets.contains { $0.name == name }
+    }
+
+    /// Keep the style now on screen under a name of its own.
+    ///
+    /// Saves what is actually in effect — the preset's own styles with the
+    /// derivation sizes currently set — so what comes back is what was being
+    /// looked at, not the preset it started from.
+    @discardableResult
+    func saveCurrentStyleAsPreset(named rawName: String) -> Bool {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else {
+            isError = true
+            status = "A preset needs a name."
+            return false
+        }
+        guard !Presets.names.contains(name), !pluginPresets.contains(where: { $0.name == name }) else {
+            isError = true
+            status = "“\(name)” is already the name of a built-in or plugin style. Choose another."
+            return false
+        }
+
+        let saved = ArtisticPreset(
+            name: name, geometryProfile: derivations, styleProfile: preset.styleProfile
+        )
+        // Replacing one of the user's own by name is fine, and is how editing
+        // a saved style works.
+        customPresets.removeAll { $0.name == name }
+        customPresets.append(saved)
+        customPresets.sort { $0.name < $1.name }
+
+        do {
+            try presetStore.save(customPresets)
+            preset = saved
+            isError = false
+            status = "Saved the style “\(name)”."
+            return true
+        } catch {
+            isError = true
+            status = "Could not save the preset: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func deleteCustomPreset(named name: String) {
+        guard isCustomPreset(name) else { return }
+        customPresets.removeAll { $0.name == name }
+        do {
+            try presetStore.save(customPresets)
+            if preset.name == name { preset = Presets.default }
+            status = "Deleted the style “\(name)”."
+            isError = false
+        } catch {
+            isError = true
+            status = "Could not delete the preset: \(error.localizedDescription)"
+        }
+    }
+
+    /// Open the plugin folder in Finder, making it first if it is not there.
+    ///
+    /// The app is sandboxed, so this lives inside its container — a path
+    /// nobody will navigate to by hand, which would make a plugin folder
+    /// nobody can find into a feature nobody can use.
+    func revealPluginFolder() {
+        let folder = PluginLoader.defaultUserPluginDirectory()
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            NSWorkspace.shared.activateFileViewerSelecting([folder])
+            status = "Put a folder with a plugin.json in there, then reopen the app."
+            isError = false
+        } catch {
+            isError = true
+            status = "Could not open the plugin folder: \(error.localizedDescription)"
+        }
+    }
+
+    /// Read the saved presets and load the plugins.
+    ///
+    /// Neither is allowed to stop the app opening: a preset file that will not
+    /// parse and a plugin that will not load are both reported in the status
+    /// line and then stepped over.
+    private func loadPresetsAndPlugins() {
+        do {
+            customPresets = try presetStore.load()
+        } catch {
+            customPresets = []
+            isError = true
+            status = "Your saved presets could not be read: \(error.localizedDescription)"
+        }
+
+        let loader = PluginLoader(userPluginDirectory: PluginLoader.defaultUserPluginDirectory())
+        let registry = loader.loadAll()
+        pluginPresets = registry.presets
+        loadedPlugins = loader.loadedPlugins
+        pluginLoadErrors = loader.loadErrors
+    }
+
     /// Which derived layers to invent on top of the map.
     ///
     /// Held apart from the preset because no preset enables one — all sixteen style
@@ -110,7 +242,7 @@ final class MapModel {
     private(set) var scene: RenderScene?
     private(set) var progress = FetchProgress()
     private(set) var isFetching = false
-    private(set) var status = "Pick an area and press Update map."
+    private(set) var status = "Pick an area and press Render map."
     private(set) var isError = false
     private(set) var provenance: String?
     private(set) var cacheSummary = ""
@@ -201,7 +333,7 @@ final class MapModel {
         do { return .success(try await body()) } catch { return .failure(error) }
     }
 
-    /// Take a found place as the area. Does not fetch — pressing Update map is
+    /// Take a found place as the area. Does not fetch — pressing Render map is
     /// still the user's decision, and a search that framed the wrong Springfield
     /// should not have cost a minute of Overpass time.
     func adopt(_ result: GeocodedPlace) {
@@ -249,6 +381,13 @@ final class MapModel {
     /// True while a snapshot is being applied, so restoring a state is never
     /// recorded as a fresh action.
     private var isRestoringState = false
+
+    /// True once launch setup — a restored session, a `--bbox` override —
+    /// has finished. The Locator starts at world scale and needs to tell a
+    /// restored session's area, arriving one SwiftUI update after the window
+    /// first appears, apart from a genuine later change: both look the same
+    /// as "the area changed" unless something says which is which.
+    private(set) var didFinishLaunchSetup = false
 
     /// Set by an action method to name the boundary its mutations make, consumed
     /// by the first record. "Choose Place" is one intention; without this it
@@ -351,7 +490,7 @@ final class MapModel {
 
         let session = snapshot.session
         stack = session.stack()
-        preset = Presets.preset(session.presetName)
+        preset = namedPreset(session.presetName)
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
         session.derived.apply(to: &derivations)
@@ -366,7 +505,7 @@ final class MapModel {
         if snapshot.sceneToken != nil, scene == nil {
             // The honest case: the history keeps every choice but only the newest
             // few maps. Saying so beats quietly spending minutes re-fetching.
-            status = "That map was let go to save memory. Press Update map to redraw it."
+            status = "That map was let go to save memory. Press Render map to redraw it."
             isError = false
         }
     }
@@ -376,7 +515,7 @@ final class MapModel {
     /// Restore what the app was doing last time.
     ///
     /// Only the choices, never the map: a saved session says which sources were
-    /// ticked and where you were looking, and pressing Update map is left to you.
+    /// ticked and where you were looking, and pressing Render map is left to you.
     /// Re-fetching on launch would mean opening the app could cost five minutes of
     /// Overpass time nobody asked for.
     func restore() {
@@ -385,7 +524,7 @@ final class MapModel {
 
         let session = Session.read(from: sessionURL)
         stack = session.stack()
-        preset = Presets.preset(session.presetName)
+        preset = namedPreset(session.presetName)
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
         session.derived.apply(to: &derivations)
@@ -395,8 +534,54 @@ final class MapModel {
         east = String(session.area.east)
         north = String(session.area.north)
 
+        // Redeem the stored permissions before anything tries to read a file.
+        reclaimFileAccess()
+
         // History begins here: opening the app is not an action to undo.
         history = SessionHistory(initial: session)
+    }
+
+    /// Take back access to the files chosen in earlier runs.
+    ///
+    /// The app is sandboxed: a saved path is text, not permission. Each
+    /// file-backed source carries a security-scoped bookmark minted when its
+    /// file was chosen, and redeeming it here is what makes the source usable
+    /// again rather than failing at fetch time with a permission error that
+    /// reads like a broken feature.
+    ///
+    /// A source whose file cannot be reclaimed is unticked and named, because
+    /// a source that silently fetches nothing is worse than one that says the
+    /// file is gone.
+    private func reclaimFileAccess() {
+        var lost: [String] = []
+        for definition in stack.definitions where definition.needsPath {
+            guard !stack.path(definition.id).isEmpty else { continue }
+            guard let bookmark = stack.bookmark(definition.id) else {
+                // Chosen before bookmarks existed. The path still works if the
+                // file happens to be somewhere the sandbox already allows.
+                continue
+            }
+            guard let resolved = SecurityScopedAccess.resolve(bookmark) else {
+                lost.append(definition.label)
+                stack.setEnabled(definition.id, false)
+                continue
+            }
+            // A moved or renamed file still resolves; the path is refreshed and
+            // a new token minted, so the next launch does not have to be stale
+            // twice.
+            if resolved.isStale {
+                stack.setPath(
+                    definition.id, resolved.url.path,
+                    bookmark: SecurityScopedAccess.bookmark(for: resolved.url)
+                )
+            }
+        }
+
+        guard !lost.isEmpty else { return }
+        isError = true
+        status = lost.count == 1
+            ? "\(lost[0]) lost access to its file. Choose it again in Sources."
+            : "\(lost.joined(separator: ", ")) lost access to their files. Choose them again in Sources."
     }
 
     /// A failure to save is worth nothing more than the settings: it must never
@@ -443,7 +628,7 @@ final class MapModel {
     /// Turning the view — pan, zoom, rotation — is deliberately kept out of
     /// the requested area, so that turning the preview frames the screen and
     /// never the file. That is right for everything except this one moment:
-    /// pressing Update map is asking the app to act on what is on screen, and
+    /// pressing Render map is asking the app to act on what is on screen, and
     /// without this it instead re-fetches whatever was last typed, so zooming
     /// out and pressing it looked like nothing happened.
     func syncAreaToVisibleView(_ bbox: BoundingBox) {
@@ -457,6 +642,48 @@ final class MapModel {
     func browseWorldMap(to bbox: BoundingBox) {
         pendingAction = ("Browse World Map", "area")
         setArea(bbox)
+    }
+
+    /// Set the area from a place clicked on the floating locator.
+    ///
+    /// A click names a point, and a point is not an area, so it is given the
+    /// same extent a pasted point gets — `LocatorSelection` defers to
+    /// `CoordinateImport` for that, so clicking Athens and pasting Athens'
+    /// coordinates frame the same place. Does not fetch: choosing where to
+    /// look is not asking for five minutes of Overpass time, the same reason
+    /// adopting a search result does not.
+    /// Set the area from a rectangle dragged out on the floating locator.
+    ///
+    /// Unlike a click, a drag states its own extent, so nothing is padded —
+    /// what was dragged is what is asked for.
+    func drawAreaOnWorldMap(_ bbox: BoundingBox) {
+        pendingAction = ("Draw Area on World Map", "area")
+        setArea(bbox)
+    }
+
+    func choosePointOnWorldMap(lat: Double, lon: Double) {
+        pendingAction = ("Choose Point", "area")
+        setArea(LocatorSelection.area(around: lat, lon: lon))
+    }
+
+    /// Widen the requested area to the shape of the window that will draw it.
+    ///
+    /// The canvas fits a map by its tighter dimension, so an area whose
+    /// proportions differ from the window's is drawn small and centred with
+    /// dead space along the other axis — a square area in a wide window fills
+    /// barely half of it. Every later fetch avoids this by asking for what is
+    /// on screen, which is already window-shaped; the first one had nothing on
+    /// screen to ask about, and so was the one map guaranteed to be the wrong
+    /// shape. The arithmetic is `AreaShaping`, which is tested; this is only
+    /// the part that knows when to apply it.
+    ///
+    /// Only ever grown, so nothing that was asked for is dropped.
+    func shapeAreaToWindow(aspect: Double?) {
+        guard let aspect, let bbox else { return }
+        let shaped = AreaShaping.shaped(bbox, toAspect: aspect)
+        guard shaped != bbox else { return }
+        pendingAction = ("Fit Area to Window", "area")
+        setArea(shaped)
     }
 
     func setArea(_ bbox: BoundingBox) {
@@ -718,12 +945,26 @@ final class MapModel {
     }
 
     private func refreshCacheSummary() async {
+        // Bound the cache here, where its size is already being asked for —
+        // after every fetch and at launch. Expiry alone never bounded it: an
+        // entry is only found stale when it is asked for again, so anything
+        // never wanted again stayed for ever and the cache only grew.
+        let evicted = await cache.enforceSizeLimit()
         let bytes = await cache.totalBytes()
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useGB]
         formatter.countStyle = .file
         await MainActor.run {
-            cacheSummary = bytes > 0 ? "cached · \(formatter.string(fromByteCount: Int64(bytes)))" : ""
+            guard bytes > 0 else {
+                cacheSummary = ""
+                return
+            }
+            let size = formatter.string(fromByteCount: Int64(bytes))
+            // Said out loud when it happens: a cache quietly deleting things
+            // is indistinguishable from a cache that never worked.
+            cacheSummary = evicted > 0
+                ? "cached · \(size) · trimmed \(evicted)"
+                : "cached · \(size)"
         }
     }
 
@@ -744,6 +985,9 @@ final class MapModel {
     /// path without a human clicking the button — driving the UI from a script needs
     /// accessibility permission this process has not been granted.
     func startIfRequestedOnLaunch() {
+        // Before `restore()`: a saved session may name a custom or plugin
+        // style, and resolving that name needs the catalogue to exist first.
+        loadPresetsAndPlugins()
         restore()
         Task { await refreshCacheSummary() }
 
@@ -754,7 +998,7 @@ final class MapModel {
 
         let arguments = ProcessInfo.processInfo.arguments
         if let flag = arguments.firstIndex(of: "--preset"), flag + 1 < arguments.count {
-            preset = Presets.preset(Presets.resolveName(arguments[flag + 1]))
+            preset = namedPreset(Presets.resolveName(arguments[flag + 1]))
         }
         // Tick extra sources on launch, so the composition can be checked from a
         // terminal: `--sources terrain_tiles` must *add* contours to the streets
@@ -796,6 +1040,7 @@ final class MapModel {
                 status = "--bbox needs four numbers: west,south,east,north"
                 isError = true
                 isRestoringState = false
+                didFinishLaunchSetup = true
                 return
             }
             setArea(BoundingBox(minLon: parts[0], minLat: parts[1], maxLon: parts[2], maxLat: parts[3]))
@@ -805,6 +1050,7 @@ final class MapModel {
         // Setup is done; from here every change — including a launch fetch when
         // it completes — is the user's history.
         isRestoringState = false
+        didFinishLaunchSetup = true
         pendingAction = nil
         if let session = currentSession() {
             history = SessionHistory(initial: session)
@@ -819,7 +1065,7 @@ final class MapModel {
         }
 
         // Exists for the same reason --search does: nobody can zoom out and
-        // click Update map in a screenshot-less environment, so this drives
+        // click Render map in a screenshot-less environment, so this drives
         // the real button code — the actual MapCanvasView, a real draw pass,
         // the same syncAreaToVisibleView and fetch the click calls — end to
         // end against a live fetch, rather than asking anyone to trust that
@@ -838,6 +1084,82 @@ final class MapModel {
                 centerLat: parts[0], centerLon: parts[1], latSpan: parts[2], lonSpan: parts[3]
             ))
             exit(0)
+        }
+        // The floating locator's two interactions, neither of which anyone can
+        // perform here: clicking a place, and pressing a zoom button. Both
+        // drive the real Coordinator and the real LocatorHandle against a real
+        // MKMapView — see `LocatorVerification` for what each can and cannot
+        // establish.
+        if arguments.contains("--verify-locator-click") {
+            let report = verifyLocatorClick()
+            print(report)
+            exit(report.contains("FAIL") ? 1 : 0)
+        }
+        // The style catalogue as the app actually assembled it — built-in,
+        // plugin-contributed and saved — plus every plugin that failed. Exists
+        // for the same reason the others do: a sidebar nobody can screenshot
+        // is a poor place to find out a plugin never loaded.
+        if arguments.contains("--plugins") {
+            print("preset store:   \(PresetStore.defaultURL().path)")
+            print("plugin folder:  \(PluginLoader.defaultUserPluginDirectory().path)")
+            print("")
+            print("built-in styles (\(Presets.names.count)):")
+            for name in Presets.names { print("  \(name)") }
+            print("plugin styles (\(pluginPresets.count)):")
+            for preset in pluginPresets { print("  \(preset.name)") }
+            print("saved styles (\(customPresets.count)):")
+            for preset in customPresets { print("  \(preset.name)") }
+            print("")
+            print("plugins loaded (\(loadedPlugins.count)):")
+            for plugin in loadedPlugins { print("  \(plugin.id) — \(plugin.name)  [\(plugin.origin)]") }
+            print("plugins refused (\(pluginLoadErrors.count)):")
+            for note in pluginLoadErrors { print("  \(note)") }
+            exit(pluginLoadErrors.isEmpty ? 0 : 1)
+        }
+        // Save the current style under a name, without a sidebar to click.
+        if let flag = arguments.firstIndex(of: "--save-preset"), flag + 1 < arguments.count {
+            let saved = saveCurrentStyleAsPreset(named: arguments[flag + 1])
+            print(status)
+            exit(saved ? 0 : 1)
+        }
+        if arguments.contains("--verify-locator-drag") {
+            let report = verifyLocatorDrag()
+            print(report)
+            exit(report.contains("FAIL") ? 1 : 0)
+        }
+        if arguments.contains("--verify-locator-pen") {
+            let report = verifyForgivingClick()
+            print(report)
+            exit(report.contains("FAIL") ? 1 : 0)
+        }
+        if arguments.contains("--verify-locator-zoom") {
+            let report = verifyLocatorZoomButtons()
+            print(report)
+            exit(report.contains("FAIL") ? 1 : 0)
+        }
+        // …and the join between them and the button: click a place, press
+        // Render map, see whether that place is what comes back.
+        if let flag = arguments.firstIndex(of: "--verify-locator-fetch"), flag + 1 < arguments.count {
+            let parts = arguments[flag + 1].split(separator: ",").compactMap { Double($0) }
+            guard parts.count == 2 else {
+                print("error: --verify-locator-fetch needs lat,lon")
+                exit(2)
+            }
+            verifyLocatorClickThenUpdate(lat: parts[0], lon: parts[1])
+            return
+        }
+        if arguments.contains("--verify-locator-launch") {
+            print(verifyLocatorLaunchSequence(
+                defaultBBox: BoundingBox(minLon: 25.32, minLat: 36.33, maxLon: 25.50, maxLat: 36.48),
+                restoredBBox: BoundingBox(minLon: 38.65, minLat: 8.90, maxLon: 38.88, maxLat: 9.10)
+            ))
+            exit(0)
+        }
+        // Does the drawn map fill the window it is drawn in? A ratio, so it
+        // needs no eyes — see `verifyFillsWindow`.
+        if let flag = arguments.firstIndex(of: "--verify-fills-window"), flag + 1 < arguments.count {
+            verifyFillsWindow(aspect: Double(arguments[flag + 1]) ?? 16.0 / 9.0)
+            return
         }
         if let flag = arguments.firstIndex(of: "--verify-zoom-then-update"), flag + 1 < arguments.count {
             let factor = Double(arguments[flag + 1]) ?? 0.5
@@ -861,7 +1183,181 @@ final class MapModel {
         renderWhenReady(to: URL(fileURLWithPath: arguments[flag + 1]))
     }
 
-    /// Prove, against a real fetch, that zooming out and pressing Update map
+    /// Measure how much of the window the drawn map actually fills, before and
+    /// after shaping the area to the window.
+    ///
+    /// This is the complaint made concrete. "The map is a small square in the
+    /// middle of a big window" is a statement about a ratio, and a ratio can be
+    /// computed without anyone looking at anything: fit the scene exactly as
+    /// the canvas fits it — the real `CanvasTransform`, at a real canvas size —
+    /// then ask how wide and how tall the drawn content came out as a fraction
+    /// of the canvas. A well-shaped map fills everything the fit margin leaves,
+    /// about 88% each way. The square-in-a-wide-window case fills far less on
+    /// one axis, and that number is the bug.
+    private func verifyFillsWindow(aspect: Double) {
+        let size = CGSize(width: 1600, height: 1600 / aspect)
+
+        /// What fraction of the canvas the drawn content covers, each way.
+        func fill(of scene: RenderScene) -> (width: Double, height: Double)? {
+            guard let bounds = scene.contentBounds,
+                  let transform = CanvasTransform(contentBounds: bounds, size: size)
+            else { return nil }
+            let corners = [
+                Coordinate(x: bounds.minX, y: bounds.minY), Coordinate(x: bounds.maxX, y: bounds.minY),
+                Coordinate(x: bounds.maxX, y: bounds.maxY), Coordinate(x: bounds.minX, y: bounds.maxY),
+            ].map(transform.worldToScreen)
+            let xs = corners.map(\.x)
+            let ys = corners.map(\.y)
+            guard let minX = xs.min(), let maxX = xs.max(),
+                  let minY = ys.min(), let maxY = ys.max()
+            else { return nil }
+            return ((maxX - minX) / size.width, (maxY - minY) / size.height)
+        }
+
+        Task { [weak self] in
+            // Explicitly isolated: a nested function does not inherit the
+            // enclosing closure's actor the way the closure inherits it from
+            // the method.
+            @MainActor func settle() async -> RenderScene? {
+                for _ in 0..<3000 {
+                    try? await Task.sleep(for: .milliseconds(100))
+                    guard let self else { return nil }
+                    if !self.isFetching, self.scene != nil || self.isError { break }
+                }
+                return self?.scene
+            }
+
+            guard let self else { return }
+            print(String(format: "canvas: %.0f × %.0f  (aspect %.3f)", size.width, size.height, aspect))
+            print("area as asked for:  \(self.bbox.map { "\($0)" } ?? "none")")
+
+            self.fetch()
+            guard let before = await settle(), let filledBefore = fill(of: before) else {
+                FileHandle.standardError.write(Data("nothing was drawn: \(self.status)\n".utf8))
+                exit(1)
+            }
+            print(String(
+                format: "  fills %.1f%% of the width, %.1f%% of the height",
+                filledBefore.width * 100, filledBefore.height * 100
+            ))
+
+            // The button's own code path, on a window of this shape.
+            self.shapeAreaToWindow(aspect: aspect)
+            print("area shaped to window: \(self.bbox.map { "\($0)" } ?? "none")")
+
+            self.fetch()
+            guard let after = await settle(), let filledAfter = fill(of: after) else {
+                FileHandle.standardError.write(Data("nothing was drawn: \(self.status)\n".utf8))
+                exit(1)
+            }
+            print(String(
+                format: "  fills %.1f%% of the width, %.1f%% of the height",
+                filledAfter.width * 100, filledAfter.height * 100
+            ))
+
+            // The fit leaves a 6% margin each side, so ~88% each way is a map
+            // filling everything it is allowed to fill. Anything much under
+            // that on one axis is the letterbox this is meant to remove.
+            let floor = 0.80
+            let filled = min(filledAfter.width, filledAfter.height)
+            print(String(format: "smaller of the two: %.1f%%  (needs %.0f%%)", filled * 100, floor * 100))
+            guard filled >= floor else {
+                FileHandle.standardError.write(
+                    Data("FAIL: the map still does not fill the window\n".utf8)
+                )
+                exit(1)
+            }
+            print("PASS: the map fills the window it is drawn in.")
+            exit(0)
+        }
+    }
+
+    /// Prove, against a real fetch, that clicking a place on the floating
+    /// locator is enough to make Render map draw *that* place.
+    ///
+    /// The two halves are each verified on their own — `--verify-locator-click`
+    /// checks that a click resolves to the place under it, and the model's
+    /// tests check that an area becomes a fetch — but the join between them is
+    /// the thing that was actually missing, and a join is exactly what
+    /// separate checks do not cover. So this runs the whole chain the way the
+    /// panel runs it: the real `Coordinator` converting a real click on a real
+    /// laid-out map, the real closure the panel installs, the real
+    /// `choosePointOnWorldMap`, and then the same `update()` the button calls,
+    /// against the live network.
+    private func verifyLocatorClickThenUpdate(lat: Double, lon: Double) {
+        // A wide view of the region, as the panel's map would be after zooming
+        // in from the whole world — then a click on its exact middle, which is
+        // the one point whose answer is known without trusting the projection.
+        let size = CGSize(width: 700, height: 560)
+        let mapView = MKMapView(frame: CGRect(origin: .zero, size: size))
+        let coordinator = Locator.Coordinator(onRegionChanged: nil)
+        mapView.delegate = coordinator
+        mapView.layoutSubtreeIfNeeded()
+        coordinator.isSettingRegionProgrammatically = true
+        mapView.setRegion(
+            MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+                span: MKCoordinateSpan(latitudeDelta: 6, longitudeDelta: 6)
+            ),
+            animated: false
+        )
+        mapView.layoutSubtreeIfNeeded()
+
+        // Exactly the closure `LocatorPanelContent` installs.
+        coordinator.onPointSelected = { [weak self] clickedLat, clickedLon in
+            self?.choosePointOnWorldMap(lat: clickedLat, lon: clickedLon)
+        }
+
+        let before = bbox
+        guard let clicked = coordinator.selectPoint(
+            at: CGPoint(x: size.width / 2, y: size.height / 2), in: mapView
+        ) else {
+            FileHandle.standardError.write(Data("the click resolved to no coordinate\n".utf8))
+            exit(1)
+        }
+
+        print(String(format: "asked to click:     %.5f, %.5f", lat, lon))
+        print(String(format: "the click resolved: %.5f, %.5f", clicked.latitude, clicked.longitude))
+        print("area before the click: \(before.map { "\($0)" } ?? "none")")
+        guard let after = bbox else {
+            FileHandle.standardError.write(Data("the click left no area to fetch\n".utf8))
+            exit(1)
+        }
+        print(String(
+            format: "area after the click:  %.5f,%.5f -> %.5f,%.5f  (%.4f° × %.4f°)",
+            after.minLon, after.minLat, after.maxLon, after.maxLat,
+            abs(after.lonSpan), abs(after.latSpan)
+        ))
+        guard after.minLat < clicked.latitude, clicked.latitude < after.maxLat,
+              after.minLon < clicked.longitude, clicked.longitude < after.maxLon
+        else {
+            FileHandle.standardError.write(Data("the area does not contain the place clicked\n".utf8))
+            exit(1)
+        }
+
+        // And now the button itself, on the area the click left behind.
+        print("pressing Render map…")
+        update()
+        Task { [weak self] in
+            for _ in 0..<3000 {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard let self else { return }
+                if !self.isFetching, self.scene != nil || self.isError { break }
+            }
+            guard let self else { return }
+            guard let scene = self.scene, !self.isError else {
+                FileHandle.standardError.write(Data("nothing was drawn: \(self.status)\n".utf8))
+                exit(1)
+            }
+            let features = scene.layers.reduce(0) { $0 + $1.geometries.count }
+            print("drawn: \(features) geometries over \(scene.layers.count) layers")
+            print("scene covers: \(scene.bbox)")
+            print(self.status)
+            exit(0)
+        }
+    }
+
+    /// Prove, against a real fetch, that zooming out and pressing Render map
     /// fetches more than was there before — the exact claim nobody can watch
     /// someone click. Runs the production code, not a re-implementation of it:
     /// a real `MapCanvasView`, pushed through a real `draw(_:)` into an
