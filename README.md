@@ -18,8 +18,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built, and the window has never been looked at.** Every
 online source, the composing source stack, the sixteen presets, illuminated
 contours, relief shading, the three-column interface and the exports are in,
-with 721 tests and
-the output checked against real ground. See `KICKOFF.md` for the brief.
+with 721 tests and the output checked against real ground.
 
 Every claim here is backed by a test or by a render someone can open. **None of
 them is a claim about the interface**, because this environment has no Screen

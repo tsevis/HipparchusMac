@@ -18,9 +18,14 @@ xcuserdata/
 /out/
 *.png.actual
 
-# Notes for a version that does not exist yet. Deliberately local: they are
-# thinking, not a record of this one.
+# Working notes, deliberately local. The brief and the handoffs are how this
+# gets built, not what it is; they name paths on one machine, argue with
+# themselves, and read as instructions to whoever picks the work up next. The
+# README is the document for anyone else.
 /docs not to push/
+/KICKOFF.md
+/HANDOFF.md
+/HANDOFF_NEXT.md
 
 # macOS
 .DS_Store
