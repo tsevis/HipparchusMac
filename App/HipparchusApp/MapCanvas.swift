@@ -145,9 +145,9 @@ final class MapCanvasView: NSView {
         context.restoreGState()
 
         if let selection {
-            NSColor.controlAccentColor.withAlphaComponent(0.15).setFill()
+            NSColor.hipparchus.withAlphaComponent(0.15).setFill()
             selection.fill()
-            NSColor.controlAccentColor.setStroke()
+            NSColor.hipparchus.setStroke()
             let path = NSBezierPath(rect: selection)
             path.lineWidth = 1.5
             path.stroke()

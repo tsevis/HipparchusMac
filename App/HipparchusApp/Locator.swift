@@ -342,8 +342,8 @@ struct Locator: NSViewRepresentable {
                 layer = band
             } else {
                 layer = CAShapeLayer()
-                layer.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
-                layer.strokeColor = NSColor.controlAccentColor.cgColor
+                layer.fillColor = NSColor.hipparchus.withAlphaComponent(0.18).cgColor
+                layer.strokeColor = NSColor.hipparchus.cgColor
                 layer.lineWidth = 1.5
                 layer.lineDashPattern = [4, 3]
                 // Above the map's own tiles and overlays.
@@ -406,9 +406,9 @@ struct Locator: NSViewRepresentable {
                 return MKOverlayRenderer(overlay: overlay)
             }
             let renderer = MKPolygonRenderer(polygon: polygon)
-            renderer.strokeColor = .controlAccentColor
+            renderer.strokeColor = .hipparchus
             renderer.lineWidth = 2
-            renderer.fillColor = NSColor.controlAccentColor.withAlphaComponent(0.18)
+            renderer.fillColor = NSColor.hipparchus.withAlphaComponent(0.18)
             return renderer
         }
     }

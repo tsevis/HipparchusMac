@@ -35,7 +35,14 @@ TARGET = (ROOT / "App/HipparchusApp/Resources/Assets.xcassets"
 #: Left edge starts just off the west coast so Paphos sits in from the
 #: margin; the top is below the Troodos ridge, so the northern half of the
 #: island and its long sea gap never appear.
-CROP = (40, 470, 808, 770)
+#:
+#: Every edge sits *inside* the frame the renderer draws around the map —
+#: white lines at x=57 and x=1222, y=116 and y=843 in this export. The first
+#: version began at x=40, which put the left frame line in shot as a bright
+#: vertical rule down the splash. The bounds are asserted below rather than
+#: trusted, because the frame moves if the export size ever changes.
+FRAME = (57, 116, 1222, 843)
+CROP = (60, 470, 1012, 842)
 
 #: The About header is 640x250pt, so 2x wants 1280x500.
 OUTPUT = (1280, 500)
@@ -51,6 +58,10 @@ def main() -> int:
         sys.exit(f"no source artwork at {SOURCE}")
 
     image = Image.open(SOURCE).convert("RGB")
+    if not (CROP[0] > FRAME[0] and CROP[1] > FRAME[1]
+            and CROP[2] < FRAME[2] and CROP[3] < FRAME[3]):
+        sys.exit(f"crop {CROP} touches the rendered frame {FRAME} — "
+                 "its border would show as a line across the artwork")
     expected = (CROP[2] - CROP[0]) / (CROP[3] - CROP[1])
     if abs(expected - OUTPUT[0] / OUTPUT[1]) > 0.01:
         sys.exit(f"crop aspect {expected:.3f} does not match output "
