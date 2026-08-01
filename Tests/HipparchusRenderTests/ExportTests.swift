@@ -61,6 +61,42 @@ final class SVGExportTests: XCTestCase {
         XCTAssertTrue(bandGroup.contains("fill=\"\(style.fillColorHigh!.hex)\""))
     }
 
+    /// A fill colour carries its own alpha and `hex` is only three channels of
+    /// it. Core Graphics honours the alpha, so the PNG and the PDF have always
+    /// drawn a translucent wash where the SVG drew a solid slab — the same
+    /// picture has to come out of all three, and relief shading is a translucent
+    /// wash by construction.
+    func testATranslucentFillKeepsItsAlphaInTheExport() throws {
+        var style = Sample.style(TerrainLayer.elevationBands)
+        style.fillColor = RGBAColor(120, 130, 140, 64)
+        style.fillColorHigh = RGBAColor(200, 40, 40, 255)
+
+        var profile = Sample.preset.styleProfile
+        profile.layerStyles[TerrainLayer.elevationBands] = style
+        let preset = ArtisticPreset(
+            name: "translucent",
+            geometryProfile: Sample.preset.geometryProfile,
+            styleProfile: profile
+        )
+        let scene = try SceneBuilder(options: SceneBuilder.Options(preset: preset))
+            .build(from: Sample.collection())
+        let svg = SVGExporter().svg(for: scene)
+
+        let bandGroup = try XCTUnwrap(group(named: TerrainLayer.elevationBands, in: svg))
+        let quoted = try XCTUnwrap(
+            bandGroup.components(separatedBy: "fill-opacity=\"").dropFirst().first,
+            "a 64/255 fill exported opaque; alpha was dropped on the way out"
+        )
+        let written = try XCTUnwrap(Double(quoted.prefix { $0 != "\"" }))
+        XCTAssertEqual(written, 64.0 / 255.0, accuracy: 1e-4)
+        // An opaque fill says nothing, rather than saying "1" on every path.
+        let opaquePath = bandGroup
+            .components(separatedBy: "<path ")
+            .first { $0.contains("fill=\"\(RGBAColor(200, 40, 40).hex)\"") }
+        XCTAssertNotNil(opaquePath)
+        XCTAssertFalse(opaquePath?.contains("fill-opacity") ?? true, "an opaque fill needs no attribute")
+    }
+
     func testContoursAreStrokedNotFilled() throws {
         let svg = try self.svg()
         let contourGroup = try XCTUnwrap(group(named: TerrainLayer.minorContours, in: svg))

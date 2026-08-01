@@ -171,13 +171,23 @@ public struct SVGExporter: Sendable {
             // `hasArea`, not just the style: a layer that fills may still hold open
             // lines, and an editor filling one closes it with an invisible chord.
             let isFilled = style.fillEnabled && geometry.hasArea
-            let fill = isFilled ? layer.fillColor(at: index).hex : "none"
+            let fillColor = layer.fillColor(at: index)
+            let fill = isFilled ? fillColor.hex : "none"
 
             for data in pathData(for: geometry, transform: transform) {
                 out += "      <path d=\"\(data)\" fill=\"\(fill)\""
                 if isFilled {
                     // Even-odd, so a hole in an elevation band stays a hole.
                     out += " fill-rule=\"evenodd\""
+                    // A fill colour carries its own alpha and `hex` is only three
+                    // channels of it. Dropping it here is how a translucent wash
+                    // on screen became a solid slab in the export: Core Graphics
+                    // honours the alpha, so the PNG and the PDF have always been
+                    // right and only the SVG disagreed. It has to be the same
+                    // picture out of all three.
+                    if fillColor.a < 255 {
+                        out += " fill-opacity=\"\(format(Double(fillColor.a) / 255.0))\""
+                    }
                 }
                 if width > 0 && style.strokeColor.a > 0 {
                     out += " stroke=\"\(stroke)\" stroke-width=\"\(format(width))\""
