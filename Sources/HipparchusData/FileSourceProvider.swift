@@ -218,9 +218,10 @@ public enum FileFormat: String, Sendable, Equatable {
 /// the layers whose online source has an offline file counterpart: a saved
 /// earthquake catalogue, an exported ground track, a polygonised hillshade.
 ///
-/// The list is `ALL_OPTIONAL_LAYERS` from the Python's `optional_providers.py`,
-/// and `terrain_hillshade` earns its place in the draw order here: no provider
-/// computes one, so a file naming it is the one way the layer ever fills.
+/// The list is `ALL_OPTIONAL_LAYERS` from the Python's `optional_providers.py`.
+/// `terrain_hillshade` stays in it now that `TerrainTileProvider` computes one
+/// as well: a shade polygonised in QGIS and named in a file is still a perfectly
+/// good way to fill the layer, and it was the only way until recently.
 public enum FileLayer {
     public static let adminBoundaries = "admin_boundaries"
 

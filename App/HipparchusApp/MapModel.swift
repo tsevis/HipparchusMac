@@ -971,6 +971,16 @@ final class MapModel {
                 if let bands = overrides["elevationBandCount"]?.intValue {
                     settings.elevationBandCount = bands
                 }
+                // Only a setting the user actually changed arrives here, so the
+                // shading stays off until it is asked for by name.
+                settings.emitHillshade = overrides["emitHillshade"]?.stringValue == "on"
+                settings.sun = SunPosition(
+                    azimuthDegrees: overrides["sunAzimuth"]?.doubleValue ?? settings.sun.azimuthDegrees,
+                    altitudeDegrees: overrides["sunAltitude"]?.doubleValue ?? settings.sun.altitudeDegrees
+                )
+                if let stretch = overrides["hillshadeExaggeration"]?.doubleValue, stretch > 0 {
+                    settings.hillshadeExaggeration = stretch
+                }
                 providers.append(TerrainTileProvider(settings: settings))
 
             case SourceID.usgsEarthquakes:

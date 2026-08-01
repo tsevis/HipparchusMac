@@ -72,6 +72,10 @@ func usage() -> Never {
     Options:
       --out <dir>        where to write files (default: ./out)
       --pixels <n>       sampling width to aim for (default: 1200)
+      --hillshade        shade the relief, banded into filled polygons
+      --sun <az,alt>     where the light comes from (default: 315,45)
+      --exaggeration <x> stretch the relief before lighting it (default: 1)
+      --shade-bands <n>  tones between shadow and light (default: 7)
       --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
       --quality <key>    \(Quality.keys.joined(separator: ", "))
       --list-presets     print the preset names and exit
@@ -95,6 +99,10 @@ struct Options {
     var preset = SceneBuilder.Options().preset
     var quality = Quality.default
     var furniture = false
+    var hillshade = false
+    var sun = SunPosition()
+    var exaggeration = 1.0
+    var shadeBands = TerrainTileSettings().hillshadeBandCount
 }
 
 var options = Options()
@@ -113,6 +121,30 @@ while argumentIndex < arguments.count {
         options.targetPixels = value
     case "--no-files":
         options.writeFiles = false
+    case "--hillshade":
+        options.hillshade = true
+    case "--sun":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        let parts = arguments[argumentIndex]
+            .split(separator: ",")
+            .compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+        guard parts.count == 2 else {
+            print("error: --sun needs two numbers: azimuth,altitude")
+            exit(2)
+        }
+        options.sun = SunPosition(azimuthDegrees: parts[0], altitudeDegrees: parts[1])
+        options.hillshade = true
+    case "--exaggeration":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count, let value = Double(arguments[argumentIndex]) else { usage() }
+        options.exaggeration = value
+        options.hillshade = true
+    case "--shade-bands":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count, let value = Int(arguments[argumentIndex]) else { usage() }
+        options.shadeBands = value
+        options.hillshade = true
     case "--furniture":
         // Everything on at once, because this flag exists to look at the result:
         // the title block, the scale bar, the north arrow and the legend, framed
@@ -197,6 +229,10 @@ enum CLIError: Error, CustomStringConvertible {
 func run(_ place: Place, options: Options) async throws {
     var settings = TerrainTileSettings()
     settings.targetPixels = options.targetPixels
+    settings.emitHillshade = options.hillshade
+    settings.sun = options.sun
+    settings.hillshadeExaggeration = options.exaggeration
+    settings.hillshadeBandCount = options.shadeBands
 
     print("\(place.name)  \(place.bbox.minLon), \(place.bbox.minLat) -> \(place.bbox.maxLon), \(place.bbox.maxLat)")
     print("  expected: \(place.expected)")
@@ -223,6 +259,13 @@ func run(_ place: Place, options: Options) async throws {
     )).build(from: collection)
     print("  \(scene.summary)   fetched in \(fetched.formattedSeconds)")
     print("  \(options.preset.name) · \(options.quality.label)")
+    if options.hillshade {
+        print(String(
+            format: "  sun %.0f° at %.0f° · exaggeration %.2g · %.0f tones",
+            options.sun.azimuthDegrees, options.sun.altitudeDegrees, options.exaggeration,
+            collection.metadata["hillshade_band_count"]?.doubleValue ?? 0
+        ))
+    }
     for layer in scene.layers {
         let count = layer.featureCount
         // Illumination turns one contour into several runs, so the drawn count and

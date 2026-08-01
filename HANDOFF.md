@@ -123,9 +123,13 @@ advertising a look it does not have:
   is already written there: OSM splits a street into one way per block, so keeping
   only the longest run per name puts the label where the street is most legible
   instead of stamping it down the road forty times.
-- **`terrain_hillshade`** — named in the draw order and the layer panel, produced
-  by nothing. Decide whether it should exist at all; if not, remove it rather than
-  leaving a row that can never fill.
+- ~~**`terrain_hillshade`** — named in the draw order and the layer panel, produced
+  by nothing.~~ **Done.** The terrain provider now computes one from the elevation
+  grid it already fetches and bands it into filled polygons, so the row fills.
+  `Sources/HipparchusGeometry/Hillshade.swift`. It has no Python counterpart —
+  that repo names the layer in three places and produces it in none — so it is a
+  divergence in the port's favour, pinned against the published ESRI/GDAL
+  formulation rather than against the Python.
 
 ### 4. Smaller things, in no particular order
 

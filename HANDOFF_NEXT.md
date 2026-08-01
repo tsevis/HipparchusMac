@@ -65,19 +65,33 @@ you would print and frame.
 |---|---|
 | Export 24×36 in @ 300 DPI | **Gap.** `exportPNG` is hardcoded `CGSize(2400, 1800)`. SVG has paper presets and orientation in `CompositionPanel`; PNG and PDF have no physical size at all. |
 | 3D terrain, sun angle, exaggeration | **Half.** `LayerStyle` already carries `illumination`, `illuminationAzimuth`, `illuminationBands`, lit/shadow scales, and `Illumination.swift` implements it — but per-layer and per-preset, with no live control. |
-| Hillshade | **Gap, and a real one.** `TerrainLayer.hillshade` exists in the draw order and in `FileLayer.all`, but `TerrainTileProvider` says plainly: "No provider computes a hillshade; the layer exists for file sources." The provider already has the elevation grid. This is the highest visual payoff on the list. |
+| Hillshade | **Done.** `Hillshade.swift` computes one by Horn's method from the elevation grid the terrain provider already fetches; the provider bands it into filled polygons carrying `band_index`, so the existing two-stop fill ramp colours it with no renderer change. Off by default — Elevation → Relief shading, with sun bearing, sun height and relief stretch beside it. |
 | 80+ palettes | **Different shape.** We have 16 built-in presets plus plugin packs, where a preset is a whole sheet. A *palette* — recolour without restyling — is a separate axis we do not have. |
 | Layer toggles, line weights | **Toggles yes** (`LayersPanel`), **weights no**: stroke widths are per-preset, not adjustable live. A single global weight scale would be a small knob with a large effect. |
 
 ## Suggested work, in the order I would do it
 
-1. **Hillshade from the elevation grid we already fetch.** `TerrainTileProvider`
-   builds a `Field2D` of elevations; a standard hillshade is a slope/aspect
-   calculation over it against a sun azimuth and altitude. It fills a layer
-   that already exists everywhere in the pipeline — draw order, layer
-   inventory, every preset's style table — so nothing downstream needs
-   inventing. Test it the way `Illumination` and `Contours` are tested, with a
-   parity fixture; there are four such fixtures already (`Scripts/generate-*-parity-fixture.py`).
+1. ~~**Hillshade from the elevation grid we already fetch.**~~ **Done.** Some of
+   it went differently from the sketch above, and the differences are the useful
+   part:
+
+   - There was **nothing to be in parity with**. The Python names
+     `terrain_hillshade` in three places and computes it in none, so the fixture
+     pins the published ESRI/GDAL slope–aspect–zenith formulation instead, in
+     numpy, against a dot-product derivation in Swift. Two pieces of algebra for
+     one number, agreeing to 1e-12 over 6,864 cells.
+   - **No preset styles it**, and `PresetTables.swift` is generated from the
+     Python — so the style is derived in `StyleProfile.derivedHillshade` rather
+     than by editing a generated file or adding dead data to the other repo.
+   - The derivation has to ask what is **underneath** the shade, not what colour
+     the paper is. `Night` pairs near-black paper with near-white elevation
+     bands; judged by its background it puts a white highlight onto white bands
+     and shades nothing.
+   - It exposed a real export bug: **SVG dropped the alpha of every fill**
+     (`fill="#rrggbb"` only), while Core Graphics honoured it. Any translucent
+     fill — `satellite_footprints` at alpha 30, `night_lights` at 90, anything
+     using `LayerStyle`'s default 200 — has been exporting opaque. Fixed by
+     writing `fill-opacity`.
 
 2. **Export at a real size.** A paper size and a DPI, applied to PNG and PDF
    as they already are to SVG. `SVGExporter.Composition` has `paper_preset`
@@ -96,8 +110,13 @@ you would print and frame.
    engine, it just runs at build time. Moving it into the app would make
    "any style in any palette" real rather than combinatorial.
 
-5. **Sun angle and exaggeration as controls**, once (1) exists — they are the
-   knobs a hillshade wants, and the illumination fields are already there.
+5. **Sun angle and exaggeration as controls** — mostly landed with (1): sun
+   bearing, sun height and relief stretch are declared knobs on the Elevation
+   source, so they render themselves in the sidebar and persist in the session.
+   What is *not* done is making them live — they are a fetch setting, so moving
+   the sun refetches rather than relighting what is already in memory. The shade
+   field could be recomputed and rebanded from the grid alone, if the grid were
+   kept.
 
 ## What a plugin is here
 
@@ -135,6 +154,16 @@ The house pattern is headless flags driving production code:
 --bbox … --preset … --render-to out.png
 ```
 
+The SwiftPM CLI is the faster loop for anything about what a sheet *looks*
+like, because it fetches, renders and writes a PNG you can open — build it
+release or the contour tracer runs about thirty times slower:
+
+```
+swift build -c release
+.build/release/hipparchus-cli everest --hillshade --preset "Relief Sheet" --out out
+.build/release/hipparchus-cli everest --sun 135,25 --exaggeration 2 --out out
+```
+
 Run `swift test` after touching `Sources/`. A run started with any of those
 flags **does not save the session** — that was a real bug: artwork renders
 were writing their own preset into the user's session, and the app kept
@@ -150,6 +179,18 @@ reopening on a style of nowhere they had chosen.
 - `⌘1`–`⌘9` reaches only the first nine of sixteen saved places.
 - Hawaii and the Dominican Republic are large enough that Overpass declines
   them; terrain renders fine. That is correct behaviour, not a bug.
+- The hillshade has been looked at on Everest (Hypsometric Relief) and San
+  Francisco (Night), as PNGs, and never in the window. Nobody has seen it on
+  gentle ground, on the four style packs, or over a city.
+- Shading costs about 0.16 s on Everest in release — 0.95 s to 1.11 s — but it
+  is the heaviest layer in the *export*: 1,150 SVG paths and 1.5 MB against the
+  elevation bands' 103 paths, because banding a derivative gives complex
+  boundaries even after decimation and two smoothing passes.
+  `hillshadeGridMaxPixels` and `hillshadeSmoothingPasses` are the knobs.
+- The fully-lit tone exports as ~86 paths at `fill-opacity="0"` — 94 KB that
+  draw nothing, and an invisible shape to click on in an editor. Small enough
+  to leave; a general "skip a path that neither fills nor strokes visibly" rule
+  in `SVGExporter` would remove it.
 
 ## Tone
 

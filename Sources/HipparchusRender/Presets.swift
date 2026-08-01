@@ -1,4 +1,5 @@
 import Foundation
+import HipparchusData
 import HipparchusGeometry
 
 /// The preset system: what a map should look like.
@@ -70,11 +71,85 @@ public struct StyleProfile: Sendable {
     /// instead of silently not rendering.
     public func style(for layer: String) -> LayerStyle {
         if let style = layerStyles[layer] { return style }
+        // The one layer with a better answer than a hairline: a hairline round
+        // every tone of a hillshade would draw the seams and none of the shade.
+        if layer == TerrainLayer.hillshade { return derivedHillshade }
+
         var fallback = LayerStyle()
         fallback.fillEnabled = false
         fallback.strokeWidth = 0.5
         fallback.strokeColor = RGBAColor(120, 120, 120, 200)
         return fallback
+    }
+
+    /// Relief shading for a preset that has never heard of it.
+    ///
+    /// Every one of the sixteen built-in presets predates the hillshade —
+    /// `PresetTables.swift` is generated from the Python registry, and the Python
+    /// names this layer without ever producing one — so none of them says
+    /// anything about how it should look. Rather than edit a generated file, or
+    /// add dead style data to the other repo, the shade is derived from what the
+    /// preset already chose.
+    ///
+    /// It is derived as a **wash that adds one tone and leaves the other alone**,
+    /// which is the part that is easy to get wrong. Relief shading is drawn over
+    /// the elevation bands, the water and the land cover — not over the
+    /// background — so the untouched end of the ramp has to be *nothing at all*,
+    /// carried as zero alpha. Setting it to the background colour instead paints
+    /// the paper over whatever the map had already put there, and the sheet goes
+    /// flat and grey while every individual colour still looks reasonable.
+    ///
+    /// Which end is the untouched one depends on what is underneath. Pale ground
+    /// takes shadow: dark where it turns away, nothing where it faces the sun.
+    /// Dark ground takes light: nothing in the shadows, which are already dark,
+    /// and a highlight on the faces that catch the sun. Getting that backwards
+    /// does not fail loudly — it produces a sheet where every colour is defensible
+    /// and the relief reads inside out.
+    ///
+    /// "Underneath" is answerable rather than guessable: the hillshade sits
+    /// directly above `elevation_bands` in the draw order, so that layer's fill
+    /// *is* the ground, and the background only governs when the bands are not
+    /// filled. Asking the background instead is wrong on any preset that pairs
+    /// dark paper with a pale sheet — `Night` does exactly that, and judging by
+    /// its background alone puts a white highlight onto near-white bands and
+    /// shades nothing at all.
+    ///
+    /// A preset or plugin that *does* name `terrain_hillshade` overrides all of
+    /// this and is used as written.
+    public var derivedHillshade: LayerStyle {
+        var style = LayerStyle()
+        // Bands share their edges. Stroking them draws every seam between tones,
+        // which is the one thing shading must not have.
+        style.strokeWidth = 0.0
+        style.fillEnabled = true
+
+        // The ground as it actually ends up: a band fill that is not opaque is
+        // sitting on the background, so the two are mixed rather than one chosen.
+        var ground = background
+        if let bands = layerStyles[TerrainLayer.elevationBands], bands.fillEnabled {
+            ground = background.mixed(towards: bands.fillColor, amount: Double(bands.fillColor.a) / 255.0)
+        }
+
+        // Rec. 601 luma, the cheap standard answer to "is this light or dark",
+        // and it agrees with the eye on every preset here.
+        let luma = (299.0 * Double(ground.r) + 587.0 * Double(ground.g)
+            + 114.0 * Double(ground.b)) / 255_000.0
+
+        if luma >= 0.5 {
+            // Band 0 is the deepest shadow, the last band the brightest.
+            style.fillColor = RGBAColor(0, 0, 0, 140)
+            style.fillColorHigh = RGBAColor(0, 0, 0, 0)
+        } else {
+            style.fillColor = RGBAColor(255, 255, 255, 0)
+            style.fillColorHigh = RGBAColor(255, 255, 255, 105)
+        }
+        // Under the contours, not over them: relief is what the linework is drawn
+        // on, and at full strength it buries the map it is supporting. The
+        // deepest band lands at a little under a third of full black, which is
+        // enough to lift a ridge off the page and not enough to muddy the
+        // hypsometric colour underneath it.
+        style.opacity = 0.55
+        return style
     }
 }
 

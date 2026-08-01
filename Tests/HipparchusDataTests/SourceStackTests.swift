@@ -167,8 +167,14 @@ final class SourceStackTests: XCTestCase {
 
     func testDeclaredSettingsComeBackWithDefaults() throws {
         let settings = SourceStack().settings(for: SourceID.terrainTiles)
-        XCTAssertEqual(settings.map(\.key), ["interval", "bands"])
+        XCTAssertEqual(
+            settings.map(\.key),
+            ["interval", "bands", "shading", "sun", "sunheight", "relief"]
+        )
         XCTAssertEqual(settings.first?.value, .number(0))
+        // Shading is a choice about the drawing rather than a fact about the
+        // ground, so it starts off and is asked for by name.
+        XCTAssertEqual(settings.first { $0.key == "shading" }?.value, .text("off"))
     }
 
     func testAnOverrideReplacesTheDefault() throws {

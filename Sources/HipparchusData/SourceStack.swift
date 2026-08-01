@@ -1,4 +1,5 @@
 import Foundation
+import HipparchusGeometry
 
 /// Composable map sources.
 ///
@@ -226,7 +227,7 @@ public struct SourceStack: Sendable, Equatable {
         SourceDefinition(
             id: SourceID.terrainTiles,
             label: "Elevation",
-            subtitle: "contours · bands · summits",
+            subtitle: "contours · bands · shading · summits",
             provenance: .measured,
             settings: [
                 // Zero means "choose a round interval from the relief actually in
@@ -236,6 +237,22 @@ public struct SourceStack: Sendable, Equatable {
                               attribute: "contourIntervalMetres"),
                 SourceSetting("bands", "Bands", .number, .integer(10),
                               attribute: "elevationBandCount"),
+                // Off by default: shading lands under the contours and changes
+                // the look of every sheet, which is a choice about the drawing
+                // rather than a fact about the ground.
+                SourceSetting("shading", "Relief shading", .choice, .text("off"),
+                              choices: [.text("off"), .text("on")], attribute: "emitHillshade"),
+                // North-west at 45° is the cartographic convention, and it is one
+                // for a reason: lit from the south-east most readers see the
+                // valleys as ridges. The knob is here because the convention is
+                // occasionally the wrong answer for a particular piece of ground,
+                // not because it is a free choice.
+                SourceSetting("sun", "Sun bearing", .number, .number(defaultSunAzimuth),
+                              suffix: "°", attribute: "sunAzimuth"),
+                SourceSetting("sunheight", "Sun height", .number, .number(defaultSunAltitude),
+                              suffix: "°", attribute: "sunAltitude"),
+                SourceSetting("relief", "Relief stretch", .number, .number(1), suffix: "×",
+                              attribute: "hillshadeExaggeration"),
             ]
         ),
         SourceDefinition(

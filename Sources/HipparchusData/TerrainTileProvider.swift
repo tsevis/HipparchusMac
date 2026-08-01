@@ -32,11 +32,16 @@ public enum TerrainLayer {
     public static let bathymetry = "bathymetry"
     public static let summits = "summits"
     public static let elevationBands = "elevation_bands"
-    /// No provider computes a hillshade; the layer exists for file sources — a
-    /// hillshade polygonised elsewhere and converted lands here by naming it.
+    /// Relief shading, computed here from the same grid the contours come from
+    /// and banded into filled polygons.
+    ///
+    /// The Python names this layer in three places and produces it in none — it
+    /// existed so a hillshade polygonised in QGIS could be dropped in as a file,
+    /// which `FileSourceProvider` still allows. Computing one is a deliberate
+    /// divergence in the port's favour; see `Hillshade.swift`.
     public static let hillshade = "terrain_hillshade"
 
-    public static let all = [elevationBands, bathymetry, minorContours, indexContours, summits]
+    public static let all = [elevationBands, hillshade, bathymetry, minorContours, indexContours, summits]
 }
 
 /// How much real elevation to fetch, and how to contour it.
@@ -82,6 +87,27 @@ public struct TerrainTileSettings: Sendable {
     /// Real DEMs carry step noise from their source resolution; one light pass
     /// settles it without moving the landforms.
     public var smoothingPasses = 1
+
+    /// Relief shading, banded into filled polygons the way elevation is.
+    ///
+    /// Off by default. A hillshade lands under the contours and changes the
+    /// look of every sheet, which is a choice about the drawing rather than a
+    /// fact about the ground — so it is asked for, not assumed.
+    public var emitHillshade = false
+    public var sun = SunPosition()
+    /// Multiplies the slope before it is lit. Above 1 deepens the relief; the
+    /// ground is not steeper, it is only drawn as if it were.
+    public var hillshadeExaggeration = 1.0
+    /// Tones between full shadow and full light. Few reads as a woodcut, many
+    /// as a wash; past a dozen or so the extra bands cost paths and show
+    /// nothing, because the banding is what makes this printable at all.
+    public var hillshadeBandCount = 7
+    /// Shading is a *derivative* of the ground, so it carries several times the
+    /// noise the elevation does, and every speck of that noise would become its
+    /// own polygon. Decimating first and smoothing the tones after is what keeps
+    /// the layer to a few hundred editable shapes instead of tens of thousands.
+    public var hillshadeGridMaxPixels = 420
+    public var hillshadeSmoothingPasses = 2
 
     public init() {}
 }
@@ -166,6 +192,12 @@ public struct TerrainTileProvider: MapProvider {
             )
         }
 
+        if settings.emitHillshade {
+            featuresByLayer[TerrainLayer.hillshade] = try hillshadeFeatures(
+                grid: grid, window: window, zoom: zoom, bounds: bounds
+            )
+        }
+
         featuresByLayer[TerrainLayer.summits] = summitFeatures(grid: grid, toLonLat: toLonLat)
 
         return FeatureCollection(
@@ -184,6 +216,12 @@ public struct TerrainTileProvider: MapProvider {
                 "index_every": .int(settings.indexEvery),
                 "summit_count": .int(featuresByLayer[TerrainLayer.summits]?.count ?? 0),
                 "elevation_band_count": .int(featuresByLayer[TerrainLayer.elevationBands]?.count ?? 0),
+                "hillshade_band_count": .int(featuresByLayer[TerrainLayer.hillshade]?.count ?? 0),
+                // The sun is a choice, and a sheet that does not record which one
+                // it was lit by cannot be reproduced from its own diagnostics.
+                "hillshade_sun_azimuth": .double(settings.sun.azimuthDegrees),
+                "hillshade_sun_altitude": .double(settings.sun.altitudeDegrees),
+                "hillshade_exaggeration": .double(settings.hillshadeExaggeration),
                 // The mosaic is a surface model, and saying so in the diagnostics
                 // is cheaper than explaining a rooftop "summit" later.
                 "elevation_model": .string("surface"),
@@ -335,6 +373,93 @@ public struct TerrainTileProvider: MapProvider {
                     "elevation_high": .double(band.upper),
                     "band_index": .int(index),
                     "band_count": .int(bands.count),
+                ]
+            ))
+        }
+        return features
+    }
+
+    /// Relief shading, as filled polygons rather than as a raster.
+    ///
+    /// This application draws vectors and exports SVG and PDF; a shaded raster
+    /// has nowhere to go in either. So the shade is computed as a field and then
+    /// banded through the same tracer that fills elevation — which means the
+    /// relief arrives as a few hundred editable shapes that carry `band_index`,
+    /// and so ramp along a preset's two-stop fill with no renderer change at all.
+    ///
+    /// Three things about the numbers:
+    ///
+    /// - The grid is **decimated first**. Shading is a derivative, so it carries
+    ///   several times the noise of the ground it describes, and banding noise
+    ///   makes speckle — thousands of one-cell polygons that cost paths and show
+    ///   nothing at any size a sheet is printed at.
+    /// - The cell size is real metres, from the Mercator ground resolution at
+    ///   this latitude and zoom. Without it the slope would be metres per pixel
+    ///   and the same mountain would harden every time the zoom stepped up.
+    /// - Bands span the **observed** range of tone rather than a fixed 0...1.
+    ///   Gentle ground never reaches either extreme, and fixed edges would put
+    ///   all of Amsterdam in one band and call it flat.
+    private func hillshadeFeatures(
+        grid: Field2D,
+        window: PixelWindow,
+        zoom: Int,
+        bounds: BoundingBox
+    ) throws -> [Feature] {
+        guard settings.hillshadeBandCount >= 2 else { return [] }
+
+        let step = max(1, Int(ceil(
+            Double(max(grid.rows, grid.columns)) / Double(max(16, settings.hillshadeGridMaxPixels))
+        )))
+        let coarse = grid.decimated(step: step)
+        guard coarse.rows >= 3, coarse.columns >= 3 else { return [] }
+
+        // Mercator is conformal, so one resolution covers both directions; it is
+        // taken at the middle of the area because it varies with latitude across
+        // a large one, and the middle is the least wrong single answer.
+        let centreLatitude = (bounds.minLat + bounds.maxLat) / 2.0
+        let cellMetres = WebMercator.groundResolution(latitude: centreLatitude, zoom: zoom) * Double(step)
+
+        let shaded = hillshade(
+            coarse,
+            sun: settings.sun,
+            cellSizeMetres: cellMetres,
+            exaggeration: settings.hillshadeExaggeration
+        ).smoothed(passes: settings.hillshadeSmoothingPasses)
+        guard let range = shaded.finiteRange, range.maximum > range.minimum else { return [] }
+
+        let geos = GEOSContext()
+        let bands = try elevationBands(
+            shaded,
+            boundaries: bandBoundaries(
+                minimum: range.minimum, maximum: range.maximum, count: settings.hillshadeBandCount
+            ),
+            using: geos
+        )
+        guard !bands.isEmpty else { return [] }
+
+        var features: [Feature] = []
+        for (index, band) in bands.enumerated() {
+            let geometry = mapIndexSpaceToLonLat(band.geometry) { point in
+                WebMercator.lonLatForPixel(
+                    x: Double(window.left) + point.column * Double(step),
+                    y: Double(window.top) + point.row * Double(step),
+                    zoom: zoom
+                )
+            }
+            if geometry.isEmpty { continue }
+            features.append(Feature(
+                id: "\(providerID)/\(TerrainLayer.hillshade)/\(index)",
+                layer: TerrainLayer.hillshade,
+                source: providerID,
+                geometry: geometry,
+                provenance: .measured,
+                properties: [
+                    "shade_low": .double(band.lower),
+                    "shade_high": .double(band.upper),
+                    "band_index": .int(index),
+                    "band_count": .int(bands.count),
+                    "sun_azimuth": .double(settings.sun.azimuthDegrees),
+                    "sun_altitude": .double(settings.sun.altitudeDegrees),
                 ]
             ))
         }

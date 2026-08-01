@@ -58,6 +58,18 @@ public enum WebMercator {
         let lat = atan(sinh(.pi * (1.0 - 2.0 * y / world))) * 180.0 / .pi
         return Coordinate(lon: lon, lat: lat)
     }
+
+    /// How many metres of ground one pixel covers, at a latitude and zoom.
+    ///
+    /// Mercator is conformal, so this is the same in both directions and one
+    /// number will do — but it shrinks with `cos(φ)`, and by a factor of two by
+    /// the time you reach Iceland. Anything measuring the real world off a grid
+    /// of tile pixels needs it: a slope in metres per pixel is not a slope until
+    /// you say how wide a pixel is.
+    public static func groundResolution(latitude: Double, zoom: Int) -> Double {
+        let clamped = Swift.min(Swift.max(latitude, -maxLatitude), maxLatitude)
+        return cos(clamped * .pi / 180.0) * 2.0 * .pi * earthRadiusMetres / worldPixels(zoom: zoom)
+    }
 }
 
 /// How the scene's geometry is projected before it is drawn.
