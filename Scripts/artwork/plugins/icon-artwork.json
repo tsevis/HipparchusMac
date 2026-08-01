@@ -1,0 +1,1460 @@
+{
+  "id": "com.tsevis.icon-artwork",
+  "name": "Icon Artwork",
+  "presets": [
+    {
+      "name": "Turquoise Sea",
+      "geometry_profile": {
+        "smoothing_iterations": 4,
+        "simplify_tolerance_export": 0.6
+      },
+      "style_profile": {
+        "background": {
+          "r": 55,
+          "g": 97,
+          "b": 160,
+          "a": 255
+        },
+        "layer_styles": {
+          "water": {
+            "stroke_width": 3.0,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 26,
+              "g": 175,
+              "b": 165,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "visible": true
+          },
+          "coastline": {
+            "stroke_width": 3.0,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true
+          },
+          "terrain_contours": {
+            "stroke_width": 1.2,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 0.4,
+            "line_cap": "round",
+            "visible": true
+          },
+          "terrain_index_contours": {
+            "stroke_width": 1.8,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 0.6,
+            "line_cap": "round",
+            "visible": true
+          },
+          "bathymetry": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "minor_contours": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "index_contours": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_motorway": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_trunk": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_primary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_secondary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_tertiary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_residential": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_service": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_other": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "buildings": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "railways": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "landuse": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "barriers": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "power": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "ferry_routes": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "parks": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "forests": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "fields": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "natural": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "night_lights": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "admin_boundaries": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "elevation_bands": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "terrain_hillshade": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "terrain_summits": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "summits": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_shallow": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_intermediate": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_deep": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "satellite_tracks": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "satellite_footprints": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "places": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "street_names": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "amenities": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "shops": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Turquoise Sea Bold",
+      "geometry_profile": {
+        "smoothing_iterations": 4,
+        "simplify_tolerance_export": 0.6
+      },
+      "style_profile": {
+        "background": {
+          "r": 55,
+          "g": 97,
+          "b": 160,
+          "a": 255
+        },
+        "layer_styles": {
+          "water": {
+            "stroke_width": 26.0,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 26,
+              "g": 175,
+              "b": 165,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "visible": true
+          },
+          "coastline": {
+            "stroke_width": 26.0,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true
+          },
+          "bathymetry": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "minor_contours": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "index_contours": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_motorway": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_trunk": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_primary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_secondary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_tertiary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_residential": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_service": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_other": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "buildings": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "railways": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "landuse": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "barriers": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "power": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "ferry_routes": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "parks": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "forests": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "fields": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "natural": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "night_lights": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "admin_boundaries": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "elevation_bands": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "terrain_hillshade": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "terrain_summits": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "summits": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_shallow": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_intermediate": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_deep": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "satellite_tracks": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "satellite_footprints": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "places": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "street_names": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "amenities": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "shops": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          }
+        }
+      }
+    }
+  ]
+}

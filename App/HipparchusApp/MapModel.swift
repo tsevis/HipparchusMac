@@ -627,9 +627,20 @@ final class MapModel {
             : "\(lost.joined(separator: ", ")) lost access to their files. Choose them again in Sources."
     }
 
+    /// True when the process was started to render or verify something rather
+    /// than to be used.
+    ///
+    /// A batch run must not write over the session. It sets an area, a preset
+    /// and a source stack of its own, and `fetch` saves on completion — so a
+    /// single `--render-to` left the app reopening on whatever that run had
+    /// asked for. That is how a person's window came back showing a turquoise
+    /// map of nowhere they had chosen.
+    private var isBatchRun = false
+
     /// A failure to save is worth nothing more than the settings: it must never
     /// interrupt what the user was doing.
     func save() {
+        guard !isBatchRun else { return }
         guard let session = currentSession() else { return }
         try? session.write(to: sessionURL)
     }
@@ -687,27 +698,16 @@ final class MapModel {
         setArea(bbox)
     }
 
-    /// Set the area from a place clicked on the floating locator.
-    ///
-    /// A click names a point, and a point is not an area, so it is given the
-    /// same extent a pasted point gets — `LocatorSelection` defers to
-    /// `CoordinateImport` for that, so clicking Athens and pasting Athens'
-    /// coordinates frame the same place. Does not fetch: choosing where to
-    /// look is not asking for five minutes of Overpass time, the same reason
-    /// adopting a search result does not.
     /// Set the area from a rectangle dragged out on the floating locator.
     ///
-    /// Unlike a click, a drag states its own extent, so nothing is padded —
-    /// what was dragged is what is asked for.
+    /// The one gesture there that states an extent of its own, so it is also
+    /// the one that overrides what the window happens to be showing. Panning
+    /// and zooming set the area to the view; a drag sets it to the rectangle.
     func drawAreaOnWorldMap(_ bbox: BoundingBox) {
         pendingAction = ("Draw Area on World Map", "area")
         setArea(bbox)
     }
 
-    func choosePointOnWorldMap(lat: Double, lon: Double) {
-        pendingAction = ("Choose Point", "area")
-        setArea(LocatorSelection.area(around: lat, lon: lon))
-    }
 
     /// Why Render map cannot run, or `nil` when it can.
     ///
@@ -1061,6 +1061,13 @@ final class MapModel {
         isRestoringState = true
 
         let arguments = ProcessInfo.processInfo.arguments
+        // Anything that renders, searches or verifies is a batch run: it will
+        // set its own area and preset, and none of that belongs in the session.
+        isBatchRun = arguments.contains { argument in
+            argument == "--render-to" || argument == "--search" || argument == "--plugins"
+                || argument == "--import-clipboard" || argument == "--save-preset"
+                || argument.hasPrefix("--verify-")
+        }
         if let flag = arguments.firstIndex(of: "--preset"), flag + 1 < arguments.count {
             // Across every style, not only the sixteen built in: a saved or
             // plugin style named here used to resolve to the default and
@@ -1477,41 +1484,62 @@ final class MapModel {
         )
         mapView.layoutSubtreeIfNeeded()
 
-        // Exactly the closure `LocatorPanelContent` installs.
-        coordinator.onPointSelected = { [weak self] clickedLat, clickedLon in
-            self?.choosePointOnWorldMap(lat: clickedLat, lon: clickedLon)
+        // Exactly the closure `LocatorPanelContent` installs: the region this
+        // window shows becomes the area, and a click only marks a point.
+        coordinator.onRegionChanged = { [weak self] region in
+            self?.browseWorldMap(to: region)
         }
 
         let before = bbox
-        guard let clicked = coordinator.selectPoint(
-            at: CGPoint(x: size.width / 2, y: size.height / 2), in: mapView
-        ) else {
-            FileHandle.standardError.write(Data("the click resolved to no coordinate\n".utf8))
-            exit(1)
-        }
 
-        print(String(format: "asked to click:     %.5f, %.5f", lat, lon))
-        print(String(format: "the click resolved: %.5f, %.5f", clicked.latitude, clicked.longitude))
-        print("area before the click: \(before.map { "\($0)" } ?? "none")")
+        // A pan or zoom in that window — which is what reports the region, and
+        // is the whole of what Render map is meant to draw.
+        let shown = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: lat, longitude: lon),
+            span: MKCoordinateSpan(latitudeDelta: 0.24, longitudeDelta: 0.30)
+        )
+        mapView.setRegion(shown, animated: false)
+        let clicked = shown.center
+
+        print(String(format: "the window shows:  %.5f, %.5f  %.3f° × %.3f°",
+                     shown.center.latitude, shown.center.longitude,
+                     shown.span.longitudeDelta, shown.span.latitudeDelta))
+        print("area before:       \(before.map { "\($0)" } ?? "none")")
         guard let after = bbox else {
-            FileHandle.standardError.write(Data("the click left no area to fetch\n".utf8))
+            FileHandle.standardError.write(Data("the window left no area to fetch\n".utf8))
             exit(1)
         }
         print(String(
-            format: "area after the click:  %.5f,%.5f -> %.5f,%.5f  (%.4f° × %.4f°)",
+            format: "area after:        %.5f,%.5f -> %.5f,%.5f  (%.4f° × %.4f°)",
             after.minLon, after.minLat, after.maxLon, after.maxLat,
             abs(after.lonSpan), abs(after.latSpan)
         ))
         guard after.minLat < clicked.latitude, clicked.latitude < after.maxLat,
               after.minLon < clicked.longitude, clicked.longitude < after.maxLon
         else {
-            FileHandle.standardError.write(Data("the area does not contain the place clicked\n".utf8))
+            FileHandle.standardError.write(Data("the area does not contain what the window showed\n".utf8))
+            exit(1)
+        }
+        // And it has to be the *shown* area, not some padded fraction of it:
+        // the bug this replaces fetched a tenth of a degree while the window
+        // showed a county.
+        guard abs(after.latSpan - shown.span.latitudeDelta) < 0.02 else {
+            FileHandle.standardError.write(Data(String(
+                format: "the area is %.4f° tall but the window showed %.4f°\n",
+                after.latSpan, shown.span.latitudeDelta
+            ).utf8))
             exit(1)
         }
 
-        // And now the button itself, on the area the click left behind.
+        // And now the button itself, on the area the window left behind.
         print("pressing Render map…")
         update()
+        // A batch run has nobody to answer the "this will take a while"
+        // dialog, so it answers it: the size is the point of the test.
+        if pendingWarning != nil {
+            print("  (size warning accepted)")
+            fetch()
+        }
         Task { [weak self] in
             for _ in 0..<3000 {
                 try? await Task.sleep(for: .milliseconds(100))

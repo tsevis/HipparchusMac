@@ -1,0 +1,744 @@
+{
+  "id": "com.tsevis.cyprus-backdrop",
+  "name": "Cyprus Backdrop",
+  "presets": [
+    {
+      "name": "Pale Sea",
+      "geometry_profile": {
+        "smoothing_iterations": 3,
+        "simplify_tolerance_export": 0.5
+      },
+      "style_profile": {
+        "background": {
+          "r": 186,
+          "g": 231,
+          "b": 228,
+          "a": 255
+        },
+        "layer_styles": {
+          "coastline": {
+            "stroke_width": 2.0,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true
+          },
+          "terrain_bathymetry": {
+            "stroke_width": 0.6,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 0.85,
+            "line_cap": "round",
+            "visible": true
+          },
+          "bathymetry": {
+            "stroke_width": 0.6,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 0.85,
+            "line_cap": "round",
+            "visible": true
+          },
+          "terrain_contours": {
+            "stroke_width": 0.4,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 0.45,
+            "line_cap": "round",
+            "visible": true
+          },
+          "terrain_index_contours": {
+            "stroke_width": 0.8,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 0.7,
+            "line_cap": "round",
+            "visible": true
+          },
+          "minor_contours": {
+            "stroke_width": 0.4,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 0.45,
+            "line_cap": "round",
+            "visible": true
+          },
+          "index_contours": {
+            "stroke_width": 0.8,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": false,
+            "opacity": 0.7,
+            "line_cap": "round",
+            "visible": true
+          },
+          "water": {
+            "stroke_width": 0.9,
+            "stroke_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 255
+            },
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 255,
+              "g": 255,
+              "b": 255,
+              "a": 40
+            },
+            "opacity": 0.95,
+            "visible": true
+          },
+          "roads": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_motorway": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_trunk": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_primary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_secondary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_tertiary": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_residential": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_service": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "roads_other": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "buildings": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "railways": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "landuse": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "barriers": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "power": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "ferry_routes": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "parks": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "forests": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "fields": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "natural": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "night_lights": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "admin_boundaries": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "elevation_bands": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "terrain_hillshade": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "terrain_summits": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "summits": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_shallow": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_intermediate": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "earthquakes_deep": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "satellite_tracks": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "satellite_footprints": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "places": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "street_names": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "amenities": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          },
+          "shops": {
+            "visible": false,
+            "fill_enabled": false,
+            "stroke_width": 0.0,
+            "opacity": 0.0,
+            "stroke_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            },
+            "fill_color": {
+              "r": 0,
+              "g": 0,
+              "b": 0,
+              "a": 0
+            }
+          }
+        }
+      }
+    }
+  ]
+}

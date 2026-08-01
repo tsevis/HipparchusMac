@@ -36,7 +36,7 @@ struct ContentView: View {
         // directly.
         VStack(spacing: 0) {
             NavigationSplitView(columnVisibility: $columnVisibility) {
-                FramePanel(model: model, openLocator: { locatorPanel.show(model: model, onRender: renderMap) })
+                FramePanel(model: model, openLocator: { locatorPanel.show(model: model, onRender: renderChosenArea) })
                     .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
             } content: {
                 map
@@ -68,7 +68,7 @@ struct ContentView: View {
             // there" and "the window does not work" look identical from the
             // outside — this tells them apart.
             if ProcessInfo.processInfo.arguments.contains("--locator") {
-                locatorPanel.show(model: model, onRender: renderMap)
+                locatorPanel.show(model: model, onRender: renderChosenArea)
             }
         }
         .onAppear { model.undoManager = undoManager }
@@ -170,13 +170,25 @@ struct ContentView: View {
     /// without being rewired on every update.
     private func wireUpMenuCommands() {
         actions.renderMap = { renderMap() }
-        actions.openLocator = { locatorPanel.show(model: model, onRender: renderMap) }
+        actions.openLocator = { locatorPanel.show(model: model, onRender: renderChosenArea) }
         actions.focusSearch = { isSearchFocused = true }
         actions.zoomIn = { viewport = viewport.zoomed(by: 1.3) }
         actions.zoomOut = { viewport = viewport.zoomed(by: 1 / 1.3) }
         actions.fitToWindow = { viewport = ViewportState() }
         actions.rotateLeft = { viewport = viewport.rotated(by: -15) }
         actions.rotateRight = { viewport = viewport.rotated(by: 15) }
+    }
+
+    /// Render exactly the area the model holds, without consulting the canvas.
+    ///
+    /// What the floating Locator's own button calls. That window shows an area
+    /// and keeps `model.bbox` equal to it, so there is nothing to reconcile —
+    /// reading the main canvas here instead would draw whatever *it* was
+    /// showing, which is a different place.
+    private func renderChosenArea() {
+        viewport = ViewportState()
+        model.shapeAreaToWindow(aspect: canvasHandle.canvasAspect())
+        model.update()
     }
 
     /// What Render map does, in one place.
@@ -281,7 +293,7 @@ struct ContentView: View {
 
         ToolbarItem(placement: .primaryAction) {
             Button {
-                locatorPanel.show(model: model, onRender: renderMap)
+                locatorPanel.show(model: model, onRender: renderChosenArea)
             } label: {
                 Image(systemName: "map")
             }

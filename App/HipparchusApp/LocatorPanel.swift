@@ -208,10 +208,15 @@ private struct LocatorPanelContent: View {
                 Locator(
                     bbox: model.bbox,
                     isSettled: model.didFinishLaunchSetup,
-                    // No `onRegionChanged`: in here, browsing is only browsing.
+                    // What this window shows *is* the area. Browsing used to
+                    // be only browsing, with a click choosing instead — which
+                    // meant the preview and the request were two different
+                    // things, and pressing Render map after a click and a zoom
+                    // fetched a tenth of a degree around the pin while the
+                    // preview showed a county. What you see is what is drawn.
+                    onRegionChanged: { model.browseWorldMap(to: $0) },
                     onPointSelected: { lat, lon in
                         chosen = ChosenPoint(lat: lat, lon: lon)
-                        model.choosePointOnWorldMap(lat: lat, lon: lon)
                     },
                     onAreaDrawn: { area in
                         chosen = nil
@@ -402,6 +407,11 @@ private struct LocatorPanelContent: View {
             // Rendering from here, so choosing a place and drawing it are not
             // separated by a trip back to the main window — which is the whole
             // reason this panel is a window of its own.
+            // Renders `model.bbox`, which this window's map keeps up to date.
+            // It deliberately does not go through the main canvas's visible
+            // area the way the toolbar button does: the two windows show
+            // different things, and a button on this one that quietly drew the
+            // other one's view is how an "extreme zoom" arrives out of nowhere.
             Button(action: onRender) {
                 if model.isFetching {
                     Label("Rendering…", systemImage: "hourglass")
