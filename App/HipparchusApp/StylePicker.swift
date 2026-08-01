@@ -85,6 +85,30 @@ struct StylePicker: View {
             }
             .controlSize(.small)
             .help("A preset says what the map should look like; quality says how much work to spend getting there.")
+
+            HStack {
+                Text("Line weight")
+                Slider(value: $model.lineWeight, in: 0.25...4.0)
+                Text(String(format: "%.2f×", model.lineWeight))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(model.lineWeight == 1.0 ? .secondary : .primary)
+                    .frame(width: 42, alignment: .trailing)
+                Button {
+                    model.lineWeight = 1.0
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                }
+                .buttonStyle(.borderless)
+                .disabled(model.lineWeight == 1.0)
+                .help("Back to the preset's own weights")
+            }
+            .controlSize(.small)
+            .help("""
+            One multiplier over every stroke. The preset owns the relative \
+            weights — that is its design — and this moves only the absolute \
+            scale, which belongs to the medium: the weight that reads on a \
+            screen is not the weight that reads on a metre of paper.
+            """)
         } header: {
             HStack {
                 Text("Style")

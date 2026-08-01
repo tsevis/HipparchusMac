@@ -285,6 +285,33 @@ public struct RenderScene: Sendable {
         layers.filter { $0.style.visible }
     }
 
+    /// The same scene with every stroke multiplied.
+    ///
+    /// **No Python counterpart.** There, and here until now, line weight is
+    /// entirely a property of the preset: sixteen sets of stroke widths, each
+    /// chosen for a look, none adjustable. That is right for the look and wrong
+    /// for the medium — the weight that reads on a screen is not the weight that
+    /// reads on a metre of paper, and a sheet exported at 24 × 36 has hairlines
+    /// a third of a millimetre wide.
+    ///
+    /// One multiplier over every stroke keeps the preset's *relative* weights,
+    /// which are the design, and moves only the absolute scale, which is the
+    /// medium. Applied to the built scene rather than during the build, so the
+    /// control is live: nothing is re-simplified or re-smoothed, the strokes are
+    /// simply drawn wider.
+    ///
+    /// Casings scale with the roads they underlie. Halos deliberately do not —
+    /// a label halo is sized against the type, and type is not getting bigger.
+    public func scalingLineWeights(by scale: Double) -> RenderScene {
+        guard scale != 1.0, scale > 0, scale.isFinite else { return self }
+        var copy = self
+        for index in copy.layers.indices {
+            copy.layers[index].style.strokeWidth *= scale
+            copy.layers[index].style.casingWidth *= scale
+        }
+        return copy
+    }
+
     /// The extent of everything drawable, in world (projected) coordinates.
     public var contentBounds: Bounds? {
         var result: Bounds?

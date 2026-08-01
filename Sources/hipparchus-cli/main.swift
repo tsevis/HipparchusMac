@@ -87,6 +87,7 @@ func usage() -> Never {
                          presets and places can be named like the built-in ones
       --paper <name>     sheet for every export: \(PaperSize.names.joined(separator: ", "))
       --dpi <n>          resolution for the raster and the SVG viewport
+      --line-weight <x>  multiply every stroke (default: 1)
       --portrait         turn the sheet (default: landscape)
       --furniture        title, scale bar, north arrow and legend on the SVG, A4
       --no-files         measure only, write nothing
@@ -109,6 +110,7 @@ struct Options {
     var quality = Quality.default
     var furniture = false
     var page = PageSpec()
+    var lineWeight = 1.0
     var hillshade = false
     var streets = false
     var sun = SunPosition()
@@ -183,6 +185,11 @@ while argumentIndex < arguments.count {
         options.page.dpi = value
     case "--portrait":
         options.page.orientation = "Portrait"
+    case "--line-weight":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count,
+              let value = Double(arguments[argumentIndex]), value > 0 else { usage() }
+        options.lineWeight = value
     case "--streets":
         options.streets = true
     case "--hillshade":
@@ -360,7 +367,7 @@ func run(_ place: Place, options: Options) async throws {
 
     let scene = try SceneBuilder(options: SceneBuilder.Options(
         preset: options.preset, quality: options.quality
-    )).build(from: collection)
+    )).build(from: collection).scalingLineWeights(by: options.lineWeight)
     print("  \(scene.summary)   fetched in \(fetched.formattedSeconds)")
     print("  \(options.preset.name) · \(options.quality.label)")
     if options.hillshade {

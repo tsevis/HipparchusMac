@@ -435,8 +435,19 @@ final class MapModel {
         for index in scene.layers.indices where hiddenLayers.contains(scene.layers[index].name) {
             scene.layers[index].style.visible = false
         }
-        return scene
+        // Applied here rather than in the build, so moving the slider redraws
+        // without re-simplifying a quarter of a million features. Everything
+        // downstream — canvas, PNG, SVG, PDF — reads this same scene, so what is
+        // on screen is what lands in the file.
+        return scene.scalingLineWeights(by: lineWeight)
     }
+
+    /// One multiplier over every stroke on the sheet, live.
+    ///
+    /// The preset owns the *relative* weights, which are its design; this moves
+    /// only the absolute scale, which is a property of the medium. A sheet that
+    /// reads on a screen has hairlines a third of a millimetre wide at 24 × 36.
+    var lineWeight: Double = 1.0
 
     private var task: Task<Void, Never>?
     private let cache = DiskCacheStore(directory: DiskCacheStore.defaultDirectory())
