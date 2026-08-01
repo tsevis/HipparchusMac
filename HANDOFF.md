@@ -117,12 +117,11 @@ rule above can be tested without a window.
 The same defect I found and fixed for roads, twice more. Each is a preset
 advertising a look it does not have:
 
-- **`street_names`** — styled by all sixteen presets, given a label budget of 90 in
-  `SceneBuilder`, ordered in the layer list, and nothing ever puts a label in it.
-  Port `_street_labels` from `application/scene_builder.py`. The interesting rule
-  is already written there: OSM splits a street into one way per block, so keeping
-  only the longest run per name puts the label where the street is most legible
-  instead of stamping it down the road forty times.
+- ~~**`street_names`** — styled by all sixteen presets, given a label budget of 90
+  in `SceneBuilder`, and nothing ever puts a label in it.~~ **Done**, and this
+  entry was simply left stale: `SceneBuilder.streetLabels` populates the layer,
+  `StreetLabelTests` covers it in eight tests, and a fetch of the Castro returns
+  90 of them. Both bullets in this section are now closed.
 - ~~**`terrain_hillshade`** — named in the draw order and the layer panel, produced
   by nothing.~~ **Done.** The terrain provider now computes one from the elevation
   grid it already fetches and bands it into filled polygons, so the row fills.

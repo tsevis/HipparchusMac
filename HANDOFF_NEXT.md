@@ -196,6 +196,12 @@ reopening on a style of nowhere they had chosen.
   Francisco on Night, all seven style-pack presets over Kefalonia, and a city
   with streets on it (Twin Peaks and the Mission, four presets) — all as PNGs,
   and **never in the window**.
+- Shading tones are banded on a **fixed** 0...1 scale, not the observed range,
+  so how many tones a sheet reaches is a fact about its ground. The first
+  version stretched the observed range — which sounds right, and turned "how
+  much relief is there" into "always maximum contrast". Amsterdam came out
+  mottled brown; the peak darkening on flat ground was 60/255, and is now
+  24/255. A sheet that reaches fewer than two tones is not shaded at all.
 - **In a dense city the shading is largely buried under the buildings.** Relief
   is ground and buildings sit on it, so the draw order is right, but with
   21,380 opaque building fills over a grid the shade only shows in parks, open

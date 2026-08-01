@@ -6,8 +6,8 @@ layered, Illustrator-editable SVG.
 
 <table>
   <tr>
-    <td width="50%"><img src="Docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands, Mauna Kea and Mauna Loa reading as concentric shields, from real elevation data"></td>
-    <td width="50%"><img src="Docs/assets/gallery-amsterdam-fragmented-urban.png" width="100%" alt="Amsterdam's canals, rail fan and building footprints drawn from OpenStreetMap"></td>
+    <td width="50%"><img src="Docs/assets/gallery-hawaii-hypsometric.png" width="100%" alt="The island of Hawaii as filled elevation bands under relief shading, Mauna Kea and Mauna Loa reading as shields with the rift zones and the sea floor around them, from real elevation data"></td>
+    <td width="50%"><img src="Docs/assets/gallery-amsterdam-fragmented-urban.png" width="100%" alt="Amsterdam's canals, rail fan and building footprints drawn from OpenStreetMap, on ground too flat to shade"></td>
   </tr>
 </table>
 
@@ -17,7 +17,8 @@ here that disagrees with it is a bug here.
 
 **Status: the app is built, and the window has never been looked at.** Every
 online source, the composing source stack, the sixteen presets, illuminated
-contours, the three-column interface and the exports are in, with 606 tests and
+contours, relief shading, the three-column interface and the exports are in,
+with 721 tests and
 the output checked against real ground. See `KICKOFF.md` for the brief.
 
 Every claim here is backed by a test or by a render someone can open. **None of
