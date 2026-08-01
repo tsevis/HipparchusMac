@@ -13,12 +13,18 @@ import HipparchusGeometry
 /// Offline, like every test in this file: tiles are synthesised in-process.
 /// A tile with a ridge across it, so there is a lit side and a shadowed one.
 /// A plain ramp shades to a single tone and tests nothing about banding.
-private func ridgeTileData() -> Data {
+///
+/// Deliberately **steep**: the `athens` window these tests fetch is about 28 km
+/// across, and a few hundred metres spread over that is a 2% grade — gentle
+/// enough that the shading correctly declines to draw anything, which is a
+/// different behaviour and has its own test below. Three thousand metres over a
+/// few kilometres is a mountain, and a mountain is what banding needs.
+private func ridgeTileData(height: Double = 3000.0) -> Data {
     let size = WebMercator.tilePixels
     let field = Field2D(rows: size, columns: size) { row, column in
-        let across = (Double(column) - Double(size) / 2.0) / (Double(size) / 6.0)
+        let across = (Double(column) - Double(size) / 2.0) / (Double(size) / 24.0)
         let along = Double(row) / Double(size)
-        return 400.0 * exp(-across * across) + 220.0 * along
+        return height * exp(-across * across) + height * 0.25 * along
     }
     return encodeTerrariumPNG(field)!
 }
@@ -71,14 +77,19 @@ final class TerrainHillshadeTests: XCTestCase {
     /// The whole reason the shade is banded rather than rasterised: these
     /// properties are what the existing two-stop fill ramp reads, so the layer
     /// colours itself through machinery that already exists.
+    /// `band_count` is the whole scale, not how much of it this sheet used —
+    /// otherwise two tones out of seven would ramp from full shadow to nothing
+    /// and gentle ground would read as maximum contrast.
     func testEveryToneCarriesWhatTheColourRampNeeds() async throws {
-        let shade = try await fetch(settings()).features(in: TerrainLayer.hillshade)
-        let count = shade.count
+        let configured = settings()
+        let shade = try await fetch(configured).features(in: TerrainLayer.hillshade)
+        let scale = configured.hillshadeBandCount
+        XCTAssertLessThanOrEqual(shade.count, scale)
         var seen: Set<Int> = []
         for feature in shade {
             let index = Int(try XCTUnwrap(feature.property("band_index")?.doubleValue))
-            XCTAssertEqual(feature.property("band_count")?.doubleValue, Double(count))
-            XCTAssertTrue((0..<count).contains(index), "band index \(index) is outside 0..<\(count)")
+            XCTAssertEqual(feature.property("band_count")?.doubleValue, Double(scale))
+            XCTAssertTrue((0..<scale).contains(index), "band index \(index) is outside 0..<\(scale)")
             XCTAssertTrue(seen.insert(index).inserted, "band index \(index) appears twice")
 
             let low = try XCTUnwrap(feature.property("shade_low")?.doubleValue)
@@ -118,11 +129,16 @@ final class TerrainHillshadeTests: XCTestCase {
     /// gradient would swamp the light direction and every sun would draw the same
     /// sheet — which looks plausible until you try to use the control.
     func testMovingTheSunChangesTheGroundThatIsInShadow() async throws {
+        // The darkest tone *present*, not band 0 — which tones a sheet reaches
+        // now depends on how steep it is, and only ground near vertical ever
+        // reaches the bottom of a fixed scale.
         func darkestTone(azimuth: Double) async throws -> Geometry? {
             let shade = try await fetch(settings {
                 $0.sun = SunPosition(azimuthDegrees: azimuth, altitudeDegrees: 45.0)
             }).features(in: TerrainLayer.hillshade)
-            return shade.first { $0.property("band_index")?.doubleValue == 0 }?.geometry
+            return shade
+                .min { ($0.property("band_index")?.doubleValue ?? 0) < ($1.property("band_index")?.doubleValue ?? 0) }?
+                .geometry
         }
 
         let litFromNorthWest = try await darkestTone(azimuth: 315.0)
@@ -138,6 +154,41 @@ final class TerrainHillshadeTests: XCTestCase {
     func testAskingForFewerThanTwoTonesProducesNoneRatherThanOne() async throws {
         let result = try await fetch(settings { $0.hillshadeBandCount = 1 })
         XCTAssertTrue(result.features(in: TerrainLayer.hillshade).isEmpty)
+    }
+
+    /// The one that matters, and the one that was missing.
+    ///
+    /// Tones are banded on a **fixed** 0...1 scale, so how many of them a sheet
+    /// reaches is a fact about the ground. Band the observed range instead and
+    /// every sheet gets maximum contrast whatever its relief: Amsterdam has 25 m
+    /// across 14 km, most of it rooftops and DEM step noise, and stretched
+    /// banding covered the whole city in a mottle that looked like terrain.
+    func testGentleGroundGetsFewerTonesThanSteepGround() async throws {
+        func tones(height: Double) async throws -> Int {
+            let stub = StubFetcher(alwaysReturning: ridgeTileData(height: height))
+            return try await TerrainTileProvider(settings: settings(), http: stub)
+                .fetch(athens)
+                .features(in: TerrainLayer.hillshade)
+                .count
+        }
+
+        let alpine = try await tones(height: 3000.0)
+        let rolling = try await tones(height: 900.0)
+        XCTAssertGreaterThan(alpine, rolling, "steeper ground must reach more of the tonal scale")
+        XCTAssertGreaterThan(alpine, 2)
+    }
+
+    /// Ground too gentle to shade is left alone rather than shaded at full
+    /// strength. A single tone is a tint, not relief: it dulls the sheet and
+    /// says nothing about the terrain.
+    func testAlmostFlatGroundIsNotShadedAtAll() async throws {
+        // Twenty-five metres across the Athens window — Amsterdam's relief.
+        let stub = StubFetcher(alwaysReturning: ridgeTileData(height: 25.0))
+        let result = try await TerrainTileProvider(settings: settings(), http: stub).fetch(athens)
+        XCTAssertTrue(
+            result.features(in: TerrainLayer.hillshade).isEmpty,
+            "a city on a flood plain was given relief it does not have"
+        )
     }
 
     /// Flat ground has no relief to shade, and must not invent any — every cell

@@ -396,9 +396,16 @@ public struct TerrainTileProvider: MapProvider {
     /// - The cell size is real metres, from the Mercator ground resolution at
     ///   this latitude and zoom. Without it the slope would be metres per pixel
     ///   and the same mountain would harden every time the zoom stepped up.
-    /// - Bands span the **observed** range of tone rather than a fixed 0...1.
-    ///   Gentle ground never reaches either extreme, and fixed edges would put
-    ///   all of Amsterdam in one band and call it flat.
+    /// - Bands span a **fixed** 0...1 rather than the observed range of tone,
+    ///   and this is the one that had to be learned by looking. Stretching the
+    ///   observed range sounds right — gentle ground never reaches either
+    ///   extreme — but it turns "how much relief is there" into "always maximum
+    ///   contrast". Amsterdam has 25 m of relief across 14 km, most of it
+    ///   rooftops and DEM step noise, and stretched banding covered the whole
+    ///   city in a mottle that looked like terrain and was not. A shade value is
+    ///   physically meaningful — it is the cosine of the incidence angle — so
+    ///   absolute edges are meaningful too, and flat ground lands in one band
+    ///   because it *is* flat.
     private func hillshadeFeatures(
         grid: Field2D,
         window: PixelWindow,
@@ -427,18 +434,25 @@ public struct TerrainTileProvider: MapProvider {
         ).smoothed(passes: settings.hillshadeSmoothingPasses)
         guard let range = shaded.finiteRange, range.maximum > range.minimum else { return [] }
 
+        let toneCount = settings.hillshadeBandCount
         let geos = GEOSContext()
         let bands = try elevationBands(
             shaded,
-            boundaries: bandBoundaries(
-                minimum: range.minimum, maximum: range.maximum, count: settings.hillshadeBandCount
-            ),
+            boundaries: bandBoundaries(minimum: 0.0, maximum: 1.0, count: toneCount),
             using: geos
         )
-        guard !bands.isEmpty else { return [] }
+        // One tone is not shading, it is a tint. Ground that lands in a single
+        // band has no relief to show, and drawing it dulls the sheet to say so.
+        guard bands.count >= 2 else { return [] }
 
         var features: [Feature] = []
-        for (index, band) in bands.enumerated() {
+        for band in bands {
+            // The band's place on the *fixed* scale, not its place in this list.
+            // Compacting the index would put gentle ground that only reaches two
+            // adjacent tones at the ramp's two extremes — full shadow against
+            // nothing — which is the stretching this just stopped doing, moved
+            // one step downstream.
+            let index = Int((band.lower * Double(toneCount)).rounded())
             let geometry = mapIndexSpaceToLonLat(band.geometry) { point in
                 WebMercator.lonLatForPixel(
                     x: Double(window.left) + point.column * Double(step),
@@ -457,7 +471,10 @@ public struct TerrainTileProvider: MapProvider {
                     "shade_low": .double(band.lower),
                     "shade_high": .double(band.upper),
                     "band_index": .int(index),
-                    "band_count": .int(bands.count),
+                    // The whole scale, not how much of it this sheet used, so
+                    // the ramp keeps its meaning: two tones out of seven has to
+                    // read as gentle ground, not as maximum contrast.
+                    "band_count": .int(toneCount),
                     "sun_azimuth": .double(settings.sun.azimuthDegrees),
                     "sun_altitude": .double(settings.sun.altitudeDegrees),
                 ]
