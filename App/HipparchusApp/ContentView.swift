@@ -107,7 +107,7 @@ struct ContentView: View {
                 // Direct manipulation needs saying once. It is a pill rather than a
                 // panel because it should read as a caption on the map, not as
                 // another piece of interface competing with it.
-                Text("drag to pan · scroll to zoom · Option-drag to draw a new area")
+                Text("drag to pan · scroll to zoom · Option-drag for a new area · arrows, + − 0 [ ]")
                     .font(.caption)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
@@ -118,6 +118,13 @@ struct ContentView: View {
             .frame(maxWidth: .infinity)
             .allowsHitTesting(false)
         }
+        // The canvas takes the keyboard too, matching the floating Locator.
+        // A `MapCanvasView` is a plain `NSView` inside an
+        // `NSViewRepresentable`, so the surrounding view holds the focus and
+        // translates the presses.
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress { press in handleCanvasKey(press) }
         // `NavigationSplitView` does not stretch a content column's view to
         // fill it the way a plain `VStack` would — `.navigationSplitViewColumnWidth`
         // (below, where this is placed) sets the column's allowed *range*, not
@@ -126,6 +133,34 @@ struct ContentView: View {
         // can resolve to a size smaller than the pane, leaving the map
         // floating in a corner of a mostly empty column rather than filling it.
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Arrow keys to move, `+`/`-` to zoom, `0` to fit, `[`/`]` to turn.
+    ///
+    /// The same set the Locator takes, so the two maps answer to the same
+    /// keys. Panning is a fraction of the view rather than a fixed number of
+    /// points, which keeps the step useful whether the map is a street or a
+    /// coastline.
+    private func handleCanvasKey(_ press: KeyPress) -> KeyPress.Result {
+        // Shift moves three times as far — the difference between nudging a
+        // label into view and crossing the frame.
+        let step = (press.modifiers.contains(.shift) ? 3.0 : 1.0) * 60
+        switch press.key {
+        case .leftArrow: viewport = viewport.panned(dx: step, dy: 0)
+        case .rightArrow: viewport = viewport.panned(dx: -step, dy: 0)
+        case .upArrow: viewport = viewport.panned(dx: 0, dy: step)
+        case .downArrow: viewport = viewport.panned(dx: 0, dy: -step)
+        default:
+            switch press.characters.lowercased() {
+            case "+", "=": viewport = viewport.zoomed(by: 1.3)
+            case "-", "_": viewport = viewport.zoomed(by: 1 / 1.3)
+            case "0": viewport = ViewportState()
+            case "[": viewport = viewport.rotated(by: -15)
+            case "]": viewport = viewport.rotated(by: 15)
+            default: return .ignored
+            }
+        }
+        return .handled
     }
 
     /// Hand the menu bar the window's verbs.
@@ -226,7 +261,10 @@ struct ContentView: View {
             HStack(spacing: 8) {
                 Button("Render map") { renderMap() }
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(model.isFetching || model.bbox == nil)
+                .disabled(model.whyCannotRender != nil)
+                // The reason is on the button that will not work, so hovering
+                // it answers the question instead of a click having to.
+                .help(model.whyCannotRender ?? "Fetch and draw the chosen area.")
                 if model.isFetching {
                     Button("Cancel") { model.cancel() }
                         .help("Skips sources not yet started and discards the result. A request already in flight runs to completion.")

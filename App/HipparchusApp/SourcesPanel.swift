@@ -27,6 +27,19 @@ struct SourcesPanel: View {
                 }
             }
             .font(.subheadline)
+            // Said here, where it can be acted on, rather than in a status
+            // bar after a click that could not work.
+            if model.stack.plan == nil {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Nothing is ticked, so there is nothing to draw. Choose a source above.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 2)
+            }
         } header: {
             HStack {
                 Text("Sources")

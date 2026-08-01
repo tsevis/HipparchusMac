@@ -43,6 +43,18 @@ final class PenTrace {
     private(set) var recognizerEvents = 0
     private(set) var lastRecognizer = "—"
 
+    /// Whether the readout is shown. Off unless asked for.
+    ///
+    /// This existed to find one bug — a pen whose clicks never arrived — and
+    /// it found it. What it cost was a line of counters permanently across
+    /// the bottom of a window that people are meant to choose places in, and
+    /// diagnostics that never leave are how an interface fills with things
+    /// nobody reads. The counting stays, because it is free and the next
+    /// input bug will want it; only the display is behind the flag:
+    ///
+    ///     Hipparchus.app/Contents/MacOS/Hipparchus --locator-diagnostics
+    static let isShown = ProcessInfo.processInfo.arguments.contains("--locator-diagnostics")
+
     func noteRecognizer(_ what: String) {
         recognizerEvents += 1
         lastRecognizer = what

@@ -10,6 +10,8 @@ struct StylePicker: View {
     @Bindable var model: MapModel
     @State private var isNamingPreset = false
     @State private var newPresetName = ""
+    /// The style Delete is asking about. Non-nil raises the confirmation.
+    @State private var presetToDelete: String?
 
     var body: some View {
         Section {
@@ -126,12 +128,33 @@ struct StylePicker: View {
 
         if model.isCustomPreset(model.preset.name) {
             Button(role: .destructive) {
-                model.deleteCustomPreset(named: model.preset.name)
+                presetToDelete = model.preset.name
             } label: {
                 Label("Delete “\(model.preset.name)”", systemImage: "trash")
                     .font(.caption)
             }
             .buttonStyle(.borderless)
+            // Asked before, not regretted after. Deleting a saved style
+            // rewrites `presets.json` — there is no undo for a file, and the
+            // only copy of a style someone spent an evening tuning can go on
+            // one stray click. A dialog is the cheapest thing that makes that
+            // impossible.
+            .confirmationDialog(
+                "Delete the style “\(presetToDelete ?? "")”?",
+                isPresented: Binding(
+                    get: { presetToDelete != nil },
+                    set: { if !$0 { presetToDelete = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let name = presetToDelete { model.deleteCustomPreset(named: name) }
+                    presetToDelete = nil
+                }
+                Button("Cancel", role: .cancel) { presetToDelete = nil }
+            } message: {
+                Text("This removes it from presets.json. It cannot be undone.")
+            }
         }
 
         if !model.loadedPlugins.isEmpty || !model.pluginLoadErrors.isEmpty {

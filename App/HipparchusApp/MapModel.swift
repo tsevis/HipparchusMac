@@ -700,6 +700,24 @@ final class MapModel {
         setArea(LocatorSelection.area(around: lat, lon: lon))
     }
 
+    /// Why Render map cannot run, or `nil` when it can.
+    ///
+    /// Asked *before* the button is pressed rather than reported after. Both
+    /// of these were previously discovered by pressing a live button and
+    /// waiting: no ticked source failed inside `fetch`, and a bad coordinate
+    /// failed inside `update`. A button that cannot work should say so where
+    /// it is, and a person should not have to spend a click to find out.
+    var whyCannotRender: String? {
+        if isFetching { return "A map is being fetched. Cancel it, or wait." }
+        if bbox == nil {
+            return "Those coordinates do not make an area. West must be less than east, south less than north."
+        }
+        if stack.plan == nil {
+            return "No sources are ticked. Choose at least one in Sources — OpenStreetMap for streets, Elevation for terrain."
+        }
+        return nil
+    }
+
     /// Widen the requested area to the shape of the window that will draw it.
     ///
     /// The canvas fits a map by its tighter dimension, so an area whose

@@ -48,7 +48,7 @@ struct HipparchusApp: App {
         CommandMenu("Map") {
             Button("Render Map") { actions.renderMap?() }
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(model.isFetching || model.bbox == nil)
+                .disabled(model.whyCannotRender != nil)
 
             Button("Cancel Fetch") { model.cancel() }
                 .keyboardShortcut(".", modifiers: .command)

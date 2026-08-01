@@ -414,10 +414,10 @@ private struct LocatorPanelContent: View {
             .disabled(model.isFetching || model.bbox == nil)
             .help("Fetch and draw the chosen area — the same as Render map in the main window.")
 
-            // What the map is actually receiving. See `PenTrace`: this is
-            // here because "nothing happened" has three different causes with
-            // three different fixes, and from outside they look identical.
-            Text(trace.summary)
+            // What the map is actually receiving — only when asked for. See
+            // `PenTrace.isShown`.
+            if PenTrace.isShown {
+                Text(trace.summary)
                 .font(.caption2)
                 .monospacedDigit()
                 .foregroundStyle(.tertiary)
@@ -426,6 +426,7 @@ private struct LocatorPanelContent: View {
                     "Presses the window received inside the map, places chosen, "
                     + "and which route the last one arrived by."
                 )
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
