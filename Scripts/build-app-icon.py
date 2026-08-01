@@ -22,19 +22,24 @@ import sys
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFilter
 except ImportError:                                    # pragma: no cover
-    sys.exit("needs Pillow: pip install Pillow")
+    sys.exit("needs Pillow and numpy: pip install Pillow numpy")
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "Scripts/artwork/AppIcon-source.png"
 ICONSET = (ROOT / "App/HipparchusApp/Resources/Assets.xcassets/AppIcon.appiconset")
 
-#: Square region of the render to keep, in source pixels. Chosen so the
-#: coastline runs corner to corner rather than sitting flat across the middle:
-#: a diagonal reads as a coast at 16 points, where a horizontal reads as a
-#: horizon or a scratch.
-CROP = (470, 200, 1380, 1110)
+#: Square region of the render to keep, in source pixels.
+#:
+#: Centred on the coastline rather than on the canvas, and inside the frame
+#: the renderer draws — the frame lines sit at x=245..250 and y=1125..1130 in
+#: this export, and either one in shot reads as a stray rule across the icon.
+#: The coastline's own centre of mass is near (813, 624), so a 1000px square
+#: about that point holds the headland and its harbour with sea on both sides.
+FRAME_MARGIN = 256
+CROP = (313, 124, 1313, 1124)
 
 #: The canvas, and how much of it the rounded square occupies. Apple's macOS
 #: icon grid leaves roughly a tenth of the canvas clear on each side.
@@ -47,11 +52,37 @@ CORNER = 0.225
 SIZES = [16, 32, 64, 128, 256, 512, 1024]
 
 
+#: How far the coastline is smoothed before it becomes an icon, in source
+#: pixels of blur radius.
+SMOOTHING = 9
+
+
+def evened(art: Image.Image) -> Image.Image:
+    """Redraw the coastline as one even line.
+
+    A coastline is hundreds of short segments, each stroked and each with its
+    own caps, so at icon weight the overlaps read as beads on a rope rather
+    than as a line — obvious at 512 and 1024, invisible below. Blurring the
+    white mask and thresholding it back rebuilds a line of constant width
+    without moving where it runs: the bulges average out against the gaps
+    beside them, and anything that survives the threshold was the line.
+    """
+    pixels = np.asarray(art).astype(np.float32)
+    ink = Image.fromarray((pixels.min(axis=2) > 200).astype(np.uint8) * 255, mode="L")
+    ink = ink.filter(ImageFilter.GaussianBlur(SMOOTHING))
+    mask = ink.point(lambda v: 255 if v > 96 else 0)
+
+    sea = np.asarray(art)[8, 8]
+    out = Image.new("RGB", art.size, tuple(int(v) for v in sea))
+    out.paste(Image.new("RGB", art.size, (255, 255, 255)), (0, 0), mask)
+    return out
+
+
 def main() -> int:
     if not SOURCE.exists():
         sys.exit(f"no source artwork at {SOURCE}")
 
-    art = Image.open(SOURCE).convert("RGB").crop(CROP)
+    art = evened(Image.open(SOURCE).convert("RGB").crop(CROP))
     side = CANVAS - 2 * SHAPE_INSET
     art = art.resize((side, side), Image.LANCZOS)
 
