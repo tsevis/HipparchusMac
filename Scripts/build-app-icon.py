@@ -33,13 +33,12 @@ ICONSET = (ROOT / "App/HipparchusApp/Resources/Assets.xcassets/AppIcon.appiconse
 
 #: Square region of the render to keep, in source pixels.
 #:
-#: Centred on the coastline rather than on the canvas, and inside the frame
-#: the renderer draws — the frame lines sit at x=245..250 and y=1125..1130 in
-#: this export, and either one in shot reads as a stray rule across the icon.
-#: The coastline's own centre of mass is near (813, 624), so a 1000px square
-#: about that point holds the headland and its harbour with sea on both sides.
-FRAME_MARGIN = 256
-CROP = (313, 124, 1313, 1124)
+#: Every edge is inside the frame the renderer draws around the map. That
+#: frame is a white rule, and one edge of it in shot reads as a line ruling
+#: off the sea — which is exactly what it did in the first two attempts. The
+#: bounds are found in the image below rather than written down here, because
+#: they move whenever the export size or the area changes.
+CROP = (260, 120, 1260, 1120)
 
 #: The canvas, and how much of it the rounded square occupies. Apple's macOS
 #: icon grid leaves roughly a tenth of the canvas clear on each side.
@@ -52,37 +51,36 @@ CORNER = 0.225
 SIZES = [16, 32, 64, 128, 256, 512, 1024]
 
 
-#: How far the coastline is smoothed before it becomes an icon, in source
-#: pixels of blur radius.
-SMOOTHING = 9
+def verify_inside_frame(image: Image.Image) -> None:
+    """Refuse a crop that would put the renderer's own frame in the icon.
 
-
-def evened(art: Image.Image) -> Image.Image:
-    """Redraw the coastline as one even line.
-
-    A coastline is hundreds of short segments, each stroked and each with its
-    own caps, so at icon weight the overlaps read as beads on a rope rather
-    than as a line — obvious at 512 and 1024, invisible below. Blurring the
-    white mask and thresholding it back rebuilds a line of constant width
-    without moving where it runs: the bulges average out against the gaps
-    beside them, and anything that survives the threshold was the line.
+    The frame is a thin white rectangle around the map area. Cropping across
+    one of its edges leaves a bright rule down the side of the icon that looks
+    like a border someone drew on purpose, and it is easy to reintroduce by
+    nudging the crop a few pixels. Checked rather than remembered.
     """
-    pixels = np.asarray(art).astype(np.float32)
-    ink = Image.fromarray((pixels.min(axis=2) > 200).astype(np.uint8) * 255, mode="L")
-    ink = ink.filter(ImageFilter.GaussianBlur(SMOOTHING))
-    mask = ink.point(lambda v: 255 if v > 96 else 0)
+    pixels = np.asarray(image).astype(int)
+    height, width, _ = pixels.shape
+    white = pixels.min(axis=2) > 235
+    columns = [x for x in range(width) if white[:, x].mean() > 0.30]
+    rows = [y for y in range(height) if white[y, :].mean() > 0.30]
 
-    sea = np.asarray(art)[8, 8]
-    out = Image.new("RGB", art.size, tuple(int(v) for v in sea))
-    out.paste(Image.new("RGB", art.size, (255, 255, 255)), (0, 0), mask)
-    return out
+    for x in columns:
+        if CROP[0] <= x <= CROP[2]:
+            sys.exit(f"crop {CROP} crosses the frame's vertical rule at x={x}")
+    for y in rows:
+        if CROP[1] <= y <= CROP[3]:
+            sys.exit(f"crop {CROP} crosses the frame's horizontal rule at y={y}")
 
 
 def main() -> int:
     if not SOURCE.exists():
         sys.exit(f"no source artwork at {SOURCE}")
 
-    art = evened(Image.open(SOURCE).convert("RGB").crop(CROP))
+    whole = Image.open(SOURCE).convert("RGB")
+    verify_inside_frame(whole)
+
+    art = Image.open(SOURCE).convert("RGB").crop(CROP)
     side = CANVAS - 2 * SHAPE_INSET
     art = art.resize((side, side), Image.LANCZOS)
 
