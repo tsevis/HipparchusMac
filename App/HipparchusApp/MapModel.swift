@@ -471,14 +471,29 @@ final class MapModel {
     /// dense city it means the shading is almost entirely hidden behind twenty
     /// thousand opaque building fills. Which one you want is a question about
     /// the drawing, so it is a switch.
-    var reliefOverBuildings = false
+    var reliefOverBuildings = false {
+        didSet {
+            guard oldValue != reliefOverBuildings else { return }
+            pendingAction = ("Relief Over Buildings", nil)
+            record()
+        }
+    }
 
     /// One multiplier over every stroke on the sheet, live.
     ///
     /// The preset owns the *relative* weights, which are its design; this moves
     /// only the absolute scale, which is a property of the medium. A sheet that
     /// reads on a screen has hairlines a third of a millimetre wide at 24 × 36.
-    var lineWeight: Double = 1.0
+    ///
+    /// Coalesced under one key, because dragging a slider is one act of
+    /// choosing a weight and not the ninety it emits.
+    var lineWeight: Double = 1.0 {
+        didSet {
+            guard oldValue != lineWeight else { return }
+            pendingAction = ("Change Line Weight", "lineWeight")
+            record()
+        }
+    }
 
     private var task: Task<Void, Never>?
     private let cache = DiskCacheStore(directory: DiskCacheStore.defaultDirectory())
@@ -520,6 +535,8 @@ final class MapModel {
             placeName: placeName,
             preset: preset.name,
             palette: paletteName,
+            lineWeight: lineWeight,
+            reliefOverBuildings: reliefOverBuildings,
             quality: quality.key,
             hiddenLayers: hiddenLayers.sorted()
         )
@@ -598,6 +615,10 @@ final class MapModel {
         preset = namedPreset(session.presetName)
         paletteName = Palette.names.contains(session.paletteName)
             ? session.paletteName : Palette.presetOwnName
+        // Clamped to the slider's own range: a hand-edited session file should
+        // not be able to set a weight the control cannot show or undo back out of.
+        lineWeight = min(max(session.lineWeight, 0.25), 4.0)
+        reliefOverBuildings = session.reliefOverBuildings
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
         placeName = session.placeName
@@ -633,6 +654,10 @@ final class MapModel {
         preset = namedPreset(session.presetName)
         paletteName = Palette.names.contains(session.paletteName)
             ? session.paletteName : Palette.presetOwnName
+        // Clamped to the slider's own range: a hand-edited session file should
+        // not be able to set a weight the control cannot show or undo back out of.
+        lineWeight = min(max(session.lineWeight, 0.25), 4.0)
+        reliefOverBuildings = session.reliefOverBuildings
         quality = Quality.profile(session.qualityKey)
         hiddenLayers = Set(session.hiddenLayers)
         placeName = session.placeName

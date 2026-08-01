@@ -69,6 +69,12 @@ public struct Session: Codable, Sendable, Equatable {
     /// default, and what every session written before palettes existed decodes
     /// to — means the preset's own colours.
     public var paletteName: String
+    /// One multiplier over every stroke. Remembered because it is a property of
+    /// the medium you are drawing for — screen or paper — and that does not
+    /// change between launches the way a title block does.
+    public var lineWeight: Double
+    /// Whether relief shading is drawn over the built environment or under it.
+    public var reliefOverBuildings: Bool
     public var qualityKey: String
     public var hiddenLayers: [String]
 
@@ -89,6 +95,11 @@ public struct Session: Codable, Sendable, Equatable {
         self.sourceChoices = try container.decodeIfPresent([String: String].self, forKey: .sourceChoices) ?? [:]
         self.presetName = try container.decodeIfPresent(String.self, forKey: .presetName) ?? defaults.presetName
         self.paletteName = try container.decodeIfPresent(String.self, forKey: .paletteName) ?? defaults.paletteName
+        // A session written before these existed simply gets the defaults: the
+        // preset's own weights, and relief under the buildings where it belongs.
+        self.lineWeight = try container.decodeIfPresent(Double.self, forKey: .lineWeight) ?? defaults.lineWeight
+        self.reliefOverBuildings = try container
+            .decodeIfPresent(Bool.self, forKey: .reliefOverBuildings) ?? defaults.reliefOverBuildings
         self.qualityKey = try container.decodeIfPresent(String.self, forKey: .qualityKey) ?? defaults.qualityKey
         self.hiddenLayers = try container.decodeIfPresent([String].self, forKey: .hiddenLayers) ?? []
     }
@@ -109,6 +120,8 @@ public struct Session: Codable, Sendable, Equatable {
         sourceChoices: [String: String] = [:],
         presetName: String = "Hypsometric Relief",
         paletteName: String = Palette.presetOwnName,
+        lineWeight: Double = 1.0,
+        reliefOverBuildings: Bool = false,
         qualityKey: String = Quality.default.key,
         hiddenLayers: [String] = [],
     ) {
@@ -121,6 +134,8 @@ public struct Session: Codable, Sendable, Equatable {
         self.sourceChoices = sourceChoices
         self.presetName = presetName
         self.paletteName = paletteName
+        self.lineWeight = lineWeight
+        self.reliefOverBuildings = reliefOverBuildings
         self.qualityKey = qualityKey
         self.hiddenLayers = hiddenLayers
     }
@@ -131,6 +146,8 @@ public struct Session: Codable, Sendable, Equatable {
     public init(
         stack: SourceStack, area: Area, placeName: String, preset: String,
         palette: String = Palette.presetOwnName,
+        lineWeight: Double = 1.0,
+        reliefOverBuildings: Bool = false,
         quality: String, hiddenLayers: [String]
     ) {
         var paths: [String: String] = [:]
@@ -167,6 +184,8 @@ public struct Session: Codable, Sendable, Equatable {
             sourceChoices: choices,
             presetName: preset,
             paletteName: palette,
+            lineWeight: lineWeight,
+            reliefOverBuildings: reliefOverBuildings,
             qualityKey: quality,
             hiddenLayers: hiddenLayers,
         )

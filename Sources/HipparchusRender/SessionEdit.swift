@@ -49,6 +49,18 @@ public enum SessionEdit {
         if before.qualityKey != after.qualityKey {
             return Description(action: "Change Quality")
         }
+        if before.paletteName != after.paletteName {
+            return Description(action: "Change Palette")
+        }
+        if before.lineWeight != after.lineWeight {
+            // Dragging a slider is one act of choosing a weight, not the ninety
+            // values it passes through on the way.
+            return Description(action: "Change Line Weight", coalescingKey: "lineWeight")
+        }
+        if before.reliefOverBuildings != after.reliefOverBuildings {
+            return Description(action: after.reliefOverBuildings
+                ? "Relief Over Buildings" : "Relief Under Buildings")
+        }
         if let edit = layerEdit(from: before.hiddenLayers, to: after.hiddenLayers) {
             return edit
         }

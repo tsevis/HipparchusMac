@@ -41,6 +41,45 @@ final class SessionTests: XCTestCase {
 
     /// Ticks and inline settings must both come back, or the map redraws differently
     /// from the one that was saved.
+    /// The three choices about how a sheet is drawn, rather than what is on it.
+    /// They survive a relaunch because they describe the medium you are drawing
+    /// for, and that does not change between launches the way a title block
+    /// does.
+    func testTheDrawingChoicesSurviveARelaunch() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        var session = Session()
+        session.paletteName = "Admiralty"
+        session.lineWeight = 1.75
+        session.reliefOverBuildings = true
+        try session.write(to: url)
+
+        let restored = Session.read(from: url)
+        XCTAssertEqual(restored.paletteName, "Admiralty")
+        XCTAssertEqual(restored.lineWeight, 1.75, accuracy: 1e-12)
+        XCTAssertTrue(restored.reliefOverBuildings)
+    }
+
+    /// A session written before these fields existed is not thrown away for
+    /// missing them — it is simply a session that made no such choice.
+    func testASessionFromAnEarlierVersionGetsTheDefaults() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        // No palette, no line weight, no relief flag — as 0.2.3 and earlier wrote it.
+        try #"{"presetName":"Clean Atlas","qualityKey":"fast_preview"}"#
+            .write(to: url, atomically: true, encoding: .utf8)
+
+        let restored = Session.read(from: url)
+        XCTAssertEqual(restored.presetName, "Clean Atlas", "the fields that were there must survive")
+        XCTAssertEqual(restored.paletteName, Palette.presetOwnName)
+        XCTAssertEqual(restored.lineWeight, 1.0, accuracy: 1e-12)
+        XCTAssertFalse(restored.reliefOverBuildings)
+    }
+
     func testTheSourceStackComesBackAsItWasLeft() throws {
         var stack = SourceStack()
         stack.setEnabled(SourceID.terrainTiles, true)
