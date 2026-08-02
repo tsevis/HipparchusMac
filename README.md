@@ -385,6 +385,24 @@ pipeline — `--bbox … --preset … --render-to`, not screenshots of a window.
   </tr>
 </table>
 
+Three cities in three of the palettes named after people who drew the world, or
+went and looked at it. One preset — Fragmented Urban — supplying the geometry
+for all three, and the colour coming from somewhere else entirely, which is what
+having colour as an axis of its own is for.
+
+<table>
+  <tr>
+    <td width="33%"><img src="Docs/assets/gallery-jerusalem-ptolemy.png" width="100%" alt="Jerusalem in the Ptolemy palette: apricot buildings on cream vellum, violet contours crossing the Judean hills from 561 to 839 metres, the Old City walls at the centre"></td>
+    <td width="33%"><img src="Docs/assets/gallery-manama-powell.png" width="100%" alt="Manama in the Powell palette: terracotta buildings on a sage ground, the Gulf pale around reclaimed land, the causeway running north to Muharraq"></td>
+    <td width="33%"><img src="Docs/assets/gallery-singapore-vespucci.png" width="100%" alt="Singapore in the Vespucci palette: terracotta and orange on a near-black ground, Marina Bay and the Singapore River in blue, Gardens by the Bay to the east"></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Jerusalem · Ptolemy · 25,873 features</em></td>
+    <td align="center"><em>Manama · Powell · 27,530 features</em></td>
+    <td align="center"><em>Singapore · Vespucci · 21,538 features</em></td>
+  </tr>
+</table>
+
 
 Ten regions, drawn by this app, each in a different preset. They are also the
 widest test it has been put through: every one was fetched, built and rendered

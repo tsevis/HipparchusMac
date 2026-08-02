@@ -159,6 +159,122 @@ extension Palette {
             vegetation: rgb(58, 78, 62),
             contour: rgb(96, 108, 118)
         ),
+        // MARK: Named for people who drew the world, or went and looked at it
+        //
+        // Eight colours each, anchored on swatch sets rather than invented at
+        // the keyboard: `Scripts/ase-to-hex.swift` reads the `.ase` files these
+        // came from, so the provenance of any one of them is a command away.
+        // Where a set had no colour for a role — a three-ink palette has no
+        // sea — the missing one is *mixed* from the ones it does have rather
+        // than picked, which is the same rule the whole engine runs on.
+
+        /// Claudius Ptolemy, Alexandria, second century: the Geographia gave
+        /// the world its first grid of latitude and longitude. Cream vellum,
+        /// violet contours, a turquoise Mediterranean.
+        Palette(
+            name: "Ptolemy",
+            ground: rgb(244, 239, 233),
+            ink: rgb(11, 4, 11),
+            water: rgb(98, 164, 231),
+            land: rgb(252, 187, 159),
+            road: white,
+            roadCasing: rgb(192, 183, 246),
+            vegetation: rgb(188, 227, 232),
+            contour: rgb(102, 46, 145)
+        ),
+
+        /// Pytheas of Massalia sailed north until the sea froze and reported a
+        /// place where the sun did not set, which nobody believed for
+        /// centuries. A sheet for the dark.
+        Palette(
+            name: "Pytheas",
+            ground: rgb(2, 0, 11),
+            ink: rgb(247, 244, 229),
+            water: rgb(44, 18, 178),
+            land: rgb(89, 28, 67),
+            road: rgb(197, 237, 237),
+            roadCasing: rgb(57, 20, 39),
+            vegetation: rgb(89, 184, 127),
+            contour: rgb(88, 124, 191)
+        ),
+
+        /// Vincenzo Coronelli, Venice: globes four metres across for the king
+        /// of France, and a cosmographer's taste for colour that a modern
+        /// atlas would call excessive.
+        Palette(
+            name: "Coronelli",
+            ground: mix(white, rgb(234, 170, 163), 0.18),
+            ink: rgb(22, 67, 177),
+            water: rgb(28, 94, 178),
+            land: rgb(203, 119, 6),
+            road: white,
+            roadCasing: rgb(241, 128, 101),
+            vegetation: mix(rgb(42, 172, 9), white, 0.45),
+            contour: rgb(191, 35, 161)
+        ),
+
+        /// Paolo dal Pozzo Toscanelli, Florence, who put Asia close enough to
+        /// the west of Europe that sailing there sounded reasonable. Columbus
+        /// carried a copy of his letter.
+        Palette(
+            name: "Toscanelli",
+            ground: mix(white, rgb(220, 143, 90), 0.12),
+            ink: rgb(41, 25, 28),
+            water: rgb(116, 219, 174),
+            land: rgb(176, 90, 58),
+            road: white,
+            roadCasing: rgb(220, 143, 90),
+            vegetation: mix(rgb(116, 219, 174), rgb(41, 25, 28), 0.45),
+            contour: mix(rgb(176, 90, 58), white, 0.35)
+        ),
+
+        /// Amerigo Vespucci, Florence, who worked out that the land in the way
+        /// was not Asia but somewhere else entirely — and had two continents
+        /// named after him for saying so.
+        Palette(
+            name: "Vespucci",
+            ground: rgb(41, 25, 28),
+            ink: rgb(220, 143, 90),
+            water: rgb(61, 120, 172),
+            land: rgb(109, 56, 45),
+            road: rgb(220, 143, 90),
+            roadCasing: rgb(33, 55, 96),
+            vegetation: rgb(68, 150, 81),
+            contour: rgb(116, 219, 174)
+        ),
+
+        /// John Wesley Powell ran the Colorado through the Grand Canyon in
+        /// 1869 with one arm and no maps, and came back with the maps. Canyon
+        /// strata: sienna, ochre, and a green river.
+        Palette(
+            name: "Powell",
+            ground: rgb(205, 227, 202),
+            ink: rgb(29, 21, 22),
+            water: rgb(54, 139, 154),
+            land: rgb(165, 93, 51),
+            road: mix(white, rgb(205, 227, 202), 0.35),
+            roadCasing: rgb(133, 67, 41),
+            vegetation: rgb(29, 92, 83),
+            contour: rgb(205, 117, 62)
+        ),
+
+        /// John C. Frémont surveyed the American West five times and was
+        /// called the Pathfinder for it. Clay, khaki and slate — three inks,
+        /// which is all a field survey ever carried.
+        Palette(
+            name: "Frémont",
+            ground: mix(white, rgb(182, 165, 114), 0.22),
+            ink: rgb(46, 42, 61),
+            // No sea in a three-ink set, so the water is the slate let down
+            // toward the paper rather than a fourth colour smuggled in.
+            water: mix(rgb(46, 42, 61), white, 0.42),
+            land: rgb(144, 91, 75),
+            road: white,
+            roadCasing: rgb(182, 165, 114),
+            vegetation: mix(rgb(182, 165, 114), rgb(46, 42, 61), 0.35),
+            contour: mix(rgb(144, 91, 75), white, 0.30)
+        ),
+
         Palette(
             name: "High Contrast Light",
             ground: white, ink: rgb(0, 0, 0),
