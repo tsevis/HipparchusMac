@@ -18,7 +18,7 @@ The Python application is the specification. It is finished, it works, and its
 here that disagrees with it is a bug here.
 
 **Status: the app is built and running.** Every online source, the composing
-source stack, the sixteen presets, ten palettes over any of them, illuminated
+source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
 and export at a real printed size are in, with 761 tests and the output checked
 against real ground.
@@ -33,7 +33,7 @@ below is as close as anything headless gets to it.
 
 ## Download
 
-[**Hipparchus 0.2.5**](https://github.com/tsevis/HipparchusMac/releases/latest)
+[**Hipparchus 0.2.6**](https://github.com/tsevis/HipparchusMac/releases/latest)
 — a disk image, on the releases page. Drag the app to Applications.
 
 The build is **signed ad-hoc: no Developer ID, no notarisation.** It opens on
@@ -727,7 +727,7 @@ emphasis come with it.
 `Scripts/build-style-packs.py` had already solved this at build time. Its
 `sheet()` derives all thirty-seven styles from eight named colours, which is
 exactly a palette engine, run once by a script and frozen into JSON. The same
-function now exists in Swift and runs at render time, so any of ten palettes can
+function now exists in Swift and runs at render time, so any of seventeen palettes can
 be laid over any preset without a build step. The preset keeps its geometry
 profile, which is what a preset still is once colour has been lifted out of it.
 
