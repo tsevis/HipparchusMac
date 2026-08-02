@@ -281,9 +281,7 @@ struct ContentView: View {
                 // else in the toolbar is grey on purpose: an accent used twice
                 // is an accent used nowhere.
                 Button("Render map") { renderMap() }
-                .buttonStyle(.borderedProminent)
-                .tint(.hipparchus)
-                .controlSize(.large)
+                .buttonStyle(RenderButtonStyle())
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(model.whyCannotRender != nil)
                 // The reason is on the button that will not work, so hovering
