@@ -210,7 +210,18 @@ extension Palette {
             road: white,
             roadCasing: rgb(241, 128, 101),
             vegetation: mix(rgb(42, 172, 9), white, 0.45),
-            contour: rgb(191, 35, 161)
+            // The swatch set's magenta, taken down towards the deep ink.
+            // Straight, at luma 96, it was the lightest contour of the
+            // seventeen and the sheet read washed: pink lines over ochre
+            // buildings, neither holding the other down.
+            //
+            // Mixing towards this palette's blue was the first attempt and it
+            // was the wrong axis — it moved the hue to violet and the luma only
+            // to 82, so against warm ochre it still read light. Towards the ink
+            // instead takes it to 60, which is darkening rather than merely
+            // cooling, and keeps enough magenta that it is still Coronelli's
+            // colour rather than a neutral grey.
+            contour: mix(rgb(191, 35, 161), deepInk, 0.55)
         ),
 
         /// Paolo dal Pozzo Toscanelli, Florence, who put Asia close enough to
