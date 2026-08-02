@@ -33,7 +33,7 @@ below is as close as anything headless gets to it.
 
 ## Download
 
-[**Hipparchus 0.2.4**](https://github.com/tsevis/HipparchusMac/releases/latest)
+[**Hipparchus 0.2.5**](https://github.com/tsevis/HipparchusMac/releases/latest)
 — a disk image, on the releases page. Drag the app to Applications.
 
 The build is **signed ad-hoc: no Developer ID, no notarisation.** It opens on
