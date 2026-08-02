@@ -124,11 +124,16 @@ public actor DiskCacheStore: CacheStoring {
 
     /// How large the cache may get before the oldest entries are dropped.
     ///
-    /// A gigabyte: several sessions of large areas, and small enough to be a
-    /// limit. Expiry alone was never one — an entry is only checked for
-    /// staleness when it is *asked for*, so anything never wanted again stayed
-    /// for ever, and the cache only ever grew.
-    public static let defaultMaximumBytes = 1_073_741_824
+    /// Expiry alone was never a limit — an entry is only checked for staleness
+    /// when it is *asked for*, so anything never wanted again stayed for ever,
+    /// and the cache only ever grew.
+    ///
+    /// Eight gigabytes, raised from one, and matching
+    /// `AppSettings.cacheSizeLimitMB`. Note this is only the **fallback** for a
+    /// caller that names no limit: the application passes its own setting, so
+    /// that is the number that binds in practice. The two are kept equal so a
+    /// caller who omits it gets the same answer the app would have given.
+    public static let defaultMaximumBytes = 8_589_934_592
 
     /// Drop the oldest entries until the cache fits, and say how many went.
     ///

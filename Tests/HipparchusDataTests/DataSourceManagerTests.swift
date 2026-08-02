@@ -11,8 +11,16 @@ private struct StubProvider: MapProvider {
     var failure: (any Error)?
     /// Blocks until cancelled, to exercise a source stopping mid-fetch.
     var waitsForCancellation = false
+    /// How long this source takes to answer, for observing that sources are
+    /// fetched together rather than in series.
+    var delay: Duration = .zero
+    /// Metadata this source claims, for checking whose answer the merge keeps.
+    var metadata: [String: PropertyValue] = [:]
 
     func fetch(_ query: BBoxQuery) async throws -> FeatureCollection {
+        if delay > .zero {
+            try? await Task.sleep(for: delay)
+        }
         if waitsForCancellation {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(2))
@@ -34,9 +42,11 @@ private struct StubProvider: MapProvider {
                 )
             }
         }
+        var claimed: [String: PropertyValue] = ["source": .string(providerID)]
+        for (key, value) in metadata { claimed[key] = value }
         return FeatureCollection(
             featuresByLayer: featuresByLayer,
-            metadata: ["source": .string(providerID)],
+            metadata: claimed,
             bbox: query.bbox,
             provenance: provenance
         )
@@ -63,6 +73,65 @@ final class DataSourceManagerTests: XCTestCase {
     private var elevation: StubProvider {
         StubProvider(providerID: SourceID.terrainTiles, label: "Elevation", provenance: .measured,
                      layers: ["terrain_contours": 5])
+    }
+
+    // MARK: - Concurrency
+
+    /// Sources are fetched together, not one after another.
+    ///
+    /// This was the difference between a fetch costing the sum of its sources
+    /// and costing the slowest of them: six ticked sources meant Overpass's
+    /// retry budget, then the imagery's, then the earthquakes', in series, and
+    /// the reasonable ones waited behind whichever was having a bad day.
+    ///
+    /// Timing is the only way to observe it, so the margin is wide: four
+    /// sources sleeping 300 ms each are 1.2 s in series and about 300 ms
+    /// together. Anything under half a second cannot have been sequential.
+    func testSourcesAreFetchedTogetherRatherThanOneAfterAnother() async throws {
+        let slow = (0..<4).map { index in
+            StubProvider(
+                providerID: "slow_\(index)", label: "Slow \(index)", provenance: .measured,
+                layers: ["roads": 1], delay: .milliseconds(300)
+            )
+        }
+        let plan = FetchPlan(base: "slow_0", extras: ["slow_1", "slow_2", "slow_3"])
+
+        let started = ContinuousClock.now
+        let result = try await manager(slow).fetch(query, plan: plan)
+        let elapsed = ContinuousClock.now - started
+
+        XCTAssertEqual(result.featureCount, 4, "every source still answered")
+        XCTAssertLessThan(
+            elapsed, .milliseconds(900),
+            "four 300 ms sources took \(elapsed) — that is the sum, so they ran in series"
+        )
+    }
+
+    /// Concurrency must not let the fastest provider decide what the sheet
+    /// says. The merge takes the first answer for keys a single source owns, so
+    /// the collections have to come back in the plan's order however they
+    /// finish — here the base is deliberately the slowest.
+    func testTheMergeKeepsThePlansOrderWhateverOrderTheyFinishIn() async throws {
+        let slowBase = StubProvider(
+            providerID: SourceID.overpass, label: "OpenStreetMap", provenance: .measured,
+            layers: ["roads": 1], delay: .milliseconds(200),
+            metadata: ["contour_interval_metres": .double(10)]
+        )
+        let quickExtra = StubProvider(
+            providerID: SourceID.terrainTiles, label: "Elevation", provenance: .measured,
+            layers: ["terrain_contours": 1],
+            metadata: ["contour_interval_metres": .double(50)]
+        )
+
+        let result = try await manager([slowBase, quickExtra]).fetch(
+            query, plan: FetchPlan(base: SourceID.overpass, extras: [SourceID.terrainTiles])
+        )
+
+        XCTAssertEqual(
+            result.metadata["contour_interval_metres"]?.doubleValue, 10,
+            "the faster source won a key the plan gave to the base"
+        )
+        XCTAssertEqual(result.metadata["sources"]?.stringValue, "overpass, terrain_tiles")
     }
 
     // MARK: - Stacking
@@ -162,13 +231,27 @@ final class DataSourceManagerTests: XCTestCase {
 
     /// A source already running stops when it checks, and the sources behind it in
     /// the queue never start.
-    func testASourceStopsWhenItChecksAndTheQueueBehindItIsSkipped() async throws {
+    /// Cancelling stops every source that is still waiting, and a fetch with
+    /// nothing finished throws rather than drawing an empty map.
+    ///
+    /// This used to be called "the queue behind it is skipped", and that
+    /// guarantee is gone on purpose: sources are fetched together now, so there
+    /// is no queue to be behind. What replaces it is the rule already stated by
+    /// `testASourceThatFinishedBeforeTheCancelIsStillDrawn` — whatever finished
+    /// before the cancel is kept, and whatever was still waiting is stopped.
+    func testCancellingStopsEverySourceStillWaiting() async throws {
         let slow = StubProvider(
             providerID: SourceID.overpass, label: "OpenStreetMap", provenance: .measured,
             waitsForCancellation: true
         )
+        // Both wait, so nothing can finish before the cancel arrives; with one
+        // fast source this is the *other* test, and it keeps that source's work.
+        let alsoSlow = StubProvider(
+            providerID: SourceID.terrainTiles, label: "Elevation", provenance: .measured,
+            waitsForCancellation: true
+        )
         let reporter = FetchReporter()
-        let manager = self.manager([slow, elevation])
+        let manager = self.manager([slow, alsoSlow])
         let query = self.query
 
         let task = Task {
@@ -191,7 +274,7 @@ final class DataSourceManagerTests: XCTestCase {
             XCTAssertEqual(progress.source(SourceID.overpass)?.state, .cancelled)
             XCTAssertEqual(
                 progress.source(SourceID.terrainTiles)?.state, .cancelled,
-                "a source behind the cancel must never start"
+                "a source still waiting when the cancel arrived must stop too"
             )
         }
     }

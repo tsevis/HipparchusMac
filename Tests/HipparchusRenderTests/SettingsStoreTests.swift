@@ -29,7 +29,12 @@ final class SettingsStoreTests: XCTestCase {
         let settings = store.load()
         XCTAssertEqual(settings.themeMode, "light")
         XCTAssertEqual(settings.performancePreviewTolerance, 1.5, accuracy: 1e-9)
-        XCTAssertEqual(settings.cacheSizeLimitMB, 4096)
+        // A deliberate divergence: the Python's own default is 4096 MB, and
+        // four gigabytes is a few sessions of real work here — OpenStreetMap
+        // over a dense city is tens of megabytes a fetch and a terrain mosaic
+        // is sixty-four tiles. Evicting an area about to be asked for again
+        // costs a round trip to a service run on donations.
+        XCTAssertEqual(settings.cacheSizeLimitMB, 8192)
         XCTAssertEqual(settings.providerRPSLimit, 1.0, accuracy: 1e-9)
     }
 
@@ -62,7 +67,7 @@ final class SettingsStoreTests: XCTestCase {
             url: directory.appendingPathComponent("a/b/settings.json")
         )
         try nested.save(UserSettings())
-        XCTAssertEqual(nested.load().cacheSizeLimitMB, 4096)
+        XCTAssertEqual(nested.load().cacheSizeLimitMB, 8192)
     }
 
     // MARK: - Files that are not what they should be

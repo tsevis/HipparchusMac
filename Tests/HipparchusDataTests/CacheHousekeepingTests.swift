@@ -108,6 +108,10 @@ final class CacheHousekeepingTests: XCTestCase {
         // Big enough that ordinary work never trips it, small enough that it
         // is a limit — the 1.8 GB this was written for was neither.
         XCTAssertGreaterThan(DiskCacheStore.defaultMaximumBytes, 500_000_000)
-        XCTAssertLessThan(DiskCacheStore.defaultMaximumBytes, 5_000_000_000)
+        XCTAssertLessThan(DiskCacheStore.defaultMaximumBytes, 32_000_000_000)
+
+        // And equal to the setting the application actually passes, so a caller
+        // that names no limit gets the same answer the app would have given.
+        XCTAssertEqual(DiskCacheStore.defaultMaximumBytes, 8 * 1024 * 1024 * 1024)
     }
 }

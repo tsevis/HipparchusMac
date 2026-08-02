@@ -285,6 +285,33 @@ Keep a `--streets` area small: a window of 0.04° × 0.03° over San Francisco
 returns 29,000 features in about half a minute, and Overpass is shared hardware
 run on donations.
 
+## Sources are fetched together
+
+Every ticked source is fetched **concurrently**. They used to run one after
+another, which made a fetch cost the sum of its sources rather than the slowest
+of them — with six ticked, OpenStreetMap's retry budget, then the imagery's,
+then the earthquakes', in series, and the reasonable ones waiting behind
+whichever was having a bad day. They share nothing but the network, so there
+was never a reason to serialise them. Seoul at 0.09° × 0.05° with streets and
+elevation went from 36 s to 13 s.
+
+Two things survive the change and are tested:
+
+- **The plan's order still decides the merge.** Collections are sorted back into
+  the order they were asked for before merging, because the merge takes the
+  first answer for keys a single source owns — the contour interval, the
+  elevation model. Without that, whichever provider happened to answer fastest
+  would decide what the sheet says.
+- **Cancelling still keeps what was already paid for.** What finished before the
+  cancel is drawn; what was still waiting is stopped. What is gone is the old
+  guarantee that a source *behind* the cancel never starts, because there is no
+  longer a queue to be behind.
+
+One mirror was dropped along the way: `overpass.kumi.systems` stopped answering
+at all — never replying rather than refusing — so every attempt paid the full
+60-second timeout waiting for a host that was never going to answer, three
+times over. Worth putting back the day it works again.
+
 ## Verifying output
 
 Rendering is visual, so the checks are numbers rather than impressions. These

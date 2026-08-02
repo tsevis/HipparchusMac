@@ -16,10 +16,16 @@ import HipparchusGeometry
 public struct OverpassSettings: Sendable {
     public var endpoint = "https://overpass-api.de/api/interpreter"
     /// Mirrors, tried in turn within each attempt.
+    ///
+    /// `overpass.kumi.systems` was here and is gone: it stopped answering
+    /// entirely — not refusing, not erroring, simply never replying — and a
+    /// silent mirror is the expensive kind. Every attempt paid the full
+    /// `timeoutSeconds` waiting for it, three times over, which is three
+    /// minutes of a fetch spent on a host that was never going to answer. Put
+    /// it back the day it does; a mirror that works is worth having.
     public var fallbackEndpoints = [
         "https://lz4.overpass-api.de/api/interpreter",
         "https://z.overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
     ]
     public var timeoutSeconds: TimeInterval = 60
     public var maxRetries = 3

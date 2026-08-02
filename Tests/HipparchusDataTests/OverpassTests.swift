@@ -245,7 +245,11 @@ final class OverpassProviderTests: XCTestCase {
             XCTFail("a fetch that never succeeded must not return a map")
         } catch let error as OverpassRequestError {
             XCTAssertEqual(error.attempts, 2)
-            XCTAssertEqual(error.endpoints, 4)
+            // Three, not four: `overpass.kumi.systems` stopped answering
+            // entirely — never replying rather than refusing — and every
+            // attempt paid the full timeout waiting for it.
+            XCTAssertEqual(error.endpoints, settings.candidateEndpoints.count)
+            XCTAssertEqual(error.endpoints, 3)
         }
     }
 

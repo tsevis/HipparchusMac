@@ -18,7 +18,14 @@ public struct UserSettings: Sendable, Equatable {
     public var performancePreviewTolerance: Double = 1.5
     /// The Python's default, and now this one's. The cache is bounded after
     /// every fetch — see `DiskCacheStore.enforceSizeLimit`.
-    public var cacheSizeLimitMB: Int = 4096
+    /// Eight gigabytes, raised from four. This is the limit that actually
+    /// binds — `DiskCacheStore.defaultMaximumBytes` is only the fallback for a
+    /// caller that supplies none — and four turned out to be a few sessions of
+    /// real work: OpenStreetMap over a dense city is tens of megabytes a fetch
+    /// and a terrain mosaic is sixty-four tiles. Evicting an area that is about
+    /// to be asked for again costs a round trip to a service run on donations,
+    /// and disk is cheaper than Overpass's time.
+    public var cacheSizeLimitMB: Int = 8192
     public var providerRPSLimit: Double = 1.0
 
     public init() {}

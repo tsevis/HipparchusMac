@@ -34,7 +34,28 @@ public struct DataSourceManager: Sendable {
 
     public var registeredIDs: [String] { providers.keys.sorted() }
 
+    /// One source's outcome, kept with its place in the plan.
+    ///
+    /// The position is carried because the sources no longer finish in the
+    /// order they were asked for, and the merge depends on that order: it takes
+    /// the *first* answer for keys a single source owns, like the contour
+    /// interval. Sorting by position before merging is what stops "which
+    /// provider answered fastest" from deciding what the sheet says.
+    private struct Outcome {
+        let position: Int
+        let collection: FeatureCollection?
+        let error: ProviderError?
+        let cancelled: Bool
+    }
+
     /// Fetch the plan and merge the results.
+    ///
+    /// Sources are fetched **concurrently**. They were sequential, which made a
+    /// fetch cost the sum of its sources rather than the slowest of them: six
+    /// ticked sources meant Overpass's retry budget, then the imagery's, then
+    /// the earthquakes', one after another, and the reasonable ones waited
+    /// behind whichever was having a bad day. They share nothing but the
+    /// network, so there was never a reason to serialise them.
     ///
     /// Throws only `FetchCancelled`, and only when cancellation left nothing to
     /// draw. Anything else a provider raises is recorded against that source and the
@@ -47,43 +68,60 @@ public struct DataSourceManager: Sendable {
         let sourceIDs = plan.sourceIDs
         await reporter?.expect(sourceIDs)
 
-        var collections: [FeatureCollection] = []
-        var errors: [ProviderError] = []
-        var wasCancelled = false
+        let outcomes = await withTaskGroup(of: Outcome.self) { group in
+            for (position, sourceID) in sourceIDs.enumerated() {
+                guard let provider = providers[sourceID] else {
+                    await reporter?.failed(sourceID, detail: "not registered")
+                    group.addTask {
+                        Outcome(
+                            position: position, collection: nil,
+                            error: ProviderError(sourceID: sourceID, message: "not registered"),
+                            cancelled: false
+                        )
+                    }
+                    continue
+                }
 
-        for sourceID in sourceIDs {
-            if Task.isCancelled {
-                // Sources that have not started are skipped outright. That is the
-                // part of cancellation that can be immediate, and it is the only
-                // part that is instant.
-                wasCancelled = true
-                await reporter?.cancelled(sourceID)
-                continue
+                group.addTask {
+                    // Checked here rather than before the group is built: a
+                    // source cancelled before it starts is skipped outright,
+                    // which is the part of cancellation that can be instant.
+                    if Task.isCancelled {
+                        await reporter?.cancelled(sourceID)
+                        return Outcome(position: position, collection: nil, error: nil, cancelled: true)
+                    }
+                    await reporter?.started(sourceID)
+                    do {
+                        let fetched = try await provider.fetch(query)
+                        await reporter?.finished(sourceID, detail: Self.describe(fetched))
+                        return Outcome(position: position, collection: fetched, error: nil, cancelled: false)
+                    } catch is CancellationError {
+                        await reporter?.cancelled(sourceID)
+                        return Outcome(position: position, collection: nil, error: nil, cancelled: true)
+                    } catch is FetchCancelled {
+                        await reporter?.cancelled(sourceID)
+                        return Outcome(position: position, collection: nil, error: nil, cancelled: true)
+                    } catch {
+                        let message = String(describing: error)
+                        await reporter?.failed(sourceID, detail: String(message.prefix(40)))
+                        return Outcome(
+                            position: position, collection: nil,
+                            error: ProviderError(sourceID: sourceID, message: message),
+                            cancelled: false
+                        )
+                    }
+                }
             }
 
-            guard let provider = providers[sourceID] else {
-                errors.append(ProviderError(sourceID: sourceID, message: "not registered"))
-                await reporter?.failed(sourceID, detail: "not registered")
-                continue
-            }
-
-            await reporter?.started(sourceID)
-            do {
-                let fetched = try await provider.fetch(query)
-                collections.append(fetched)
-                await reporter?.finished(sourceID, detail: describe(fetched))
-            } catch is CancellationError {
-                wasCancelled = true
-                await reporter?.cancelled(sourceID)
-            } catch is FetchCancelled {
-                wasCancelled = true
-                await reporter?.cancelled(sourceID)
-            } catch {
-                let message = String(describing: error)
-                errors.append(ProviderError(sourceID: sourceID, message: message))
-                await reporter?.failed(sourceID, detail: String(message.prefix(40)))
-            }
+            var collected: [Outcome] = []
+            for await outcome in group { collected.append(outcome) }
+            // Back into the plan's order, whatever order they finished in.
+            return collected.sorted { $0.position < $1.position }
         }
+
+        let collections = outcomes.compactMap(\.collection)
+        let errors = outcomes.compactMap(\.error)
+        let wasCancelled = outcomes.contains(where: \.cancelled)
 
         // Cancelling discards the result rather than drawing it — but only when
         // there is nothing worth drawing. Sources that finished before the cancel
@@ -104,7 +142,7 @@ public struct DataSourceManager: Sendable {
     // MARK: -
 
     /// A short note for the progress line: what this source actually returned.
-    private func describe(_ collection: FeatureCollection) -> String {
+    private static func describe(_ collection: FeatureCollection) -> String {
         let layers = collection.featuresByLayer.filter { !$0.value.isEmpty }.count
         let features = collection.featureCount
         guard features > 0 else { return "nothing here" }
