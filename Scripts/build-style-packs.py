@@ -177,20 +177,22 @@ def sheet(
                                fill=mix(water, ink, 0.3), fillAlpha=28, opacity=0.75),
         "seamark_harbours": style(stroke=0.8, strokeColor=mix(land, ink, 0.45),
                                   fill=mix(ground, land, 0.35), fillAlpha=70, opacity=0.85),
-        # The four point layers are sized by their stroke, because that is what a
-        # point is to the renderer: a half-point dot with the layer's stroke
-        # round it. At the linework's own weights a buoy came out as a speck you
-        # had to be told was there, so these are chosen against a rendered sheet.
+        # These were three and four points wide while a mark was a dot, because a
+        # point is its stroke to the renderer. They are shapes now -- a can, a
+        # pair of cardinal cones, a wreck's masts -- and the shape carries the
+        # size, so the stroke goes back to being linework. Left heavy, a
+        # 4.2-point line closed the light flare into a solid blob.
         #
         # Fixed to the ground, and drawn like it.
-        "seamark_beacons": style(stroke=3.2, strokeColor=mix(land, ink, 0.6), halo=ground),
+        "seamark_beacons": style(stroke=1.0, strokeColor=mix(land, ink, 0.6), halo=ground),
         # Afloat, and lighter on the page for it.
-        "seamark_buoys": style(stroke=3.0, strokeColor=mix(water, ink, 0.65), halo=ground),
+        "seamark_buoys": style(stroke=0.9, strokeColor=mix(water, ink, 0.65), halo=ground),
         # Danger reads as weight: a wreck is the one mark that exists to say
         # "not here", so it takes the ink undiluted.
-        "seamark_hazards": style(stroke=3.6, strokeColor=ink, opacity=0.95, halo=ground),
-        # What a reader looks for first, so nothing on the sheet is heavier.
-        "seamark_lights": style(stroke=4.2, strokeColor=ink,
+        "seamark_hazards": style(stroke=1.05, strokeColor=ink, opacity=0.95, halo=ground),
+        # What a reader looks for first. The flare is filled, so its weight comes
+        # from its area rather than from its edge.
+        "seamark_lights": style(stroke=0.9, strokeColor=ink,
                                 fill=mix(ground, ink, 0.15), fillAlpha=210, halo=ground),
     })
     return styles

@@ -52,6 +52,32 @@ public enum OverpassDecode {
 
             let type = element["type"] as? String ?? "element"
             let identifier = element["id"].map { "\($0)" } ?? "unknown"
+            let shared = properties(from: tags)
+
+            // A sea mark that is a point becomes its chart symbol: a can, a
+            // cone, a pair of cardinal cones, a wreck's masts. Several parts
+            // make one mark, so they arrive as several features in the layer —
+            // one geometry each, which is what the render layer's parallel
+            // arrays require and what lets a part be a polygon while its
+            // neighbour is a line.
+            //
+            // Only points. A harbour mapped as its own outline is already the
+            // right shape, and replacing it with a symbol would throw away
+            // surveyed geography to draw a pictogram of it.
+            if case .point(let position) = geometry,
+               let symbol = SeamarkSymbols.geometry(for: tags, at: position, in: bbox) {
+                for (index, part) in symbol.enumerated() {
+                    featuresByLayer[layer, default: []].append(Feature(
+                        id: "\(type)/\(identifier)/\(index)",
+                        layer: layer,
+                        source: "overpass",
+                        geometry: part,
+                        provenance: .measured,
+                        properties: shared
+                    ))
+                }
+                continue
+            }
 
             featuresByLayer[layer, default: []].append(Feature(
                 id: "\(type)/\(identifier)",
@@ -60,7 +86,7 @@ public enum OverpassDecode {
                 geometry: geometry,
                 // OSM is surveyed ground, whatever the pipe that carried it here.
                 provenance: .measured,
-                properties: properties(from: tags)
+                properties: shared
             ))
         }
 

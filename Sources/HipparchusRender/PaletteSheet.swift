@@ -131,34 +131,32 @@ extension Palette {
             stroke: 0.8, strokeColor: Self.mix(land, ink, 0.45),
             fill: Self.mix(ground, land, 0.35), fillAlpha: 70, opacity: 0.85
         )
-        // The four point layers are sized by their stroke, because that is what
-        // a point *is* to this renderer: a half-point dot with the layer's
-        // stroke drawn round it. At the weights the linework uses — one point,
-        // give or take — a buoy came out as a speck you had to be told was
-        // there. These are chosen against a rendered sheet rather than by
-        // analogy with the contours.
-        //
-        // Still dots rather than symbols. A cardinal buoy has a shape and a
-        // topmark on a real chart, and giving it one is sprite work; a legible
-        // dot in the right place is the honest half of it, and it is the half
-        // that has to be right first.
+        // These were three and four points wide while a mark was a dot, because
+        // a point *is* its stroke to this renderer and anything less was a speck
+        // you had to be told was there. They are shapes now — a can, a pair of
+        // cardinal cones, a wreck's masts — and the shape carries the size, so
+        // the stroke goes back to being linework. Left heavy, a 4.2-point line
+        // closed the light flare into a solid blob and thickened every mast
+        // until the wrecks read as smudges. Measured by looking at the sheet,
+        // twice, in both directions.
         //
         // Fixed to the ground, and drawn like it.
         styles["seamark_beacons"] = style(
-            stroke: 3.2, strokeColor: Self.mix(land, ink, 0.6), halo: ground
+            stroke: 1.0, strokeColor: Self.mix(land, ink, 0.6), halo: ground
         )
         // Afloat, and lighter on the page for it.
         styles["seamark_buoys"] = style(
-            stroke: 3.0, strokeColor: Self.mix(water, ink, 0.65), halo: ground
+            stroke: 0.9, strokeColor: Self.mix(water, ink, 0.65), halo: ground
         )
         // Danger reads as weight. A wreck is the one mark on the sheet that
         // exists to say "not here", so it takes the ink undiluted.
         styles["seamark_hazards"] = style(
-            stroke: 3.6, strokeColor: ink, opacity: 0.95, halo: ground
+            stroke: 1.05, strokeColor: ink, opacity: 0.95, halo: ground
         )
-        // What a reader looks for first, so nothing on the sheet is heavier.
+        // What a reader looks for first. The flare is filled, so its weight
+        // comes from its area rather than from its edge.
         styles["seamark_lights"] = style(
-            stroke: 4.2, strokeColor: ink,
+            stroke: 0.9, strokeColor: ink,
             fill: Self.mix(ground, ink, 0.15), fillAlpha: 210, halo: ground
         )
 
