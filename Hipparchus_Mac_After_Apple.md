@@ -137,9 +137,13 @@ pass whatever you do.
 
 The asset on the release is an un-notarised build until this is done.
 
+`<TAG>` is whatever release is current when you get here — a placeholder rather
+than a number, because it was written as `v0.2.6` and the version has since moved
+to 0.3.0. Check with `gh release list --repo tsevis/HipparchusMac`.
+
 ```bash
-gh release delete-asset v0.2.6 <OLD_FILENAME>.dmg --repo tsevis/HipparchusMac --yes
-gh release upload v0.2.6 dist/<NEW_FILENAME>.dmg --repo tsevis/HipparchusMac
+gh release delete-asset <TAG> <OLD_FILENAME>.dmg --repo tsevis/HipparchusMac --yes
+gh release upload <TAG> dist/<NEW_FILENAME>.dmg --repo tsevis/HipparchusMac
 ```
 
 **Then edit the release notes.** They name the file by its commit sha in the
