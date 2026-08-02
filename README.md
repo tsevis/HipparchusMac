@@ -20,8 +20,12 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with 761 tests and the output checked
+and export at a real printed size are in, with 803 tests and the output checked
 against real ground.
+
+The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
+are fetched and drawn, and the sea floor is banded on a ramp of its own instead
+of borrowing the land's.
 
 Every claim here is backed by a test or by a render someone can open. **Almost
 none of them is a claim about the interface.** The window at the top of this
@@ -367,6 +371,17 @@ Two have no Python to be in parity with, and are pinned against something else:
 Regenerate them with the scripts in `Scripts/`. A diff there means one of the two
 implementations changed; find out which before accepting it.
 
+The palette fixture had no generator until recently — it was made by importing
+the build script from something nobody committed, so the one artefact preventing
+two style engines from drifting could not be reproduced, and adding a layer to
+the pair meant hand-editing JSON or leaving the layer unchecked.
+`Scripts/generate-palette-parity-fixture.py` does it now, and
+`--check` reports what moved without writing:
+
+```sh
+python3 Scripts/generate-palette-parity-fixture.py --check
+```
+
 ## Gallery
 
 The same two areas in a light preset and in Night, rendered by the app's own
@@ -390,6 +405,19 @@ pipeline — `--bbox … --preset … --render-to`, not screenshots of a window.
     <td align="center"><em>Lefkada &amp; Kefalonia · Night</em></td>
   </tr>
 </table>
+
+**A sheet that is mostly sea.** The Myrtoan Sea, between the Peloponnese and the
+Cyclades: Serifos and its neighbours as the only land in a thousand square
+kilometres, and the sea floor drawn as filled depth bands with 546 sub-sea
+contours over them. This is the same frame the verification table below uses,
+and until recently it came out as blue lines on paper — the sea got contours
+where the land got mass.
+
+<p align="center">
+  <img src="Docs/assets/gallery-myrtoan-sea-coastal-survey.png" width="70%" alt="The Myrtoan Sea drawn as filled depth bands from pale shallows to deep blue-grey, with 546 sub-sea contours over them; Serifos at 120 metres and two smaller islands are the only land in the frame">
+</p>
+
+<p align="center"><em>Myrtoan Sea · Coastal Survey · Admiralty · −1,310 m · six depth bands, 546 contours</em></p>
 
 Three cities in three of the palettes named after people who drew the world, or
 went and looked at it. One preset — Fragmented Urban — supplying the geometry
@@ -771,6 +799,66 @@ is a smaller error than the sea painted over the town. The count is in the
 scene's diagnostics as `inferred_sea_polygons`, since a reader is entitled to
 know the water was reasoned rather than measured.
 
+## Depth, as mass rather than as linework
+
+`elevation_bands` always spanned the whole measured range, so a coastal sheet was
+already banding its sea floor — in the land's ramp, under the land's colours, a
+trench drawn as a kind of valley. The sea got contours where the land got mass,
+and what mass it did get was wearing the wrong clothes.
+
+The split is the one `separateBathymetry` already makes for the contours, one
+level up: land bands from the waterline, `depth_bands` below it, each with its
+own count and its own ramp. Band 0 is the deepest, so the sea ramp runs dark
+water up to the shallows — the opposite direction from the land, which is what
+makes the two meet at the coast instead of colliding there.
+
+**Two modes, because the question is not always the same one.** `even` divides
+whatever depth the frame holds, and is right for looking at the shape of a basin.
+`chart` puts its boundaries at the depths a chart states — 2, 5, 10, 20, 30, 50
+and up — and is right for reading, where the answer wants to be a round number
+and the shallow end is where decisions get made. Chart mode deliberately does not
+reach past the water actually in the frame: a harbour sheet should not carry a
+200 m band it has no ground for. Which mode drew a sheet is in its diagnostics as
+`depth_band_mode`, because an evenly banded sea and a sea banded at charted
+depths look alike and mean different things.
+
+Switching the split off restores the single ramp every sheet had before, for
+comparing an old render against a new one.
+
+## Sea marks
+
+Every buoy, beacon, light, harbour and restricted area in OpenStreetMap was
+invisible to this application — and to the Python it was ported from — because
+neither had ever asked Overpass for a `seamark:*` tag. On a program that ships a
+preset called Coastal Survey, a palette called Admiralty and a pack called
+Nautical, that was the largest thing missing.
+
+Six layers, grouped by what a reader does with the thing rather than by S-57's
+own taxonomy, which is organised for encoding: lights are looked for, buoys
+float, beacons are fixed, hazards are avoided, harbours are where a vessel goes,
+and areas are rules. One Overpass request answers for all six, because the whole
+marine namespace hangs off one key — which makes what can be *asked for* and what
+comes *back* two different lists for the first time.
+
+The classification runs before the generic tag tests, and that is the point of
+it. A lighthouse is `seamark:type=light_major` **and** `man_made=lighthouse`
+**and** named; a marina is a seamark and a `leisure` facility; a wreck is a
+seamark and `historic`. Every one of them would have been claimed by the
+named-place rule, and the chart layers would have come back empty from a fetch
+that looked like it had worked.
+
+**Two honest limits.** They are dots, not S-52 symbols: a cardinal buoy has a
+shape and a topmark on a real chart, and giving it one is sprite work this has
+not done. And no preset styles them, exactly as no preset styles `ferry_routes` —
+the preset tables are generated, so the documented hairline fallback is what a
+new layer gets until somebody chooses otherwise. Any of the seventeen palettes
+dresses them properly, because the styles are derived from a palette's eight
+colours in both engines.
+
+Coverage is uneven and that is a fact about the data, not about this: OSM's
+seamarks are dense in Northern Europe and thin in the Eastern Mediterranean. A
+sheet drawn from them is not a chart and must not be read as one.
+
 ## Things that are not bugs
 
 - **A ferry route crosses open water in a straight line**, because it does. OSM
@@ -1034,8 +1122,12 @@ means a motorway is never dropped because forty thousand footpaths came first.
 
 ## Where OSM tags land
 
-Layers are a reading of OSM tags, and the reading is ported from the Python. One
-place it deliberately differs: **routes are not water.** OSM tags the
+Layers are a reading of OSM tags, and the reading is ported from the Python —
+except for the `seamark:*` namespace, which the Python has no reading of at all
+and which is read here before anything else looks at a tag. See "Sea marks"
+above for why the order is the whole of it.
+
+One place the ported reading deliberately differs: **routes are not water.** OSM tags the
 Piraeus–Serifos ferry `waterway=seaway`, so a rule keyed on the presence of a
 `waterway` tag drew an 80-kilometre crossing of the Saronic Gulf as if it were a
 river. `route=ferry`, `waterway=seaway` and `waterway=fairway` now land in
