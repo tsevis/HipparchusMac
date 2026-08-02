@@ -181,14 +181,41 @@ final class TerrainFetchTests: XCTestCase {
     func testTheURLTemplateIsFilledIn() async throws {
         let (provider, stub) = provider()
         _ = try await provider.fetch(athens)
-        XCTAssertFalse(stub.urls.isEmpty)
-        for url in stub.urls {
+
+        // Two kinds of request leave this provider now: the terrarium tiles, and
+        // — inside European waters, which Athens is — one coverage request for
+        // the finer sea floor. Only the first kind is filled in from a template.
+        let tiles = stub.urls.filter { $0.absoluteString.contains("/terrarium/") }
+        XCTAssertFalse(tiles.isEmpty)
+        for url in tiles {
             XCTAssertEqual(url.scheme, "https")
             XCTAssertTrue(url.absoluteString.hasSuffix(".png"))
             XCTAssertFalse(url.absoluteString.contains("{z}"))
             XCTAssertFalse(url.absoluteString.contains("{x}"))
             XCTAssertFalse(url.absoluteString.contains("{y}"))
         }
+    }
+
+    /// The bathymetry request goes out for European water and not elsewhere.
+    ///
+    /// A frame outside the coverage must cost nothing — no round trip, and no
+    /// error document to be mistaken for a coverage.
+    func testTheCoverageIsAskedForOnlyWhereItExists() async throws {
+        let (european, europeanStub) = provider()
+        _ = try await european.fetch(athens)
+        XCTAssertTrue(
+            europeanStub.urls.contains { $0.absoluteString.contains("emodnet") },
+            "Athens is in European waters and should have been asked about"
+        )
+
+        let (pacific, pacificStub) = provider()
+        _ = try? await pacific.fetch(BBoxQuery(
+            bbox: BoundingBox(minLon: -157.0, minLat: 19.5, maxLon: -156.8, maxLat: 19.7)
+        ))
+        XCTAssertFalse(
+            pacificStub.urls.contains { $0.absoluteString.contains("emodnet") },
+            "Hawaii is not in EMODnet's coverage and should not have been asked about"
+        )
     }
 
     /// One unavailable tile must not lose the rest of the area.

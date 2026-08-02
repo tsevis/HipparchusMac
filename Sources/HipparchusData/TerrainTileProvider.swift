@@ -100,6 +100,14 @@ public struct TerrainTileSettings: Sendable {
     /// floor was always being banded, in the land's colours. Off restores the
     /// single ramp every sheet had before, for comparing an old render to a new
     /// one.
+    /// Put EMODnet's ~115 m bathymetry under the sea, where it reaches.
+    ///
+    /// On by default in European waters and a no-op everywhere else. The mosaic
+    /// this provider fetches carries a global ocean grid on the order of a
+    /// kilometre or two, upsampled — which is why a sea sheet could look
+    /// confident and be interpolation. See `EMODnetBathymetry`.
+    public var useEMODnetBathymetry = true
+    public var emodnet = EMODnetSettings()
     public var separateDepthBands = true
     /// Fewer than the land gets. Depth on these sheets spans further than height
     /// and matters less finely — the interesting part of a coastal sheet is the
@@ -157,7 +165,26 @@ public struct TerrainTileProvider: MapProvider {
         guard let (cropped, window) = cropToBounds(mosaic: mosaic, origin: origin, zoom: zoom, bounds: bounds) else {
             throw TerrainTileError.coveredNothing
         }
-        let grid = cropped.smoothed(passes: settings.smoothingPasses)
+        // A finer sea floor, where there is one to be had.
+        //
+        // Blended into the grid rather than emitted as a layer of its own, which
+        // is the whole reason this is three lines: the contours, the depth
+        // bands, the hillshade and the summits are all downstream of this one
+        // array, so every one of them improves without knowing anything happened.
+        var blended = cropped
+        var emodnetCells = 0
+        if settings.useEMODnetBathymetry, EMODnetBathymetry.covers(bounds) {
+            let service = EMODnetBathymetry(settings: settings.emodnet, http: http)
+            if let finer = await service.grid(
+                for: bounds, rows: cropped.rows, columns: cropped.columns
+            ) {
+                let result = blendSeaFloor(cropped, with: finer, over: bounds)
+                blended = result.field
+                emodnetCells = result.replaced
+            }
+        }
+
+        let grid = blended.smoothed(passes: settings.smoothingPasses)
         guard let range = grid.finiteRange else {
             throw TerrainTileError.noTilesReadable
         }
@@ -256,6 +283,14 @@ public struct TerrainTileProvider: MapProvider {
                 // The mosaic is a surface model, and saying so in the diagnostics
                 // is cheaper than explaining a rooftop "summit" later.
                 "elevation_model": .string("surface"),
+                // How much of the sea floor on this sheet is EMODnet's ~115 m
+                // rather than the mosaic's kilometre-scale ocean grid. A reader
+                // is entitled to know which of the two they are looking at, and
+                // a sheet that does not say cannot be told apart afterwards.
+                "emodnet_cells": .int(emodnetCells),
+                "bathymetry_source": .string(
+                    emodnetCells > 0 ? "emodnet+terrarium" : "terrarium"
+                ),
             ],
             bbox: bounds,
             provenance: .measured

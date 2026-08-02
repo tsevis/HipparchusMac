@@ -191,8 +191,9 @@ struct AboutView: View {
 
     private static let legal = """
     Map data © OpenStreetMap contributors, under the Open Database License \
-    (ODbL). Elevation from Mapzen/AWS Terrain Tiles. Imagery from NASA GIBS. \
-    Earthquakes from the U.S. Geological Survey. Satellite elements from \
+    (ODbL). Elevation from Mapzen/AWS Terrain Tiles. Bathymetry in European \
+    seas from EMODnet Bathymetry (emodnet-bathymetry.eu). Imagery from NASA \
+    GIBS. Earthquakes from the U.S. Geological Survey. Satellite elements from \
     CelesTrak. Geocoding by Nominatim and Apple MapKit; Locator basemap © \
     Apple. Rendered with GEOS.
 
