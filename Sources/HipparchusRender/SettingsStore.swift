@@ -16,9 +16,11 @@ public struct UserSettings: Sendable, Equatable {
     /// being opened here.
     public var themeMode: String = "light"
     public var performancePreviewTolerance: Double = 1.5
-    /// The Python's default, and now this one's. The cache is bounded after
-    /// every fetch — see `DiskCacheStore.enforceSizeLimit`.
-    /// Eight gigabytes, raised from four. This is the limit that actually
+    /// The cache is bounded after every fetch — see
+    /// `DiskCacheStore.enforceSizeLimit`.
+    ///
+    /// Eight gigabytes, raised from four, and **no longer the Python's own
+    /// default**, which this used to be. This is the limit that actually
     /// binds — `DiskCacheStore.defaultMaximumBytes` is only the fallback for a
     /// caller that supplies none — and four turned out to be a few sessions of
     /// real work: OpenStreetMap over a dense city is tens of megabytes a fetch
