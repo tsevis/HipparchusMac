@@ -27,9 +27,15 @@ Every claim here is backed by a test or by a render someone can open. **Almost
 none of them is a claim about the interface.** The window at the top of this
 page was photographed by the author on his own Mac; it is not something the
 build can produce, because the environment this was written in has no Screen
-Recording permission and cannot capture any window. The model behind the window
-is verified continuously, the layout is not, and "Verifying the app itself"
-below is as close as anything headless gets to it.
+Recording permission and cannot capture any window.
+
+The interface has now been used and looked at — the toolbar, the style column,
+the palettes and the page controls — which it had not been for most of this
+project's life. That is a person saying it looks right, and it is worth more
+than nothing and less than a test: **no automated check covers the layout**, so
+a control that moves, greys out or stops responding will not fail anything. The
+model behind the window is verified continuously and the window is not, and
+"Verifying the app itself" below is as close as anything headless gets to it.
 
 ## Download
 
