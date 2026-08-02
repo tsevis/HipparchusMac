@@ -10,13 +10,22 @@ import Foundation
 /// the layers actually requested rather than always asking for everything.
 public enum OverpassQuery {
 
+    /// One request, six layers. The marine namespace is a single tag key, so
+    /// asking for `seamark:type` once answers for buoys, beacons, lights,
+    /// hazards, harbours and areas together — six clauses would be six copies of
+    /// the same query. `Seamarks` does the sorting afterwards.
+    public static let seamarks = "seamarks"
+
     /// The layers this provider knows how to ask for, in the order the query lists
     /// them.
+    ///
+    /// A *request* name, which since seamarks is no longer the same thing as a
+    /// layer the decoder emits — see `OverpassDecode.layers`.
     public static let supportedLayers = [
         "roads", "buildings", "water", "parks", "railways",
         "forests", "fields", "natural", "coastline", "places",
         "shops", "amenities", "landuse", "barriers", "power",
-        "ferry_routes",
+        "ferry_routes", seamarks,
     ]
 
     /// One layer's Overpass clauses. `{bbox}` is substituted with `s,w,n,e`.
@@ -112,6 +121,19 @@ public enum OverpassQuery {
             #"way["route"="ferry"]({bbox});"#,
             #"relation["route"="ferry"]({bbox});"#,
             #"way["waterway"~"seaway|fairway"]({bbox});"#,
+        ],
+        // The whole marine namespace in three clauses, because it hangs off one
+        // key. A buoy is a node, a restricted area is a way or a relation, and
+        // `seamark:type` is on all of them — so asking for the key rather than
+        // for each of its hundred-odd values is both shorter and proof against
+        // whatever OSM adds next.
+        //
+        // Cheap despite the breadth: this is one tag, absent from everything
+        // inland, and an Overpass tag index answers it without scanning.
+        seamarks: [
+            #"node["seamark:type"]({bbox});"#,
+            #"way["seamark:type"]({bbox});"#,
+            #"relation["seamark:type"]({bbox});"#,
         ],
     ]
 

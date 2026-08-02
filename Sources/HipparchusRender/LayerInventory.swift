@@ -35,6 +35,12 @@ public enum LayerInventory {
         "landuse": "Land use",
         "coastline": "Coastline / sea",
         "ferry_routes": "Ferry routes",
+        "seamark_lights": "Lights",
+        "seamark_buoys": "Buoys",
+        "seamark_beacons": "Beacons",
+        "seamark_hazards": "Wrecks & hazards",
+        "seamark_harbours": "Harbours & anchorages",
+        "seamark_areas": "Restricted & traffic areas",
         "roads": "Roads",
         "roads_motorway": "Motorways",
         "roads_trunk": "Trunk roads",
@@ -51,7 +57,15 @@ public enum LayerInventory {
     ]
 
     /// The order the panel reads in: terrain under the built environment, labels last.
-    public static let groupOrder = ["Terrain", "Water & land", "Built", "Movement", "Labels", "Derived"]
+    ///
+    /// Sea marks are a group of their own rather than six rows inside
+    /// "Water & land". They are a different kind of thing from a coastline — a
+    /// coastline is the shape of the ground, a buoy is a statement about
+    /// navigation — and on a sheet that carries both, a reader turning marks off
+    /// wants one place to do it.
+    public static let groupOrder = [
+        "Terrain", "Water & land", "Sea marks", "Built", "Movement", "Labels", "Derived",
+    ]
 
     static let groups: [String: String] = [
         "elevation_bands": "Terrain",
@@ -71,6 +85,12 @@ public enum LayerInventory {
         "fields": "Water & land",
         "natural": "Water & land",
         "landuse": "Water & land",
+        "seamark_lights": "Sea marks",
+        "seamark_buoys": "Sea marks",
+        "seamark_beacons": "Sea marks",
+        "seamark_hazards": "Sea marks",
+        "seamark_harbours": "Sea marks",
+        "seamark_areas": "Sea marks",
         "buildings": "Built",
         "barriers": "Built",
         "power": "Built",

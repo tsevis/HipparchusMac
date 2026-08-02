@@ -156,6 +156,34 @@ def sheet(
         "satellite_tracks": style(stroke=0.6, strokeColor=mix(ink, ground, 0.4), opacity=0.8),
         "satellite_footprints": style(stroke=0.4, strokeColor=mix(ink, ground, 0.5),
                                       fill=ink, fillAlpha=30, opacity=0.5),
+
+        # Sea marks. The twin of the block in `PaletteSheet.swift`, mix for mix.
+        # A chart's own hierarchy in the pack's own colours: the rules are
+        # ground, the marks are ink, and the emphasis runs from a restricted
+        # area you should notice to a light you must not miss.
+        #
+        # No magenta, which is what a real chart would use -- these sheets have
+        # eight colours and a ninth would break the rule the whole derivation
+        # exists to keep.
+        "seamark_areas": style(stroke=0.7, strokeColor=mix(water, ink, 0.55),
+                               fill=mix(water, ink, 0.3), fillAlpha=28, opacity=0.75),
+        "seamark_harbours": style(stroke=0.8, strokeColor=mix(land, ink, 0.45),
+                                  fill=mix(ground, land, 0.35), fillAlpha=70, opacity=0.85),
+        # The four point layers are sized by their stroke, because that is what a
+        # point is to the renderer: a half-point dot with the layer's stroke
+        # round it. At the linework's own weights a buoy came out as a speck you
+        # had to be told was there, so these are chosen against a rendered sheet.
+        #
+        # Fixed to the ground, and drawn like it.
+        "seamark_beacons": style(stroke=3.2, strokeColor=mix(land, ink, 0.6), halo=ground),
+        # Afloat, and lighter on the page for it.
+        "seamark_buoys": style(stroke=3.0, strokeColor=mix(water, ink, 0.65), halo=ground),
+        # Danger reads as weight: a wreck is the one mark that exists to say
+        # "not here", so it takes the ink undiluted.
+        "seamark_hazards": style(stroke=3.6, strokeColor=ink, opacity=0.95, halo=ground),
+        # What a reader looks for first, so nothing on the sheet is heavier.
+        "seamark_lights": style(stroke=4.2, strokeColor=ink,
+                                fill=mix(ground, ink, 0.15), fillAlpha=210, halo=ground),
     })
     return styles
 

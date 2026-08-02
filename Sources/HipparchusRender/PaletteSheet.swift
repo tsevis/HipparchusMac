@@ -103,6 +103,54 @@ extension Palette {
             fill: ink, fillAlpha: 30, opacity: 0.5
         )
 
+        // Sea marks. A chart's own hierarchy, in the palette's own colours: the
+        // rules are ground, the marks are ink, and the emphasis runs from a
+        // restricted area you should notice to a light you must not miss.
+        //
+        // No dashes, because `LayerStyle` has none — a translucent fill and a
+        // stated edge carry the same "this is an area, not an object" without
+        // one. No magenta either, which is what a real chart would use: this
+        // sheet has eight colours and borrowing a ninth would break the one rule
+        // the palette engine exists to keep.
+        styles["seamark_areas"] = style(
+            stroke: 0.7, strokeColor: Self.mix(water, ink, 0.55),
+            fill: Self.mix(water, ink, 0.3), fillAlpha: 28, opacity: 0.75
+        )
+        styles["seamark_harbours"] = style(
+            stroke: 0.8, strokeColor: Self.mix(land, ink, 0.45),
+            fill: Self.mix(ground, land, 0.35), fillAlpha: 70, opacity: 0.85
+        )
+        // The four point layers are sized by their stroke, because that is what
+        // a point *is* to this renderer: a half-point dot with the layer's
+        // stroke drawn round it. At the weights the linework uses — one point,
+        // give or take — a buoy came out as a speck you had to be told was
+        // there. These are chosen against a rendered sheet rather than by
+        // analogy with the contours.
+        //
+        // Still dots rather than symbols. A cardinal buoy has a shape and a
+        // topmark on a real chart, and giving it one is sprite work; a legible
+        // dot in the right place is the honest half of it, and it is the half
+        // that has to be right first.
+        //
+        // Fixed to the ground, and drawn like it.
+        styles["seamark_beacons"] = style(
+            stroke: 3.2, strokeColor: Self.mix(land, ink, 0.6), halo: ground
+        )
+        // Afloat, and lighter on the page for it.
+        styles["seamark_buoys"] = style(
+            stroke: 3.0, strokeColor: Self.mix(water, ink, 0.65), halo: ground
+        )
+        // Danger reads as weight. A wreck is the one mark on the sheet that
+        // exists to say "not here", so it takes the ink undiluted.
+        styles["seamark_hazards"] = style(
+            stroke: 3.6, strokeColor: ink, opacity: 0.95, halo: ground
+        )
+        // What a reader looks for first, so nothing on the sheet is heavier.
+        styles["seamark_lights"] = style(
+            stroke: 4.2, strokeColor: ink,
+            fill: Self.mix(ground, ink, 0.15), fillAlpha: 210, halo: ground
+        )
+
         return StyleProfile(layerStyles: styles, background: ground)
     }
 

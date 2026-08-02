@@ -225,7 +225,11 @@ public enum FileFormat: String, Sendable, Equatable {
 public enum FileLayer {
     public static let adminBoundaries = "admin_boundaries"
 
-    public static let all: [String] = OverpassQuery.supportedLayers + [
+    // `OverpassDecode.layers` rather than `OverpassQuery.supportedLayers`: a file
+    // holds features, and the two lists stopped being the same when one seamark
+    // request began answering for six layers. Offering `seamarks` here would name
+    // a layer no file can contain.
+    public static let all: [String] = OverpassDecode.layers + [
         adminBoundaries,
         TerrainLayer.minorContours,
         TerrainLayer.indexContours,

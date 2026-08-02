@@ -16,7 +16,15 @@ public enum OverpassDecode {
     /// Empty layers are kept so the layer panel can say "none here" rather than
     /// silently omitting a layer that was asked for and genuinely had nothing —
     /// an empty map should explain itself.
-    public static let layers = OverpassQuery.supportedLayers
+    ///
+    /// **Not the same list as `OverpassQuery.supportedLayers`**, and that is new:
+    /// what can be *asked for* and what can be *produced* used to be one list.
+    /// Seamarks are one request — a single clause on `seamark:type` answers for
+    /// all of them — and six layers, because a buoy and a restricted area are
+    /// not one thing to a reader even though they are one query.
+    public static let layers = OverpassQuery.supportedLayers.flatMap { requested in
+        requested == OverpassQuery.seamarks ? Seamarks.allLayers : [requested]
+    }
 
     public static func featureCollection(
         from data: Data,
@@ -94,6 +102,18 @@ public enum OverpassDecode {
 
         if natural == "coastline" { return "coastline" }
         if place == "sea" || place == "ocean" { return "coastline" }
+
+        // Before the generic tests, and this is the whole reason seamarks were
+        // worth a file of their own. A lighthouse is `seamark:type=light_major`
+        // *and* `man_made=lighthouse` *and* named; a marina is a seamark and a
+        // `leisure` facility; a wreck is a seamark and `historic`. Every one of
+        // them would be claimed by the named-place test below, and the chart
+        // layers would come back empty from a fetch that looked like it worked.
+        //
+        // After the coastline, though: a coastline way carrying a seamark tag is
+        // still the shape of the land, and it is the only thing on the sheet
+        // that the sea inference reads.
+        if let seamark = Seamarks.layer(forTags: tags) { return seamark }
 
         // A shipping lane is not a body of water, and this has to be asked *before*
         // the water tests: OSM tags the Piraeus–Serifos ferry `waterway=seaway`, and

@@ -159,8 +159,31 @@ final class OverpassDecodeTests: XCTestCase {
     /// An empty map should explain itself, so every layer stays listed.
     func testEveryLayerIsPresentEvenWhenEmpty() {
         let collection = OverpassDecode.featureCollection(from: payload(""))
-        XCTAssertEqual(Set(collection.layerNames), Set(OverpassQuery.supportedLayers))
+        XCTAssertEqual(Set(collection.layerNames), Set(OverpassDecode.layers))
         XCTAssertEqual(collection.featureCount, 0)
+    }
+
+    /// What can be asked for and what comes back are two lists now.
+    ///
+    /// They were one until seamarks, and this test asserted that. One clause on
+    /// `seamark:type` answers for six layers, because a buoy and a restricted
+    /// area are one query and not one thing — so the request list expands into
+    /// the emitted list rather than equalling it.
+    func testTheRequestListExpandsIntoTheEmittedList() {
+        for requested in OverpassQuery.supportedLayers where requested != OverpassQuery.seamarks {
+            XCTAssertTrue(
+                OverpassDecode.layers.contains(requested),
+                "\(requested) can be asked for and never comes back"
+            )
+        }
+        for produced in Seamarks.allLayers {
+            XCTAssertTrue(OverpassDecode.layers.contains(produced))
+            XCTAssertFalse(
+                OverpassQuery.supportedLayers.contains(produced),
+                "\(produced) is an answer, not a question: asking for it by name would build no clause"
+            )
+        }
+        XCTAssertFalse(OverpassDecode.layers.contains(OverpassQuery.seamarks))
     }
 
     func testOSMDataClaimsToBeMeasured() {

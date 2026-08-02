@@ -65,6 +65,11 @@ public struct SceneBuilder: Sendable {
         // label; ranking them is a deliberate divergence in the port's favour.)
         "elevation_bands", "terrain_hillshade", "bathymetry",
         "terrain_contours", "terrain_index_contours", "night_lights",
+        // Rules drawn as ground: restricted areas, traffic separation, fairways,
+        // and the harbours a vessel is heading for. Above the relief rather than
+        // under it, because a hypsometric band fill is opaque and would paint
+        // them out — the same lesson the inferred sea taught, learned once.
+        "seamark_areas", "seamark_harbours",
         // The built environment.
         "buildings", "barriers", "power",
         // Roads, major to minor.
@@ -77,6 +82,10 @@ public struct SceneBuilder: Sendable {
         "satellite_footprints", "satellite_tracks",
         // Measured point phenomena sit above the base map.
         "earthquakes_deep", "earthquakes_intermediate", "earthquakes_shallow",
+        // The marks themselves, nearly last: on a chart these are the subject,
+        // and a buoy hidden under a building has failed at the one thing it is
+        // for. Lights above the rest, being what the reader looks for first.
+        "seamark_hazards", "seamark_beacons", "seamark_buoys", "seamark_lights",
         // Labels on top, by importance.
         "summits", "places", "street_names", "amenities", "shops",
         // Derived artistic layers.
@@ -141,7 +150,15 @@ public struct SceneBuilder: Sendable {
 
                 // A point with a name is a label, not linework. The height on a
                 // summit is the whole reason that layer exists.
-                if case .point(let point) = feature.geometry {
+                //
+                // **Unless the point is the subject.** A buoy is a dot on the
+                // water and nothing else: it usually has no name, and treating
+                // it as a label meant twenty-one of them arrived from Overpass
+                // and none reached the sheet. That is exactly the failure this
+                // loop already learned from earthquakes and satellite tracks —
+                // "styled, budgeted, and permanently empty" — and points are the
+                // one geometry it had left.
+                if case .point(let point) = feature.geometry, !Self.pointMarkLayers.contains(name) {
                     if let name = feature.property("name")?.stringValue, !name.isEmpty {
                         layer.labels.append(PlaceLabel(
                             name: name,
@@ -632,6 +649,20 @@ public struct SceneBuilder: Sendable {
     static let labelLayers: Set<String> = [
         "places", "shops", "amenities", "summits", "satellite_tracks",
     ]
+
+    /// The layers where a bare point is a *mark* rather than a label anchor.
+    ///
+    /// Everywhere else on this map a point means "something is here, and its
+    /// name is the interesting part": a town, a shop, a summit's height. A sea
+    /// mark is the other way round. A lateral buoy is a position and a colour;
+    /// most carry no name at all, and the ones that do carry something like
+    /// "No. 3", which is not worth a label on a printed sheet.
+    ///
+    /// So these draw their points and stay unlabelled. The four point layers
+    /// only — a harbour or a restricted area arrives as a way or a relation, and
+    /// a point tagged as one of those is a pin dropped where the area should be,
+    /// which is better shown as a mark than as nothing.
+    static let pointMarkLayers: Set<String> = Set(Seamarks.allLayers)
 
     /// What a label says it is: the feature's own word for itself, or the
     /// layer's when it has none.
