@@ -51,7 +51,12 @@ struct ContentView: View {
                 .listStyle(.sidebar)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 380)
             }
-            .navigationTitle("Hipparchus")
+            // Deliberately empty. The name was set here and macOS drew it in
+            // the toolbar, between the search field and the area — a word that
+            // told you which application you were already looking at, in the
+            // space where the controls live. The app's name is in the menu bar
+            // and on the Dock icon; it does not need saying a third time.
+            .navigationTitle("")
             .toolbar { toolbar }
 
             statusBar
@@ -271,7 +276,14 @@ struct ContentView: View {
             // Cancel appears beside Render map while a fetch runs — where the eye
             // already is — as well as in the status bar next to the progress.
             HStack(spacing: 8) {
+                // The one button the whole window exists to have pressed, so it
+                // is the one thing wearing the app's own turquoise. Everything
+                // else in the toolbar is grey on purpose: an accent used twice
+                // is an accent used nowhere.
                 Button("Render map") { renderMap() }
+                .buttonStyle(.borderedProminent)
+                .tint(.hipparchus)
+                .controlSize(.large)
                 .keyboardShortcut(.return, modifiers: .command)
                 .disabled(model.whyCannotRender != nil)
                 // The reason is on the button that will not work, so hovering
