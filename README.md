@@ -20,12 +20,13 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with 803 tests and the output checked
+and export at a real printed size are in, with 839 tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
-are fetched and drawn, and the sea floor is banded on a ramp of its own instead
-of borrowing the land's.
+are fetched and drawn as chart symbols, the sea floor is banded on a ramp of its
+own instead of borrowing the land's, and in European waters the depths under all
+of it are EMODnet's 115 m rather than a kilometre-scale global grid.
 
 Every claim here is backed by a test or by a render someone can open. **Almost
 none of them is a claim about the interface.** The window at the top of this
@@ -330,22 +331,42 @@ expected. Every one currently matches:
 
 | Area | Bounding box | Expected | Measured |
 |---|---|---|---|
-| Santorini | `25.32, 36.33 → 25.50, 36.48` | −79 m floor, 525 m rim | −79 m to 525 m |
-| Athens | `23.575, 37.816 → 23.895, 38.136` | −4 m to 1091 m | −4 m to 1091 m |
+| Santorini | `25.32, 36.33 → 25.50, 36.48` | 525 m rim | −85 m to 525 m |
+| Athens | `23.575, 37.816 → 23.895, 38.136` | tops at 1,091 m | −11 m to 1091 m |
 | San Francisco | `−122.53, 37.70 → −122.35, 37.84` | tops at 284 m | −114 m to 284 m |
 | Addis Ababa | `38.65, 8.90 → 38.88, 9.10` | never below 2,075 m | 2075 m to 3127 m |
 | Everest | `86.85, 27.93 → 87.05, 28.06` | 5,060 m to 8,746 m | 5060 m to 8746 m |
-| Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | −1,310 m, ~546 sub-sea contours | −1310 m, 546 |
+| Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | deeper than −1,300 m | −1350 m, 802 contours |
+
+**Three of the sea figures moved when EMODnet arrived**, and the movement is the
+point rather than a regression: Santorini's floor went from −79 m to −85 m,
+Athens's from −4 m to −11 m, and the Myrtoan Sea's from −1,310 m to −1,350 m
+with 546 sub-sea contours becoming 802. The land columns did not move at all,
+which is what you would expect from a change that only touches the sea. The
+expected column is stated as the thing that is actually known — a summit height,
+a floor deeper than some figure — rather than as the number this app last
+printed, because a verification table that pins its own output verifies nothing.
 
 Addis Ababa, Everest and the Myrtoan Sea are verification areas rather than
 saved places — the sidebar's list is the eleven cities and island groups worth
 returning to — so reach them by `--bbox`, or by pasting the coordinates above.
 
 Athens, Addis Ababa and Everest yield no bathymetry; the Myrtoan Sea yields five
-summits rather than two dozen. Santorini's Illustrator layers come out as 178
-contours, 798 index contours, 7 bathymetry and 24 summit labels — the same counts
-the Python's own screenshot shows — and its longest contour is 8,097 vertices,
-arriving whole.
+summits rather than two dozen.
+
+Santorini's Illustrator layers, counted out of the SVG that
+`hipparchus-cli santorini` writes, are **178 contours, 889 index contours, 142
+bathymetry and 34 summit labels**, and its longest contour is 8,097 vertices,
+arriving whole. The 178 is the figure this port has always produced and the one
+the Python's own screenshot shows.
+
+The other three no longer match that screenshot, and only one of them has an
+explanation I am sure of: **bathymetry was 7 and is 142**, because the sea around
+the caldera is now EMODnet's 115 m rather than a kilometre-scale global grid, and
+that structure is real. The index-contour and summit-label figures had already
+drifted from the 798 and 24 published here before today — measured, not
+explained, and written down that way rather than given a cause I have not
+established.
 
 Beyond that, fixtures compare this port against something other than my reading
 of it. Most are the Python itself:
@@ -408,16 +429,16 @@ pipeline — `--bbox … --preset … --render-to`, not screenshots of a window.
 
 **A sheet that is mostly sea.** The Myrtoan Sea, between the Peloponnese and the
 Cyclades: Serifos and its neighbours as the only land in a thousand square
-kilometres, and the sea floor drawn as filled depth bands with 546 sub-sea
-contours over them. This is the same frame the verification table below uses,
-and until recently it came out as blue lines on paper — the sea got contours
-where the land got mass.
+kilometres, and the sea floor drawn as filled depth bands with 802 sub-sea
+contours over them. This is the same frame the verification table above uses,
+and it has been redrawn twice — once when the sea stopped borrowing the land's
+ramp, and again when the depths themselves stopped being interpolation.
 
 <p align="center">
-  <img src="Docs/assets/gallery-myrtoan-sea-coastal-survey.png" width="70%" alt="The Myrtoan Sea drawn as filled depth bands from pale shallows to deep blue-grey, with 546 sub-sea contours over them; Serifos at 120 metres and two smaller islands are the only land in the frame">
+  <img src="Docs/assets/gallery-myrtoan-sea-coastal-survey.png" width="70%" alt="The Myrtoan Sea drawn from EMODnet bathymetry as filled depth bands with 802 sub-sea contours over them, showing ridges, channels and basin structure; Serifos at 120 metres and two smaller islands are the only land in the frame">
 </p>
 
-<p align="center"><em>Myrtoan Sea · Coastal Survey · Admiralty · −1,310 m · six depth bands, 546 contours</em></p>
+<p align="center"><em>Myrtoan Sea · Coastal Survey · Admiralty · −1,350 m · six depth bands, 802 contours, EMODnet</em></p>
 
 Three cities in three of the palettes named after people who drew the world, or
 went and looked at it. One preset — Fragmented Urban — supplying the geometry
@@ -798,6 +819,47 @@ the frame, or every face scoring alike — because a line where the sea should b
 is a smaller error than the sea painted over the town. The count is in the
 scene's diagnostics as `inferred_sea_polygons`, since a reader is entitled to
 know the water was reasoned rather than measured.
+
+## A sea floor that was surveyed rather than guessed
+
+The elevation this application draws comes from the AWS terrarium mosaic, and its
+*ocean* component is a global grid on the order of a kilometre or two, upsampled
+to whatever zoom was asked for. A sheet with hundreds of smooth confident
+isobaths was drawing interpolation with the same authority as the SRTM land
+beside it. EMODnet's DTM is about 115 m over European waters — the Aegean, the
+Ionian, the Levantine, Cyprus — which is most of the water this keeps returning
+to.
+
+It arrives over EMODnet's coverage service as an uncompressed single-band float32
+GeoTIFF, north-up, in EPSG:4326. That is the easiest possible GeoTIFF, and it is
+the whole reason `GeoTIFF.swift` is short enough to be worth having rather than a
+note telling you to run GDAL first. It reads that subset and refuses the rest by
+name, for the same reason the MVT, PBF, Shapefile and PMTiles readers are written
+here: Swift has none of them.
+
+**Blended into the elevation grid, not added as a layer**, which is why the change
+is three lines at the call site: the contours, the depth bands, the hillshade and
+the summits are all downstream of one array, so every one of them improves
+without knowing anything happened.
+
+Three rules, each of them from a way this goes wrong:
+
+- **Land is the mosaic's job.** The coverage carries land as well as sea —
+  southern Cyprus reaches 688 m in it — and its land is coarser than SRTM's.
+  Testing only the coverage's own sign was not enough: where the two disagree at
+  a coastline, the sea climbed up the beach.
+- **A hole changes nothing**, in either direction. A gap in the coverage keeps
+  the mosaic; a gap in the mosaic is filled outright, because something is better
+  than nothing.
+- **The edge of coverage is feathered.** A hard switch between two grids that
+  disagree by a few metres draws a straight line across open water, and a
+  straight line on a bathymetric sheet reads as a fault or a survey track — which
+  is to say, as data.
+
+The sheet says which it is. `bathymetry_source` in the diagnostics is
+`emodnet+terrarium` or `terrarium`, and `emodnet_cells` counts what was replaced,
+because a reader is entitled to know whether they are looking at 115 m or at a
+kilometre. Outside European waters nothing is requested at all.
 
 ## Depth, as mass rather than as linework
 
