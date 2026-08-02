@@ -136,6 +136,83 @@ public func bandBoundaries(minimum: Double, maximum: Double, count: Int) -> [Dou
     return (0...count).map { minimum + step * Double($0) }
 }
 
+/// How the sea floor is divided.
+public enum DepthBandMode: String, Sendable, CaseIterable {
+    /// Evenly, across whatever depth the frame holds. Right for looking at the
+    /// shape of a basin, where the question is "how does this ground vary".
+    case even
+    /// At the depths a chart states. Right for reading, where the question is
+    /// "how much water is there", and the answer wants to be a round number.
+    case chart
+
+    public var label: String {
+        switch self {
+        case .even: "Even"
+        case .chart: "Chart depths"
+        }
+    }
+}
+
+/// The depths a chart prints, shallowest first, in metres below the surface.
+///
+/// Not an even division of anything. These are the numbers a mariner already
+/// has in their head, and the shallow end is where they matter — the difference
+/// between five metres and ten is a decision, the difference between two
+/// thousand and three is a colour.
+let statedDepths: [Double] = [2, 5, 10, 20, 30, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+
+/// Boundaries for the land half of a field, from the waterline up.
+///
+/// `elevation_bands` has always spanned the whole measured range, so a coastal
+/// sheet banded its sea floor in the land's own ramp — a trench drawn as a kind
+/// of valley. Splitting at zero is the same division `separateBathymetry`
+/// already makes for contours, one level up.
+///
+/// Returns nothing when the frame is all water: there is no land to band, and an
+/// empty list says so more clearly than one band spanning nothing.
+public func landBandBoundaries(minimum: Double, maximum: Double, count: Int) -> [Double] {
+    guard maximum > 0 else { return [] }
+    return bandBoundaries(minimum: Swift.max(0, minimum), maximum: maximum, count: count)
+}
+
+/// Boundaries for the sea half of a field, from the deepest water up to the
+/// waterline.
+///
+/// Returns nothing when the frame is all land.
+public func depthBandBoundaries(
+    minimum: Double,
+    maximum: Double,
+    count: Int,
+    mode: DepthBandMode = .even
+) -> [Double] {
+    guard minimum < 0, minimum.isFinite else { return [] }
+    let floor = minimum
+    let surface = Swift.min(0, maximum)
+    guard surface > floor else { return [] }
+
+    switch mode {
+    case .even:
+        return bandBoundaries(minimum: floor, maximum: surface, count: count)
+
+    case .chart:
+        // Every stated depth the frame actually reaches, deep to shallow, and
+        // the waterline itself. Deliberately *not* extended down to the deepest
+        // sounding: a harbour sheet should not carry a 200 m band it has no
+        // ground for, and a boundary at a depth nobody states is the thing this
+        // mode exists to avoid.
+        var chosen = statedDepths.filter { -$0 > floor }.map { -$0 }
+        chosen.sort()
+        chosen.append(surface)
+        guard chosen.count >= 2 else { return [] }
+        // If the ladder offers more bands than were asked for, the deep end goes
+        // first — the shallow end is the half a reader is making decisions with.
+        if chosen.count > count + 1 {
+            chosen = Array(chosen.suffix(count + 1))
+        }
+        return chosen
+    }
+}
+
 /// Rebuild a geometry with every vertex passed through `mapper`.
 ///
 /// `mapper` takes a point in `(row, column)` index space and returns `(lon, lat)`;

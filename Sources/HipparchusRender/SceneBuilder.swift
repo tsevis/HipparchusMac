@@ -63,7 +63,7 @@ public struct SceneBuilder: Sendable {
         // relief they resemble — the panel already groups them under Terrain.
         // (The Python's `_ordered_layers` omits them, so they painted over every
         // label; ranking them is a deliberate divergence in the port's favour.)
-        "elevation_bands", "terrain_hillshade", "bathymetry",
+        "elevation_bands", "depth_bands", "terrain_hillshade", "bathymetry",
         "terrain_contours", "terrain_index_contours", "night_lights",
         // Rules drawn as ground: restricted areas, traffic separation, fairways,
         // and the harbours a vessel is heading for. Above the relief rather than

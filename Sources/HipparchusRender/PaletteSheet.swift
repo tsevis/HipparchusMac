@@ -44,6 +44,17 @@ extension Palette {
             stroke: 0.5 * contourWeight,
             strokeColor: Self.mix(water, ground, 0.4), opacity: 0.9
         )
+        // Depth as mass, on a ramp of its own. `elevation_bands` runs pale-to-
+        // dark up the land; this runs the other way, dark water to shallow, so
+        // the two meet at the coast instead of colliding there. The high stop is
+        // set below, with the other two-stop ramps.
+        // Index 0 is the deepest band, so the ramp starts dark and comes up to
+        // the shallows — the opposite direction from the land, which is what
+        // makes the two meet at the coast instead of colliding there.
+        styles["depth_bands"] = style(
+            stroke: 0, fill: Self.mix(water, ink, 0.5),
+            fillHigh: Self.mix(water, ground, 0.55), opacity: 0.9
+        )
         styles["buildings"] = style(
             stroke: 0.35, strokeColor: Self.mix(land, ink, 0.4),
             fill: land, opacity: 0.95
@@ -204,6 +215,10 @@ extension Palette {
         strokeColor: RGBAColor? = nil,
         fill: RGBAColor? = nil,
         fillAlpha: UInt8 = 255,
+        /// The far end of a two-stop ramp, for layers whose features carry a
+        /// position in a sequence. The presets state this for `elevation_bands`;
+        /// a palette has to state it for `depth_bands`, which no preset knows.
+        fillHigh: RGBAColor? = nil,
         opacity: Double = 1.0,
         cap: LayerStyle.LineCap = .round,
         casing: Double = 0,
@@ -222,6 +237,9 @@ extension Palette {
         out.fillEnabled = fill != nil
         if let fill {
             out.fillColor = RGBAColor(fill.r, fill.g, fill.b, fillAlpha)
+        }
+        if let fillHigh {
+            out.fillColorHigh = RGBAColor(fillHigh.r, fillHigh.g, fillHigh.b, fillAlpha)
         }
         if let casingColor {
             out.casingColor = casingColor

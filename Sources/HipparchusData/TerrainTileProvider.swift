@@ -41,7 +41,18 @@ public enum TerrainLayer {
     /// divergence in the port's favour; see `Hillshade.swift`.
     public static let hillshade = "terrain_hillshade"
 
-    public static let all = [elevationBands, hillshade, bathymetry, minorContours, indexContours, summits]
+    /// Filled ground below the waterline.
+    ///
+    /// `elevation_bands` spanned the whole measured range, so the sea floor was
+    /// already being banded — in the land's ramp, under the land's colours. This
+    /// is the same split `bathymetry` makes for the contours: the sea is a
+    /// different thing and reads as a different thing.
+    public static let depthBands = "depth_bands"
+
+    public static let all = [
+        elevationBands, depthBands, hillshade, bathymetry,
+        minorContours, indexContours, summits,
+    ]
 }
 
 /// How much real elevation to fetch, and how to contour it.
@@ -83,6 +94,18 @@ public struct TerrainTileSettings: Sendable {
     /// show.
     public var emitElevationBands = true
     public var elevationBandCount = 10
+    /// Band the sea floor apart from the land, on its own ramp.
+    ///
+    /// On by default, and this is a correction rather than an addition: the sea
+    /// floor was always being banded, in the land's colours. Off restores the
+    /// single ramp every sheet had before, for comparing an old render to a new
+    /// one.
+    public var separateDepthBands = true
+    /// Fewer than the land gets. Depth on these sheets spans further than height
+    /// and matters less finely — the interesting part of a coastal sheet is the
+    /// first fifty metres, which `chart` mode gives most of its boundaries to.
+    public var depthBandCount = 6
+    public var depthBandMode = DepthBandMode.even
     public var bandGridMaxPixels = 520
     /// Real DEMs carry step noise from their source resolution; one light pass
     /// settles it without moving the landforms.
@@ -187,9 +210,9 @@ public struct TerrainTileProvider: MapProvider {
         }
 
         if settings.emitElevationBands {
-            featuresByLayer[TerrainLayer.elevationBands] = try bandFeatures(
-                grid: grid, window: window, zoom: zoom
-            )
+            let banded = try bandFeatures(grid: grid, window: window, zoom: zoom)
+            featuresByLayer[TerrainLayer.elevationBands] = banded.land
+            featuresByLayer[TerrainLayer.depthBands] = banded.depth
         }
 
         if settings.emitHillshade {
@@ -216,6 +239,14 @@ public struct TerrainTileProvider: MapProvider {
                 "index_every": .int(settings.indexEvery),
                 "summit_count": .int(featuresByLayer[TerrainLayer.summits]?.count ?? 0),
                 "elevation_band_count": .int(featuresByLayer[TerrainLayer.elevationBands]?.count ?? 0),
+                "depth_band_count": .int(featuresByLayer[TerrainLayer.depthBands]?.count ?? 0),
+                // Which of the two depth modes drew this sheet. A banded sea
+                // read as an even division and a banded sea read at charted
+                // depths look alike and mean different things, so the sheet says
+                // which it is rather than leaving a reader to infer it.
+                "depth_band_mode": .string(
+                    settings.separateDepthBands ? settings.depthBandMode.rawValue : "with_land"
+                ),
                 "hillshade_band_count": .int(featuresByLayer[TerrainLayer.hillshade]?.count ?? 0),
                 // The sun is a choice, and a sheet that does not record which one
                 // it was lit by cannot be reproduced from its own diagnostics.
@@ -336,19 +367,69 @@ public struct TerrainTileProvider: MapProvider {
 
     // MARK: - Bands and summits
 
-    private func bandFeatures(grid: Field2D, window: PixelWindow, zoom: Int) throws -> [Feature] {
-        guard settings.elevationBandCount >= 2 else { return [] }
+    /// The land bands and the depth bands, split at the waterline.
+    ///
+    /// One traverse of the grid, two sets of boundaries. Until now the bands
+    /// spanned the whole measured range, so a coastal sheet banded its sea floor
+    /// in the land's own ramp — a trench drawn as a kind of valley, in the
+    /// colours of a hill. That is the same mistake `separateBathymetry` was
+    /// added to stop for the contours, one level up.
+    private func bandFeatures(
+        grid: Field2D, window: PixelWindow, zoom: Int
+    ) throws -> (land: [Feature], depth: [Feature]) {
+        guard settings.elevationBandCount >= 2 else { return ([], []) }
 
         let step = max(1, Int(ceil(Double(max(grid.rows, grid.columns)) / Double(max(16, settings.bandGridMaxPixels)))))
         let coarse = grid.decimated(step: step)
-        guard let range = coarse.finiteRange else { return [] }
+        guard let range = coarse.finiteRange else { return ([], []) }
 
         let geos = GEOSContext()
-        let bands = try elevationBands(
-            coarse,
-            boundaries: bandBoundaries(minimum: range.minimum, maximum: range.maximum, count: settings.elevationBandCount),
-            using: geos
+
+        // With the split switched off the sea floor bands with the land, on one
+        // ramp across the whole range — what every sheet did before this, kept
+        // so an old render and a new one can be compared.
+        guard settings.separateDepthBands else {
+            return (try bandFeatures(
+                coarse, step: step, window: window, zoom: zoom, geos: geos,
+                layer: TerrainLayer.elevationBands,
+                boundaries: bandBoundaries(
+                    minimum: range.minimum, maximum: range.maximum,
+                    count: settings.elevationBandCount
+                )
+            ), [])
+        }
+
+        return (
+            try bandFeatures(
+                coarse, step: step, window: window, zoom: zoom, geos: geos,
+                layer: TerrainLayer.elevationBands,
+                boundaries: landBandBoundaries(
+                    minimum: range.minimum, maximum: range.maximum,
+                    count: settings.elevationBandCount
+                )
+            ),
+            try bandFeatures(
+                coarse, step: step, window: window, zoom: zoom, geos: geos,
+                layer: TerrainLayer.depthBands,
+                boundaries: depthBandBoundaries(
+                    minimum: range.minimum, maximum: range.maximum,
+                    count: settings.depthBandCount, mode: settings.depthBandMode
+                )
+            )
         )
+    }
+
+    private func bandFeatures(
+        _ coarse: Field2D,
+        step: Int,
+        window: PixelWindow,
+        zoom: Int,
+        geos: GEOSContext,
+        layer: String,
+        boundaries: [Double]
+    ) throws -> [Feature] {
+        guard boundaries.count >= 2 else { return [] }
+        let bands = try elevationBands(coarse, boundaries: boundaries, using: geos)
         guard !bands.isEmpty else { return [] }
 
         var features: [Feature] = []
@@ -363,8 +444,8 @@ public struct TerrainTileProvider: MapProvider {
             }
             if geometry.isEmpty { continue }
             features.append(Feature(
-                id: "\(providerID)/\(TerrainLayer.elevationBands)/\(index)",
-                layer: TerrainLayer.elevationBands,
+                id: "\(providerID)/\(layer)/\(index)",
+                layer: layer,
                 source: providerID,
                 geometry: geometry,
                 provenance: .measured,
@@ -373,6 +454,10 @@ public struct TerrainTileProvider: MapProvider {
                     "elevation_high": .double(band.upper),
                     "band_index": .int(index),
                     "band_count": .int(bands.count),
+                    // A depth band states the water over it, which is the number
+                    // a reader wants and the opposite sign from the ground.
+                    "depth_low": .double(-band.upper),
+                    "depth_high": .double(-band.lower),
                 ]
             ))
         }

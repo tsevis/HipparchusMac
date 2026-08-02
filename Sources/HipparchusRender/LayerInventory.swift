@@ -17,6 +17,7 @@ public enum LayerInventory {
     public static let labels: [String: String] = [
         "admin_boundaries": "Admin boundaries",
         "elevation_bands": "Elevation bands",
+        "depth_bands": "Depth bands",
         "terrain_contours": "Contours",
         "terrain_index_contours": "Index contours",
         "terrain_hillshade": "Hillshade",
@@ -69,6 +70,7 @@ public enum LayerInventory {
 
     static let groups: [String: String] = [
         "elevation_bands": "Terrain",
+        "depth_bands": "Terrain",
         "terrain_contours": "Terrain",
         "terrain_index_contours": "Terrain",
         "terrain_hillshade": "Terrain",
