@@ -42,7 +42,16 @@ TARGET = (ROOT / "App/HipparchusApp/Resources/Assets.xcassets"
 #: vertical rule down the splash. The bounds are asserted below rather than
 #: trusted, because the frame moves if the export size ever changes.
 FRAME = (57, 116, 1222, 843)
-CROP = (60, 470, 1012, 842)
+
+#: Clearing the frame *line* was not enough. x=60 cleared it by three pixels
+#: and still caught the flat margin the renderer leaves between the frame and
+#: the first drawn contour: about fifteen source pixels of unbroken sea, which
+#: became a pale vertical band down the left of the About window — the same
+#: fault as the first version, quieter. Starting at 75 puts the crop into
+#: drawn map on every edge, and the right edge follows so the aspect still
+#: matches OUTPUT exactly, which is what lets the header fill 640x250 with
+#: nothing stretched and nothing left over.
+CROP = (75, 470, 1027, 842)
 
 #: The About header is 640x250pt, so 2x wants 1280x500.
 OUTPUT = (1280, 500)
