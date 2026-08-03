@@ -279,6 +279,13 @@ public struct SceneBuilder: Sendable {
         metadata["preset"] = .string(options.preset.name)
         metadata["quality_profile"] = .string(quality.key)
 
+        // Built before the scene so the flag can be part of it: this has to
+        // reach a PNG and a PDF too, and only the SVG has furniture.
+        let marine = layers.contains { layer in
+            NotForNavigation.marineLayers.contains(layer.name)
+                && (!layer.geometries.isEmpty || !layer.labels.isEmpty)
+        }
+
         return RenderScene(
             layers: layers,
             bbox: collection.bbox,
@@ -300,6 +307,9 @@ public struct SceneBuilder: Sendable {
                 // Inferred, not fetched: a reader is entitled to know the water
                 // was reasoned out of the linework rather than measured.
                 "inferred_sea_polygons": .int(inferredSea),
+                // Beside every export, including the two that have no furniture
+                // to write it on. The words can be turned off; this cannot.
+                "not_for_navigation": .bool(marine),
                 "geos_version": .string(geos.version),
             ]
         )

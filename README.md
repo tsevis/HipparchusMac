@@ -20,7 +20,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->846<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->859<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -955,6 +955,44 @@ asked for, so every sheet had a diluted margin with nothing to feather against.
 The request is wider than the frame now, which moves that margin off the page and
 leaves the feather meaning what it was written to mean: the place where the
 service genuinely runs out of data. The share reads 0.9996.
+
+## Not for navigation
+
+Every other piece of furniture in this application is off until asked for,
+because the map is the product. **This one is on by default**, and the inversion
+is the statement.
+
+It appears on any sheet that carries sea marks or depths, and on no other. A
+street map of Amsterdam is not pretending to be a chart; a sheet with buoys drawn
+as chart symbols, wrecks with their masts and a sea floor in filled depth bands
+is closer to pretending than is comfortable, and it gets closer with every
+improvement. An empty `bathymetry` layer does not count — that layer sits on
+every terrain sheet ever drawn, and stamping a warning on a map of Everest would
+teach a reader to ignore the warning.
+
+The notice says what is wrong rather than only that something is, because "not
+for navigation" alone reads as boilerplate:
+
+> NOT FOR NAVIGATION · not a charted survey, and not corrected by Notices to
+> Mariners
+
+Which is the truth of it. OpenStreetMap's seamarks are community-maintained and
+unvalidated, and a mark that has been moved, retired or never surveyed looks
+exactly like one that has not. The depths are a survey compilation in European
+waters and a kilometre-scale global grid everywhere else — the sheet says which,
+in `sea_floor_surveyed_share` — and neither has been reduced to a chart datum.
+
+**It is drawn in the SVG and in the PNG.** Furniture is otherwise an SVG idea,
+and this is the exception, because a PNG is the artefact that actually gets
+shared and a sheet that looks like a chart in one looks exactly as much like one
+in the other. The preview canvas leaves it off: the window is not the artefact,
+and the status bar is already saying what the map is made of.
+
+A person can turn the words off — this is a drawing tool, and a poster of the
+Aegean does not want a warning stamped across it. **What they cannot turn off is
+the claim.** `data-hipparchus-not-for-navigation` goes on the SVG root and
+`not_for_navigation` into the diagnostics beside every export, including the two
+formats that have no furniture to write it on.
 
 ## Depth, as mass rather than as linework
 

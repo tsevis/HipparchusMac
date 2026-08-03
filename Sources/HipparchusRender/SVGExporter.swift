@@ -28,6 +28,14 @@ public struct SVGExporter: Sendable {
         public var includeScaleBar = false
         public var includeNorthArrow = false
         public var includeLegend = false
+        /// **The one piece of furniture that is on by default**, and only ever
+        /// drawn on a sheet that carries the sea — see `NotForNavigation`. The
+        /// inversion is the statement: everything else here is off because the
+        /// map is the product, and this is not decoration.
+        ///
+        /// Turning it off removes the words and nothing else. The claim stays on
+        /// the SVG root and in the diagnostics either way.
+        public var includeNotForNavigation = true
         /// Fraction of the page kept clear around the furniture, clamped to
         /// 0.02…0.18 when used.
         public var marginRatio = 0.06
@@ -228,7 +236,8 @@ public struct SVGExporter: Sendable {
     /// and inverted on a dark ground so they do not vanish into it.
     private func furniture(for scene: RenderScene, transform: CanvasTransform?) -> String {
         let composition = options.composition
-        guard composition.wantsAnything else { return "" }
+        let warns = composition.includeNotForNavigation && NotForNavigation.applies(to: scene)
+        guard composition.wantsAnything || warns else { return "" }
 
         let width = Double(options.width)
         let height = Double(options.height)
@@ -345,6 +354,31 @@ public struct SVGExporter: Sendable {
             }
         }
 
+        if warns {
+            // Bottom centre, which is the one edge the other furniture leaves
+            // alone: the scale bar takes the left corner and the legend the
+            // right. On a sheet with neither it still reads as a caption rather
+            // than as something floating.
+            let size = max(11.0, short * 0.016)
+            let y = height - margin * 0.45
+            let padding = size * 0.6
+            // A panel behind it, because this is the one thing on the sheet that
+            // must not be lost against a dark sea or a busy coast.
+            let notice = NotForNavigation.notice
+            let approximateWidth = Double(notice.count) * size * 0.5
+            out += "    <g id=\"not_for_navigation\">\n"
+            out += "      <rect x=\"\(format(width * 0.5 - approximateWidth * 0.5 - padding))\""
+            out += " y=\"\(format(y - size - padding * 0.6))\""
+            out += " width=\"\(format(approximateWidth + padding * 2))\""
+            out += " height=\"\(format(size + padding * 1.4))\""
+            out += " fill=\"\(panelFill)\" opacity=\"0.82\" stroke=\"\(panelStroke)\"/>\n"
+            out += "      <text x=\"\(format(width * 0.5))\" y=\"\(format(y))\""
+            out += " font-family=\"Arial, Helvetica, sans-serif\""
+            out += " font-size=\"\(format(size))\" font-weight=\"700\" letter-spacing=\"0.04em\""
+            out += " text-anchor=\"middle\" fill=\"\(text)\">\(escape(notice))</text>\n"
+            out += "    </g>\n"
+        }
+
         return out + "  </g>\n"
     }
 
@@ -434,6 +468,13 @@ public struct SVGExporter: Sendable {
         ]
         if let provenance = scene.metadata["provenance"]?.stringValue {
             attributes["data-hipparchus-provenance"] = provenance
+        }
+        // **Unconditional.** A person may remove the words — this is a drawing
+        // tool and a poster does not want a warning across it — but not the
+        // claim. A file that carries sea marks or depths says so to anything
+        // that reads it, whether or not it says so to the eye.
+        if NotForNavigation.applies(to: scene) {
+            attributes["data-hipparchus-not-for-navigation"] = "true"
         }
         if let bbox = scene.bbox {
             attributes["data-hipparchus-bbox"] =

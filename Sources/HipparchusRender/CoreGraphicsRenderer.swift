@@ -17,6 +17,10 @@ public struct CoreGraphicsRenderer: Sendable {
     public struct Options: Sendable {
         public var drawBackground = true
         public var drawLabels = true
+        /// **On by default**, and only ever drawn on a sheet carrying the sea.
+        /// Off for the on-screen preview, where the canvas is not the artefact
+        /// and the status bar is already saying what the map is made of.
+        public var drawNotForNavigation = true
         /// Points. Summit heights are small type on a busy sheet.
         public var labelFontSize: Double = 9.0
 
@@ -55,7 +59,59 @@ public struct CoreGraphicsRenderer: Sendable {
                 drawLabels(of: layer, in: context, transform: transform)
             }
         }
+        // The one thing this renderer draws that is not the map.
+        //
+        // Furniture is otherwise an SVG idea — the scale bar, the legend and the
+        // title block all live in the exporter. This does not, because a PNG is
+        // the artefact that actually gets shared, and a sheet that looks like a
+        // chart in an SVG looks exactly as much like one as a picture.
+        if options.drawNotForNavigation, NotForNavigation.applies(to: scene) {
+            drawNotForNavigation(in: context, size: size, background: scene.background)
+        }
         return transform
+    }
+
+    /// The notice, bottom centre, on a panel that keeps it legible over a dark
+    /// sea or a busy coast.
+    private func drawNotForNavigation(in context: CGContext, size: CGSize, background: RGBAColor) {
+        let luminance = 0.2126 * Double(background.r)
+            + 0.7152 * Double(background.g) + 0.0722 * Double(background.b)
+        let dark = luminance < 128.0
+        let ink = dark ? RGBAColor(242, 242, 242) : RGBAColor(34, 34, 34)
+        let panel = dark ? RGBAColor(18, 21, 28) : RGBAColor(255, 255, 255)
+
+        let short = min(size.width, size.height)
+        let fontSize = max(9.0, short * 0.014)
+        let font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, fontSize, nil)
+        let attributed = CFAttributedStringCreate(
+            nil, NotForNavigation.notice as CFString,
+            [
+                kCTFontAttributeName: font,
+                kCTForegroundColorAttributeName: ink.cgColor,
+            ] as CFDictionary
+        )
+        guard let attributed else { return }
+        let line = CTLineCreateWithAttributedString(attributed)
+        let bounds = CTLineGetBoundsWithOptions(line, [])
+
+        let padding = fontSize * 0.6
+        let centre = CGPoint(x: size.width / 2, y: size.height - max(14.0, short * 0.026))
+
+        context.saveGState()
+        context.setFillColor(panel.withOpacity(0.82).cgColor)
+        context.fill(CGRect(
+            x: centre.x - bounds.width / 2 - padding,
+            y: centre.y - bounds.height / 2 - padding * 0.6,
+            width: bounds.width + padding * 2,
+            height: bounds.height + padding * 1.2
+        ))
+        // Text draws in its own upright frame regardless of the canvas flip, the
+        // same dance the labels do.
+        context.translateBy(x: centre.x, y: centre.y)
+        context.scaleBy(x: 1, y: -1)
+        context.textPosition = CGPoint(x: -bounds.width / 2, y: -bounds.height / 2)
+        CTLineDraw(line, context)
+        context.restoreGState()
     }
 
     /// Render to an image, for tests and for thumbnails.
