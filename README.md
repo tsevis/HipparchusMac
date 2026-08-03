@@ -348,12 +348,13 @@ expected. Every one currently matches:
 | San Francisco | `−122.53, 37.70 → −122.35, 37.84` | tops at 284 m | −114 m to 284 m |
 | Addis Ababa | `38.65, 8.90 → 38.88, 9.10` | never below 2,075 m | 2075 m to 3127 m |
 | Everest | `86.85, 27.93 → 87.05, 28.06` | 5,060 m to 8,746 m | 5060 m to 8746 m |
-| Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | deeper than −1,300 m | −1356 m, 883 contours |
+| Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | deeper than −1,300 m | −<!--myrtoan:depth-->1,356<!--/myrtoan:depth--> m, <!--myrtoan:contours-->883<!--/myrtoan:contours--> contours |
 
 **Three of the sea figures moved when EMODnet arrived**, and the movement is the
 point rather than a regression: Santorini's floor went from −79 m to −85 m,
-Athens's from −4 m to −11 m, and the Myrtoan Sea's from −1,310 m to −1,356 m
-with 546 sub-sea contours becoming 883. The land columns did not move at all,
+Athens's from −4 m to −11 m, and the Myrtoan Sea's from −1,310 m to
+−<!--myrtoan:depth-->1,356<!--/myrtoan:depth--> m with 546 sub-sea contours
+becoming <!--myrtoan:contours-->883<!--/myrtoan:contours-->. The land columns did not move at all,
 which is what you would expect from a change that only touches the sea. The
 expected column is stated as the thing that is actually known — a summit height,
 a floor deeper than some figure — rather than as the number this app last
@@ -373,8 +374,9 @@ Santorini's Illustrator layers, counted out of the SVG that
 <!--santorini:bathymetry-->130<!--/santorini:bathymetry--> bathymetry and
 <!--santorini:summits-->17<!--/santorini:summits--> summit labels**, and its
 longest contour is <!--santorini:longest-->6,729<!--/santorini:longest-->
-vertices, arriving whole. `Scripts/update-santorini-counts.sh` derives them; it
-draws a real Santorini, so unlike the test count it needs the network.
+vertices, arriving whole. `Scripts/update-render-figures.sh` derives them, along
+with the Myrtoan figures below; it draws both areas for real, so unlike the test
+count it needs the network.
 
 The 178 is the figure this port has always produced and the one the Python's own
 screenshot shows. Two of the others no longer match it, for reasons worth
@@ -478,16 +480,20 @@ pipeline — `--bbox … --preset … --render-to`, not screenshots of a window.
 
 **A sheet that is mostly sea.** The Myrtoan Sea, between the Peloponnese and the
 Cyclades: Serifos and its neighbours as the only land in a thousand square
-kilometres, and the sea floor drawn as filled depth bands with 883 sub-sea
-contours over them. This is the same frame the verification table above uses,
-and it has been redrawn twice — once when the sea stopped borrowing the land's
-ramp, and again when the depths themselves stopped being interpolation.
+kilometres, and the sea floor drawn as filled depth bands with
+<!--myrtoan:contours-->883<!--/myrtoan:contours--> sub-sea contours over them.
+This is the same frame the verification table above uses, and it has been redrawn
+twice — once when the sea stopped borrowing the land's ramp, and again when the
+depths themselves stopped being interpolation.
 
 <p align="center">
-  <img src="Docs/assets/gallery-myrtoan-sea-coastal-survey.png" width="70%" alt="The Myrtoan Sea drawn from EMODnet bathymetry as filled depth bands with 883 sub-sea contours over them, showing ridges, channels and basin structure; Serifos at 120 metres and two smaller islands are the only land in the frame">
+  <img src="Docs/assets/gallery-myrtoan-sea-coastal-survey.png" width="70%" alt="The Myrtoan Sea drawn from EMODnet bathymetry as filled depth bands from pale shallows to deep blue-grey, with sub-sea contours over them showing ridges, channels and basin structure; Serifos and two smaller islands are the only land in the frame">
 </p>
 
-<p align="center"><em>Myrtoan Sea · Coastal Survey · Admiralty · −1,356 m · six depth bands, 883 contours, EMODnet</em></p>
+<p align="center"><em>Myrtoan Sea · Coastal Survey · Admiralty ·
+−<!--myrtoan:depth-->1,356<!--/myrtoan:depth--> m ·
+<!--myrtoan:bands-->6<!--/myrtoan:bands--> depth bands,
+<!--myrtoan:contours-->883<!--/myrtoan:contours--> contours, EMODnet</em></p>
 
 Three cities in three of the palettes named after people who drew the world, or
 went and looked at it. One preset — Fragmented Urban — supplying the geometry
