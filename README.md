@@ -656,6 +656,21 @@ One test also **passed for the wrong reason**: it skipped elements it could not
 find, so it sailed through against the wrong window entirely. A test that cannot
 fail is worse than no test, because it reports confidence it never earned.
 
+**They found a real bug on their first outing, which is the argument for having
+them.** Whether the Locator opened at launch was a coin toss: the splash was
+shown from a `.task` the app attached to `ContentView`, and its completion called
+`actions.openLocator` — which `ContentView`'s *own* `.task` assigns. SwiftUI does
+not specify which of two `.task` modifiers runs first, so when the app's won the
+closure was still nil and the panel never appeared. The splash normally masked it
+by giving the wiring time to land, so it only bit with "Show About on launch"
+off — which is how these tests launch, and how anybody who turns that preference
+off was already living.
+
+The fix was not a delay: the sequence moved into one task, after the wiring,
+where the order is program order. **A race cannot be caught by one launch**, so
+`LaunchOrderTests` launches the app five times per test — one launch of a coin
+toss is a passing test half the time.
+
 This closes the first part of the largest gap in the project. **It is not the
 whole gap.** Nothing here judges whether the window looks right — only that its
 parts are present, placed and alive.
