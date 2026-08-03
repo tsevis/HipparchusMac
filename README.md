@@ -20,7 +20,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with 839 tests and the output checked
+and export at a real printed size are in, with <!--tests-->839<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -88,6 +88,18 @@ tile in the suite is committed as a fixture.
 Swift's unoptimised build runs it roughly fifty times slower — the whole
 difference between the two numbers above. Debug is worth it only when you need a
 debugger.
+
+The test count in the status line above is **derived rather than typed**. It went
+stale three times in one day, in three consecutive commits, because it is a fact
+about every commit and nothing checked it — and a figure that is wrong more often
+than it is right teaches a reader that the numbers here are decorative, when most
+of them are the whole argument. It comes from `swift test --list-tests`, which is
+the runner's own answer and needs no test to be executed:
+
+```sh
+Scripts/update-test-count.sh            # rewrite it
+Scripts/update-test-count.sh --check    # say whether it is stale, write nothing
+```
 
 The app project is generated rather than committed, so `project.yml` is the
 source of truth and there is no `.xcodeproj` to merge:
