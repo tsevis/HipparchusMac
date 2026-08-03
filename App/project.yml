@@ -46,11 +46,16 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.hipparchus.HipparchusMac
         # Modest on purpose: the model behind the window is well tested, and the
-        # window itself has never been reviewed by anyone. That has not changed
-        # at 0.2.0 — the minor bump is for relief shading, which is a layer the
-        # application never had, not for a milestone in confidence.
-        MARKETING_VERSION: "0.3.0"
-        CURRENT_PROJECT_VERSION: "7"
+        # window itself has never been reviewed by anyone. A minor bump here
+        # marks a layer the application never had — relief shading at 0.2.0, the
+        # sea at 0.3.0 — and never a milestone in confidence. 0.3.1 puts real
+        # bathymetry under the sea 0.3.0 drew.
+        #
+        # `CURRENT_PROJECT_VERSION` is the only number here that must be
+        # monotonic. `make-dmg.sh` reads the version out of the built Info.plist,
+        # so this file is the one place it is stated.
+        MARKETING_VERSION: "0.3.1"
+        CURRENT_PROJECT_VERSION: "8"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
