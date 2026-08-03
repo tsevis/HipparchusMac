@@ -38,9 +38,11 @@ struct ContentView: View {
             NavigationSplitView(columnVisibility: $columnVisibility) {
                 FramePanel(model: model, openLocator: { locatorPanel.show(model: model, onRender: renderChosenArea) })
                     .navigationSplitViewColumnWidth(min: 180, ideal: 210, max: 280)
+                    .accessibilityIdentifier(UITestID.framePanel)
             } content: {
                 map
                     .navigationSplitViewColumnWidth(min: 420, ideal: 720)
+                    .accessibilityIdentifier(UITestID.mapColumn)
             } detail: {
                 List {
                     SourcesPanel(model: model)
@@ -50,6 +52,7 @@ struct ContentView: View {
                 }
                 .listStyle(.sidebar)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 380)
+                .accessibilityIdentifier(UITestID.inspector)
             }
             // Deliberately empty. The name was set here and macOS drew it in
             // the toolbar, between the search field and the area — a word that
@@ -287,9 +290,11 @@ struct ContentView: View {
                 // The reason is on the button that will not work, so hovering
                 // it answers the question instead of a click having to.
                 .help(model.whyCannotRender ?? "Fetch and draw the chosen area.")
+                .accessibilityIdentifier(UITestID.renderButton)
                 if model.isFetching {
                     Button("Cancel") { model.cancel() }
                         .help("Skips sources not yet started and discards the result. A request already in flight runs to completion.")
+                        .accessibilityIdentifier(UITestID.cancelButton)
                 }
             }
         }
@@ -299,6 +304,7 @@ struct ContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+                .accessibilityIdentifier(UITestID.areaDescription)
         }
 
         ToolbarItem(placement: .primaryAction) {
@@ -308,6 +314,7 @@ struct ContentView: View {
                 Image(systemName: "map")
             }
             .help("Open the Locator in its own floating window")
+            .accessibilityIdentifier(UITestID.locatorButton)
         }
 
         ToolbarItem(placement: .primaryAction) {
@@ -319,6 +326,7 @@ struct ContentView: View {
                 Button("Clear cache") { model.clearCache() }
             }
             .disabled(model.scene == nil)
+            .accessibilityIdentifier(UITestID.exportMenu)
         }
     }
 
@@ -386,6 +394,7 @@ struct ContentView: View {
             .padding(.vertical, 7)
         }
         .background(.bar)
+        .accessibilityIdentifier(UITestID.statusBar)
     }
 }
 

@@ -80,3 +80,56 @@ targets:
         CODE_SIGN_ENTITLEMENTS: HipparchusApp/Hipparchus.entitlements
         CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: YES
+
+  # The layout tests.
+  #
+  # **These open real windows on whoever's desktop runs them**, because that is
+  # what XCUITest is — it launches the application and drives it. That makes them
+  # unlike every other test here, and it is why they are a separate target with a
+  # scheme of their own rather than something `swift test` can reach. Nothing
+  # runs them by accident.
+  #
+  #   bash Scripts/ui-test.sh
+  #
+  # is the only way in, and it says what it is about to do before it does it.
+  HipparchusUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: HipparchusUITests
+    dependencies:
+      - target: HipparchusMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.hipparchus.HipparchusUITests
+        TEST_TARGET_NAME: HipparchusMac
+        CODE_SIGN_STYLE: Automatic
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "6.0"
+        # XCUITest's own API is not Sendable-clean, and the strictness that is
+        # right for the model would be noise here.
+        SWIFT_STRICT_CONCURRENCY: minimal
+
+schemes:
+  # The application, with the layout tests deliberately *not* attached. Building
+  # or running the app must never start opening windows and driving them.
+  HipparchusMac:
+    build:
+      targets:
+        HipparchusMac: all
+    run:
+      config: Debug
+    archive:
+      config: Release
+
+  # The layout tests, on a scheme of their own so that reaching them is a
+  # decision. `xcodebuild test -scheme HipparchusMac` finds nothing to run.
+  HipparchusUITests:
+    build:
+      targets:
+        HipparchusMac: all
+        HipparchusUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - HipparchusUITests

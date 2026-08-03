@@ -142,8 +142,15 @@ final class MapModel {
     /// visible rather than merely absent.
     private(set) var pluginLoadErrors: [String] = []
 
-    private let presetStore = PresetStore(url: PresetStore.defaultURL())
-    private let settingsStore = SettingsStore(url: SettingsStore.defaultURL())
+    // All four stores take the same directory name, so an isolated launch is
+    // isolated in every one of them. Splitting them would leave a test writing
+    // its session somewhere safe and its preferences over the user's.
+    private let presetStore = PresetStore(
+        url: PresetStore.defaultURL(subdirectory: StateDirectory.name)
+    )
+    private let settingsStore = SettingsStore(
+        url: SettingsStore.defaultURL(subdirectory: StateDirectory.name)
+    )
     /// Preferences that belong to neither a map nor a session — the cache
     /// ceiling and the shared-service rate limit. Read once at launch.
     private(set) var settings = UserSettings()
@@ -255,10 +262,10 @@ final class MapModel {
     /// all: nobody is going to navigate to `~/Library/Containers/…` by hand.
     var storageLocations: [(label: String, url: URL)] {
         [
-            ("Preferences", SettingsStore.defaultURL()),
-            ("Saved styles", PresetStore.defaultURL()),
+            ("Preferences", settingsStore.url),
+            ("Saved styles", presetStore.url),
             ("Plugins", PluginLoader.defaultUserPluginDirectory()),
-            ("Cache", DiskCacheStore.defaultDirectory()),
+            ("Cache", DiskCacheStore.defaultDirectory(subdirectory: StateDirectory.name)),
         ]
     }
 
@@ -496,8 +503,10 @@ final class MapModel {
     }
 
     private var task: Task<Void, Never>?
-    private let cache = DiskCacheStore(directory: DiskCacheStore.defaultDirectory())
-    private let sessionURL = Session.defaultURL()
+    private let cache = DiskCacheStore(
+        directory: DiskCacheStore.defaultDirectory(subdirectory: StateDirectory.name)
+    )
+    private let sessionURL = Session.defaultURL(subdirectory: StateDirectory.name)
 
     // MARK: - Undo
 
@@ -1301,13 +1310,13 @@ final class MapModel {
         // for the same reason the others do: a sidebar nobody can screenshot
         // is a poor place to find out a plugin never loaded.
         if arguments.contains("--plugins") {
-            print("settings:       \(SettingsStore.defaultURL().path)")
+            print("settings:       \(settingsStore.url.path)")
             print(String(
                 format: "  cache limit %d MB · %.2f requests/second · preview tolerance %.2f",
                 settings.cacheSizeLimitMB, settings.providerRPSLimit,
                 settings.performancePreviewTolerance
             ))
-            print("preset store:   \(PresetStore.defaultURL().path)")
+            print("preset store:   \(presetStore.url.path)")
             print("plugin folder:  \(PluginLoader.defaultUserPluginDirectory().path)")
             print("")
             print("built-in styles (\(Presets.names.count)):")

@@ -20,7 +20,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->922<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->934<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -151,14 +151,17 @@ data layer and its application layer that no test caught, because every test
 reached the application layer first. Separate targets make the same mistake a
 compile error.
 
-**`App/` is the one target with no tests**, so what lives there is kept to
-wiring. The rules a change has to obey are values in the package, where they can
-be checked: `SessionHistory` decides what undo restores and when a run of edits
-is one action, and `SessionEdit` decides what the Edit menu calls it — naming
-that once lived in the window as three observers diffing model properties, where
-no rule could be checked without a person opening the menu and reading it. Every
-property observer now does the same thing: take a `Session`, hand it to those
-two, act on the answer.
+**`App/` has no headless tests**, so what lives there is kept to wiring. The
+rules a change has to obey are values in the package, where they can be checked:
+`SessionHistory` decides what undo restores and when a run of edits is one
+action, and `SessionEdit` decides what the Edit menu calls it — naming that once
+lived in the window as three observers diffing model properties, where no rule
+could be checked without a person opening the menu and reading it. Every property
+observer now does the same thing: take a `Session`, hand it to those two, act on
+the answer.
+
+It does now have **layout tests**, which are a different animal and live behind
+their own scheme — see "The layout tests open real windows" below.
 
 That leaves `MapModel` holding the parts that genuinely need the window — which
 provider a ticked source builds, what the status bar says, when to warn before
@@ -587,13 +590,56 @@ app is sandboxed and may only write where it has been pointed. With no arguments
 it opens on the session it last saved.
 
 This exercises the path the window uses — the source stack, the manager, the
-scene builder and the renderer. It does **not** check the SwiftUI layout; only a
-person looking at the window can do that.
+scene builder and the renderer. It does **not** check the SwiftUI layout; the
+layout tests below do some of that, and the rest still needs a person looking.
 
 Santorini through OpenStreetMap alone comes out as 14 layers and 10 772
 features; ticking Elevation on top gives 19 layers, 11 787 features and −79 m to
 525 m. The streets are still there. That is the whole idea of the source stack,
 and it is why the check is worth running.
+
+## The layout tests open real windows
+
+Everything else here is headless. **These are not**: XCUITest works by launching
+the application and driving it, so running them takes over the screen for a
+minute or two — windows appear, controls are clicked, the app quits. That is why
+they are not something `swift test` can reach, and why the way in is a script
+that asks first:
+
+```bash
+bash Scripts/ui-test.sh
+```
+
+The application's own scheme has an empty test action, so `xcodebuild test
+-scheme HipparchusMac` finds nothing to run. Reaching the layout tests is a
+decision, not a default.
+
+**They cannot touch your saved work.** A UI test run is a second copy of the
+application, and every store here already took a `subdirectory:` while every call
+site passed the default — so before this, a test that ticked a source and quit
+would have written its session over the real one. `--state-directory` points the
+session, preferences, saved styles and cache at a throwaway name, and one of the
+tests asserts the isolation held rather than assuming it. If that test ever
+fails, stop: the run is writing where the user lives.
+
+What they assert is deliberately not pixels. A test that pins a button to
+(412, 96) fails on every honest improvement, and a suite that fails on
+improvements is one people stop running. These check the things true of a working
+window at any size: the three columns and the status bar exist, nothing sits
+outside the window, the columns are still left to right, the status bar spans the
+width, the controls are *hittable* rather than merely present, and Export is dead
+until there is something to export.
+
+One of them earns its place by keeping the others honest. A UI test bundle cannot
+import the app target, so the identifiers are written out twice —
+`testTheIdentifiersMatchTheApplication` asserts every one is present in the
+window. Without it, renaming an identifier would not fail; every other test would
+quietly stop finding its element and report "does not exist", which reads like a
+broken window rather than a stale string.
+
+This closes the first part of the largest gap in the project. **It is not the
+whole gap.** Nothing here judges whether the window looks right — only that its
+parts are present, placed and alive.
 
 ## Turning the view
 
