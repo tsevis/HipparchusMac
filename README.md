@@ -383,9 +383,13 @@ stating:
 - **Bathymetry was 7 and is 142**, because the water round the caldera is now
   EMODnet's 115 m rather than a kilometre-scale global grid. That structure is
   real, and it is the clearest single demonstration of what the change bought.
-- **The index contours were published as 798 and are 889.** That drift predates
-  the sea work; it is measured rather than explained, and nothing here has
-  established when it happened.
+- **The index contours were published as 798 and are 889**, and that is EMODnet
+  too, by a route worth knowing. Index contours sit at fixed absolute heights —
+  every fifth interval step — so **the 0 m contour is one of them, and the 0 m
+  contour is the shoreline.** EMODnet changed the grid on the sea side of it, so
+  the traced coastline broke into more pieces: rocks and islets the coarse grid
+  had smoothed away. The minor land contours are unchanged at exactly 178, which
+  is what says the land itself did not move.
 
 The summit figure counts **labels, not text elements**. It was published as 24,
 then briefly as 34, and both were counting the wrong thing: every label is
@@ -394,6 +398,19 @@ labels. The longest contour had drifted too — published as 8,097 vertices, it 
 6,658. Deriving these is what caught both, which is the argument for deriving
 them: of the five figures in this paragraph, four were wrong and none of the
 four announced itself.
+
+**The 8,097 was never a lie about the sea.** Bisecting it — building old commits
+and drawing Santorini from each — puts the change at `2b08d24`, "drive the scene
+from presets, quality profiles and illumination", on 30 July, one day after the
+figure was published. That is the commit where simplification began to apply, so
+8,097 was the vertex count *before anything simplified it*. It then moved a
+second time, to 6,658, when EMODnet changed the shoreline the longest contour
+follows.
+
+That bisect also settled something worth knowing on its own: a build from 30
+July, run today, reproduces 30 July's numbers exactly. **The upstream data has
+not moved.** Every figure that drifted here drifted because this repository
+changed, which is the more useful answer and not the one I expected.
 
 Two counts of one layer can disagree honestly, too. The CLI reports what it
 *drew* — 887 index contours — where the file holds 889 paths, because
