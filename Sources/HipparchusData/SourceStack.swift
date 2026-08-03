@@ -180,6 +180,7 @@ public enum SourceID {
     public static let usgsEarthquakes = "usgs_earthquakes"
     public static let satelliteTracks = "satellite_tracks"
     public static let seaTemperature = erddapProviderIDPrefix + "sst"
+    public static let currents = currentsProviderID
     public static let simulatedTerrain = "simulated_terrain"
     public static let localOSMPBF = "local_osm_pbf"
     public static let vectorTiles = "vector_tiles"
@@ -308,6 +309,27 @@ public struct SourceStack: Sendable, Equatable {
                 // more samples means a finer field and a slower fetch, and the
                 // subsetting happens before anything crosses the network.
                 SourceSetting("samples", "Samples across", .number, .integer(220),
+                              attribute: "targetSamples"),
+            ]
+        ),
+        SourceDefinition(
+            id: SourceID.currents,
+            label: "Surface currents",
+            subtitle: "NOAA ERDDAP · geostrophic streamlines",
+            // Derived from measured sea surface height rather than measured
+            // directly. Calling it `measured` would launder a model into an
+            // observation.
+            provenance: .approximate,
+            settings: [
+                // The one number that decides whether this reads as a field or
+                // as a tangle, so it is the one to put first.
+                SourceSetting("spacing", "Line spacing", .number, .number(1.6),
+                              suffix: "cells", attribute: "separation"),
+                // A streamline drawn at one width says where the water goes; one
+                // that thickens where the water runs says how fast.
+                SourceSetting("bands", "Weight bands", .number, .integer(5),
+                              attribute: "speedBands"),
+                SourceSetting("samples", "Samples across", .number, .integer(160),
                               attribute: "targetSamples"),
             ]
         ),

@@ -20,7 +20,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->872<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->898<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -999,13 +999,66 @@ field: **fills under lines.** Ranked above the linework first, the temperature
 wash rubbed out the isobaths underneath it; the bands sit with the other fills
 now, and only the isotherms draw on top.
 
+## Currents, drawn rather than animated
+
+The signature visual of every modern marine application is animated GPU particle
+advection, and this one cannot have it — **and should not want it.** Particles
+are a raster technique on a screen; the product here is a sheet, and a moving dot
+has nowhere to go in an SVG or on paper. What a printed current chart does
+instead is older and better suited: **streamlines**, curves everywhere tangent to
+the flow, spaced evenly enough to read as a field.
+
+```sh
+.build/release/hipparchus-cli --bbox 22.0,34.0,29.0,41.0 --currents \
+    --preset "Coastal Survey" --palette Admiralty --out out
+```
+
+The brief that asked for this assumed CMEMS and a prepared file, because its
+toolbox is Python. That was reasoning rather than checking, for the third time in
+this marine work: **NOAA publishes global geostrophic velocities through the same
+ERDDAP the sea surface temperature already comes from**, as `ugos` and `vgos` on
+a 0.25° lattice. Both components arrive in one CSV, so a current costs one round
+trip and no new network path at all. Asking both in one request is not just
+tidier — fetched separately they could land on different time steps, and a vector
+assembled from two different fields is a flow that exists nowhere.
+
+The integrator is RK4 over a **normalised** direction field, with Jobard and
+Lefer's evenly-spaced placement: seed a lattice, run forward and backward from
+each seed, stop at the edge of the data, on still water, or on approach to a line
+already drawn. Normalising matters. A streamline's *shape* is the direction
+field, not its magnitude — stepping by the velocity itself makes a fast current
+take enormous strides and a slow one crawl, and the drawing then says more about
+the integrator than about the sea. Speed rides along on each vertex instead, and
+becomes **weight**: each line is split where it crosses a speed band, one feature
+per run, so a streamline thickens where the water runs. That is the same shape
+the illuminated contours already take, so the renderer learned nothing new.
+
+Two mistakes, both found by rendering the Eastern Mediterranean and looking at
+it, and both worth recording because each produced a plausible picture:
+
+- **The separation test read bucket occupancy instead of distance.** Buckets are
+  an index; the test is still a distance. Treating a non-empty neighbouring
+  bucket as "too close" rejects everything within three separations rather than
+  one, and the sheet came out as fifteen stray curves across a whole sea.
+- **Stopping a line that came near its own tail threw away the eddies.** An eddy
+  is *supposed* to come back near itself — that is what an eddy is, and it is the
+  feature the drawing exists to show. What actually distinguishes a runaway
+  spiral is that it returns near its **starting point**, so that is what is
+  tested, with the step cap bounding whatever neither catches.
+
+Over the Aegean and the Levantine on the 26 March field, 29×29 samples yield 22
+streamlines in 99 weighted runs, the fastest water at 0.55 m/s in a tight
+anticyclonic eddy off the Turkish coast south of Rhodes — which the sheet draws
+as a single closed loop at the heaviest weight on the page.
+
 ## Not for navigation
 
 Every other piece of furniture in this application is off until asked for,
 because the map is the product. **This one is on by default**, and the inversion
 is the statement.
 
-It appears on any sheet that carries sea marks or depths, and on no other. A
+It appears on any sheet that carries sea marks, depths or currents, and on no
+other. A
 street map of Amsterdam is not pretending to be a chart; a sheet with buoys drawn
 as chart symbols, wrecks with their masts and a sea floor in filled depth bands
 is closer to pretending than is comfortable, and it gets closer with every
@@ -1024,6 +1077,17 @@ unvalidated, and a mark that has been moved, retired or never surveyed looks
 exactly like one that has not. The depths are a survey compilation in European
 waters and a kilometre-scale global grid everywhere else — the sheet says which,
 in `sea_floor_surveyed_share` — and neither has been reduced to a chart datum.
+
+**A sheet drawing something that changes says when.** A depth is as true this
+year as last; a current is not. `[(last)]` asks a server for its most recent time
+step, which is not the same as *today* — the geostrophic dataset answered a
+request made in August with a field from 26 March, because that is genuinely
+where the product ends. So the notice gains `· ocean data 2026-03-26` whenever an
+observation carries a date, taking the earliest when a sheet carries several, for
+the same reason the weakest provenance wins. A four-month-old current drawn
+beside a warning that never mentions time is precisely the artefact the rest of
+this is meant to prevent, and leaving the date in the diagnostics where no reader
+of the sheet will find it is not good enough.
 
 **It is drawn in the SVG and in the PNG.** Furniture is otherwise an SVG idea,
 and this is the exception, because a PNG is the artefact that actually gets

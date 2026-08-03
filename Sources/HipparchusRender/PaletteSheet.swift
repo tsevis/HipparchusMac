@@ -124,6 +124,12 @@ extension Palette {
             stroke: 0.4 * contourWeight,
             strokeColor: Self.mix(water, ink, 0.5), opacity: 0.65
         )
+        // A streamline is the one line on the sheet whose width means
+        // something, so the stroke here is the *base* a `stroke_scale`
+        // multiplies: thin where the water is slack, heavy where it runs.
+        styles["current_streamlines"] = style(
+            stroke: 0.75, strokeColor: Self.mix(water, ink, 0.7), opacity: 0.85, cap: .round
+        )
 
         // Sea marks. A chart's own hierarchy, in the palette's own colours: the
         // rules are ground, the marks are ink, and the emphasis runs from a

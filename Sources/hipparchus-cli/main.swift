@@ -84,6 +84,9 @@ func usage() -> Never {
                          them, for a city dense enough to bury it
       --sea-temperature  stack sea surface temperature over the elevation, as
                          isotherms and filled bands, from NOAA ERDDAP
+      --currents         surface currents as streamlines, thickening where the
+                         water runs faster. Wants a sea-sized frame: the field
+                         is 0.25 deg, so a bay is four cells across.
       --simulated        a generated field instead of measured elevation. Needs
                          no network and is not a measurement of anywhere.
       --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
@@ -122,6 +125,7 @@ struct Options {
     var palette: Palette?
     var hillshade = false
     var reliefOnTop = false
+    var currents = false
     var seaTemperature = false
     var simulated = false
     var streets = false
@@ -222,6 +226,8 @@ while argumentIndex < arguments.count {
     case "--relief-on-top":
         options.reliefOnTop = true
         options.hillshade = true
+    case "--currents":
+        options.currents = true
     case "--sea-temperature":
         options.seaTemperature = true
     case "--simulated":
@@ -366,6 +372,15 @@ func run(_ place: Place, options: Options) async throws {
         field.hillshadeExaggeration = options.exaggeration
         field.hillshadeBandCount = options.shadeBands
         collection = try await SimulatedFieldProvider(settings: field).fetch(BBoxQuery(bbox: place.bbox))
+    } else if options.currents {
+        let manager = DataSourceManager(providers: [terrain, CurrentsProvider()])
+        collection = try await manager.fetch(
+            BBoxQuery(bbox: place.bbox),
+            plan: FetchPlan(base: SourceID.terrainTiles, extras: [currentsProviderID])
+        )
+        if let failures = collection.metadata["provider_errors"]?.stringValue {
+            print("  some sources failed: \(failures)")
+        }
     } else if options.seaTemperature {
         // The same manager the app fetches through, so the merge and the
         // weakest-provenance rule are the shipped ones. Stacked on the

@@ -1089,6 +1089,21 @@ final class MapModel {
                 }
                 providers.append(ERDDAPProvider(settings: settings))
 
+            case SourceID.currents:
+                var settings = CurrentsSettings()
+                // The separation lives on the tracer rather than on the
+                // provider, so it is set through rather than copied — a second
+                // copy of the number is a second thing to keep in step.
+                if let spacing = overrides["separation"]?.doubleValue {
+                    settings.streamlines.separation = spacing
+                    settings.streamlines.seedSpacing = spacing
+                }
+                if let bands = overrides["speedBands"]?.intValue { settings.speedBands = bands }
+                if let samples = overrides["targetSamples"]?.intValue {
+                    settings.targetSamples = samples
+                }
+                providers.append(CurrentsProvider(settings: settings))
+
             case SourceID.gibsImagery:
                 var settings = SatelliteImagerySettings()
                 if let layer = overrides["layer"]?.stringValue { settings.layer = layer }

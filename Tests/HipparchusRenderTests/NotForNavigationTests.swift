@@ -14,8 +14,10 @@ final class NotForNavigationTests: XCTestCase {
 
     private let bbox = BoundingBox(minLon: 23.2, minLat: 36.3, maxLon: 24.2, maxLat: 37.1)
 
-    private func scene(_ layers: [RenderLayer]) -> RenderScene {
-        RenderScene(layers: layers, bbox: bbox)
+    private func scene(
+        _ layers: [RenderLayer], metadata: [String: PropertyValue] = [:]
+    ) -> RenderScene {
+        RenderScene(layers: layers, bbox: bbox, metadata: metadata)
     }
 
     private func populated(_ name: String) -> RenderLayer {
@@ -51,6 +53,58 @@ final class NotForNavigationTests: XCTestCase {
     func testDepthsCountToo() {
         XCTAssertTrue(NotForNavigation.applies(to: scene([populated(TerrainLayer.bathymetry)])))
         XCTAssertTrue(NotForNavigation.applies(to: scene([populated(TerrainLayer.depthBands)])))
+    }
+
+    /// A drawing of where the water goes is at least as actionable as a depth,
+    /// and it was missing from the list until a currents sheet was rendered and
+    /// the notice turned out to be arriving only because bathymetry happened to
+    /// be on as well.
+    func testCurrentsCountToo() {
+        XCTAssertTrue(NotForNavigation.applies(to: scene([populated(CurrentsProvider.layer)])))
+    }
+
+    // MARK: - Saying when
+
+    /// A depth is as true this year as last. A current is not, and `[(last)]`
+    /// means *the server's most recent step*, which is not the same as today —
+    /// the geostrophic dataset answered an August request with a field from
+    /// 26 March.
+    func testASheetDrawingSomethingThatChangesSaysWhen() {
+        let dated = scene(
+            [populated(CurrentsProvider.layer)],
+            metadata: ["erddap_current.erddap_time": .string("2026-03-26T00:00:00Z")]
+        )
+        XCTAssertTrue(NotForNavigation.notice(for: dated).hasSuffix("ocean data 2026-03-26"))
+    }
+
+    /// A sheet of depths and sea marks has nothing time-varying on it, and a
+    /// date there would be inventing a currency it does not have.
+    func testASheetWithNothingTimeVaryingStaysUndated() {
+        let plain = scene([populated(TerrainLayer.depthBands)])
+        XCTAssertEqual(NotForNavigation.notice(for: plain), NotForNavigation.notice)
+    }
+
+    /// The oldest ingredient decides, for the same reason the weakest provenance
+    /// does: the sheet cannot claim currency its stalest layer does not support.
+    func testTheEarliestObservationIsTheOneStated() {
+        let mixed = scene(
+            [populated(CurrentsProvider.layer)],
+            metadata: [
+                "erddap_current.erddap_time": .string("2026-03-26T00:00:00Z"),
+                "erddap_sst.erddap_time": .string("2026-08-01T09:00:00Z"),
+            ]
+        )
+        XCTAssertTrue(NotForNavigation.notice(for: mixed).hasSuffix("ocean data 2026-03-26"))
+    }
+
+    /// The date has to reach the paper, not just the diagnostics — a reader
+    /// looking at the sheet is the person the notice is for.
+    func testTheDateReachesTheSheet() throws {
+        let dated = scene(
+            [populated(CurrentsProvider.layer)],
+            metadata: ["erddap_current.erddap_time": .string("2026-03-26T00:00:00Z")]
+        )
+        XCTAssertTrue(try svg(dated).contains("ocean data 2026-03-26"))
     }
 
     /// A river and a shoreline are geography. A street map of Amsterdam is not

@@ -76,6 +76,10 @@ public struct SceneBuilder: Sendable {
         // subject when this source is on, and they are sparse enough not to
         // crowd what they cross.
         "sst_contours",
+        // Streamlines over everything the sea is made of, because when this
+        // source is on it is the subject; and under the marks, which are
+        // objects rather than a field.
+        "current_streamlines",
         // Rules drawn as ground: restricted areas, traffic separation, fairways,
         // and the harbours a vessel is heading for. Above the relief rather than
         // under it, because a hypsometric band fill is opaque and would paint
@@ -154,7 +158,12 @@ public struct SceneBuilder: Sendable {
             // properties, and processing the layer in a batch would separate the
             // colour list from the geometry list the moment clipping split a band.
             // Do not "optimise" this back into a batch.
-            var processed: [(geometry: Geometry, fillColor: RGBAColor?)] = []
+            // `strokeScale` is a per-feature multiplier on the layer stroke,
+            // carried by anything that varies along its own length — a
+            // streamline thickening where the water runs faster is the first
+            // user, and it needs no renderer change because the weight array
+            // was always there.
+            var processed: [(geometry: Geometry, strokeScale: Double?, fillColor: RGBAColor?)] = []
 
             for feature in features {
                 guard processed.count < cap else { break }
@@ -208,7 +217,11 @@ public struct SceneBuilder: Sendable {
                     counts: &counts
                 ) else { continue }
 
-                processed.append((geometry, rampColor(for: feature, style: style)))
+                processed.append((
+                    geometry,
+                    feature.property("stroke_scale")?.doubleValue,
+                    rampColor(for: feature, style: style)
+                ))
             }
 
             layer.labels = thinned(
@@ -229,7 +242,9 @@ public struct SceneBuilder: Sendable {
                 illuminatedLayers.append(name)
             } else {
                 for item in processed {
-                    layer.append(item.geometry, fillColor: item.fillColor)
+                    layer.append(
+                        item.geometry, weight: item.strokeScale, fillColor: item.fillColor
+                    )
                 }
             }
 

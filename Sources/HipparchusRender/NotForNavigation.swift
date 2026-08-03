@@ -38,12 +38,46 @@ public enum NotForNavigation {
     /// It is the marks and the depths that do that.
     public static let marineLayers: Set<String> =
         Set(Seamarks.allLayers)
-        + [TerrainLayer.bathymetry, TerrainLayer.depthBands]
+        + [TerrainLayer.bathymetry, TerrainLayer.depthBands, CurrentsProvider.layer]
 
     /// The words. Short enough to sit in a margin, specific enough to mean
     /// something — "not for navigation" alone reads as boilerplate, and the
     /// second clause is what stops it.
     public static let notice = "NOT FOR NAVIGATION · not a charted survey, and not corrected by Notices to Mariners"
+
+    /// The notice for a particular sheet, dated when the sheet is drawing
+    /// something that changes.
+    ///
+    /// A depth is as true this year as last. **A current is not**, and the
+    /// distinction has to reach the paper. `[(last)]` asks a server for its most
+    /// recent time step, which is not the same as *today* — the geostrophic
+    /// dataset answered a request made in August with a field from 26 March,
+    /// because that is genuinely where the product ends. A four-month-old
+    /// current drawn beside a warning that does not mention time is the exact
+    /// artefact the rest of this file exists to prevent, so the date is appended
+    /// rather than left in the diagnostics where nobody looking at the sheet
+    /// will find it.
+    ///
+    /// The *earliest* observation wins when a sheet carries more than one, for
+    /// the same reason the weakest provenance does: the sheet can only claim
+    /// what its oldest ingredient supports.
+    public static func notice(for scene: RenderScene) -> String {
+        guard let observed = observationDate(in: scene) else { return notice }
+        return "\(notice) · ocean data \(observed)"
+    }
+
+    /// The day the sea was observed, from whichever providers said so.
+    ///
+    /// Provider metadata is namespaced by source in the merge, so the key is
+    /// `<source>.erddap_time` rather than a bare one. ISO 8601 sorts
+    /// chronologically as text, which is the one thing that format is for.
+    static func observationDate(in scene: RenderScene) -> String? {
+        let times = scene.metadata
+            .filter { $0.key == "erddap_time" || $0.key.hasSuffix(".erddap_time") }
+            .compactMap { $0.value.stringValue }
+            .compactMap { $0.split(separator: "T").first.map(String.init) }
+        return times.min()
+    }
 
     /// Whether this scene is drawing the sea.
     ///

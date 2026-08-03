@@ -173,6 +173,10 @@ def sheet(
                            fillHigh=mix(land, ink, 0.15), opacity=0.42),
         "sst_contours": style(stroke=0.4 * contourWeight,
                               strokeColor=mix(water, ink, 0.5), opacity=0.65),
+        # A streamline is the one line on the sheet whose width means
+        # something, so this stroke is the base a `stroke_scale` multiplies.
+        "current_streamlines": style(stroke=0.75, strokeColor=mix(water, ink, 0.7),
+                                     opacity=0.85, cap="round"),
 
         # Sea marks. The twin of the block in `PaletteSheet.swift`, mix for mix.
         # A chart's own hierarchy in the pack's own colours: the rules are

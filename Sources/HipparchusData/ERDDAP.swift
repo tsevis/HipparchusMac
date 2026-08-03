@@ -145,6 +145,42 @@ public struct ERDDAPClient: Sendable {
         return URL(string: "\(dataset.server)/griddap/\(dataset.datasetID).csv?\(encoded)")
     }
 
+    /// Two variables in one request, for a vector field.
+    ///
+    /// griddap takes a comma-separated list, each with its own dimension
+    /// selection, and answers with one CSV carrying both columns — so a current
+    /// costs one round trip rather than two, and the two components are
+    /// guaranteed to be the same time step and the same lattice. Fetched
+    /// separately they might not be.
+    public func vectorURL(for bbox: BoundingBox, second: String) -> URL? {
+        let step = stride(for: bbox)
+        let selection = "[(last)]"
+            + "[(\(bbox.minLat)):\(step):(\(bbox.maxLat))]"
+            + "[(\(bbox.minLon)):\(step):(\(bbox.maxLon))]"
+        let query = "\(dataset.variable)\(selection),\(second)\(selection)"
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "()-._:,")
+        guard let encoded = query.addingPercentEncoding(withAllowedCharacters: allowed) else {
+            return nil
+        }
+        return URL(string: "\(dataset.server)/griddap/\(dataset.datasetID).csv?\(encoded)")
+    }
+
+    /// The eastward and northward halves of a flow, on one lattice.
+    public func vectorGrid(
+        for bbox: BoundingBox, second: String
+    ) async throws -> (east: ERDDAPGrid, north: ERDDAPGrid) {
+        guard let url = vectorURL(for: bbox, second: second) else {
+            throw ERDDAPError.refused("the request could not be formed")
+        }
+        let data = try await http.data(from: url, timeout: timeoutSeconds)
+        let text = String(decoding: data, as: UTF8.self)
+        return (
+            try Self.parse(text, variable: dataset.variable),
+            try Self.parse(text, variable: second)
+        )
+    }
+
     public func grid(for bbox: BoundingBox) async throws -> ERDDAPGrid {
         guard let url = url(for: bbox) else {
             throw ERDDAPError.refused("the request could not be formed")

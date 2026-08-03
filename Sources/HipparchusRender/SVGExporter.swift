@@ -364,7 +364,7 @@ public struct SVGExporter: Sendable {
             let padding = size * 0.6
             // A panel behind it, because this is the one thing on the sheet that
             // must not be lost against a dark sea or a busy coast.
-            let notice = NotForNavigation.notice
+            let notice = NotForNavigation.notice(for: scene)
             let approximateWidth = Double(notice.count) * size * 0.5
             out += "    <g id=\"not_for_navigation\">\n"
             out += "      <rect x=\"\(format(width * 0.5 - approximateWidth * 0.5 - padding))\""

@@ -66,14 +66,19 @@ public struct CoreGraphicsRenderer: Sendable {
         // the artefact that actually gets shared, and a sheet that looks like a
         // chart in an SVG looks exactly as much like one as a picture.
         if options.drawNotForNavigation, NotForNavigation.applies(to: scene) {
-            drawNotForNavigation(in: context, size: size, background: scene.background)
+            drawNotForNavigation(
+                NotForNavigation.notice(for: scene),
+                in: context, size: size, background: scene.background
+            )
         }
         return transform
     }
 
     /// The notice, bottom centre, on a panel that keeps it legible over a dark
     /// sea or a busy coast.
-    private func drawNotForNavigation(in context: CGContext, size: CGSize, background: RGBAColor) {
+    private func drawNotForNavigation(
+        _ notice: String, in context: CGContext, size: CGSize, background: RGBAColor
+    ) {
         let luminance = 0.2126 * Double(background.r)
             + 0.7152 * Double(background.g) + 0.0722 * Double(background.b)
         let dark = luminance < 128.0
@@ -84,7 +89,7 @@ public struct CoreGraphicsRenderer: Sendable {
         let fontSize = max(9.0, short * 0.014)
         let font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, fontSize, nil)
         let attributed = CFAttributedStringCreate(
-            nil, NotForNavigation.notice as CFString,
+            nil, notice as CFString,
             [
                 kCTFontAttributeName: font,
                 kCTForegroundColorAttributeName: ink.cgColor,
