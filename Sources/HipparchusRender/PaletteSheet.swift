@@ -44,13 +44,10 @@ extension Palette {
             stroke: 0.5 * contourWeight,
             strokeColor: Self.mix(water, ground, 0.4), opacity: 0.9
         )
-        // Depth as mass, on a ramp of its own. `elevation_bands` runs pale-to-
-        // dark up the land; this runs the other way, dark water to shallow, so
-        // the two meet at the coast instead of colliding there. The high stop is
-        // set below, with the other two-stop ramps.
-        // Index 0 is the deepest band, so the ramp starts dark and comes up to
-        // the shallows — the opposite direction from the land, which is what
-        // makes the two meet at the coast instead of colliding there.
+        // Depth as mass, on a ramp of its own. Index 0 is the deepest band, so
+        // this runs dark water up to the shallows — the opposite direction from
+        // the land, which is what makes the two meet at the coast instead of
+        // colliding there.
         styles["depth_bands"] = style(
             stroke: 0, fill: Self.mix(water, ink, 0.5),
             fillHigh: Self.mix(water, ground, 0.55), opacity: 0.9
@@ -112,6 +109,20 @@ extension Palette {
         styles["satellite_footprints"] = style(
             stroke: 0.4, strokeColor: Self.mix(ink, ground, 0.5),
             fill: ink, fillAlpha: 30, opacity: 0.5
+        )
+
+        // An ocean scalar — sea surface temperature today, whatever ERDDAP is
+        // pointed at next. Warm reads as the palette's land and cool as its
+        // water, which is not a physical claim but is the association every
+        // reader already has, and it keeps the sheet inside its eight colours
+        // rather than importing a rainbow.
+        styles["sst_bands"] = style(
+            stroke: 0, fill: Self.mix(water, ink, 0.35),
+            fillHigh: Self.mix(land, ink, 0.15), opacity: 0.42
+        )
+        styles["sst_contours"] = style(
+            stroke: 0.4 * contourWeight,
+            strokeColor: Self.mix(water, ink, 0.5), opacity: 0.65
         )
 
         // Sea marks. A chart's own hierarchy, in the palette's own colours: the

@@ -20,7 +20,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->859<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->872<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -955,6 +955,49 @@ asked for, so every sheet had a diluted margin with nothing to feather against.
 The request is wider than the frame now, which moves that margin off the page and
 leaves the feather meaning what it was written to mean: the place where the
 service genuinely runs out of data. The share reads 0.9996.
+
+## One client for a federated network of ocean data
+
+ERDDAP is a REST protocol with server-side subsetting, and hundreds of servers
+speak it — NOAA CoastWatch, IOOS, IFREMER, academic institutions. Sea surface
+temperature, salinity, wave height, ocean colour, surface winds, buoy
+observations: **one client reaches all of it**, and each product arrives as a
+grid this application already knows how to contour, band and shade.
+
+That is the entire argument for writing a client rather than a provider per
+product, and the file is short enough to be the proof. The contour tracer, the
+GEOS banding and the two-stop ramp were written for elevation and know nothing
+about metres, so a temperature is the same pipeline pointed at a different
+array. **The next product is an `ERDDAPDataset` and two style entries.**
+
+```sh
+.build/release/hipparchus-cli --bbox 23.2,36.3,24.2,37.1 --sea-temperature \
+    --preset "Coastal Survey" --palette Admiralty --out out
+```
+
+The first dataset is MUR sea surface temperature, a global daily analysis at
+0.01°. Over the Myrtoan Sea on 1 August it reads 24.1 °C to 26.0 °C, warm in the
+south-west and cool to the north-east — a number a reader can check against their
+own experience of that water in August, which is the point of choosing it first.
+
+**CSV, not NetCDF and not GeoTIFF**, all three of which griddap offers. NetCDF
+would want an HDF5 reader this does not have. GeoTIFF would have reused
+`GeoTIFF.swift` — and the server answered a real request for one with a 503 while
+the CSV of the same subset came back immediately, carrying its own units in the
+second header row. A format that states what its numbers mean is worth more here
+than one that saves bytes, and the parsing is twenty lines.
+
+Two things the parsing does not take on trust. The grid is rebuilt from the
+coordinates that arrived rather than from the ones that were asked for, because a
+server may snap a range to its own cell edges and a grid laid out by the request
+is a map of somewhere slightly else. And row 0 is made north whatever order the
+rows came in — griddap sends south first, and a temperature field is smooth
+enough that upside down would look perfectly fine.
+
+Where the layers sit is the rule this README already states, applied to a second
+field: **fills under lines.** Ranked above the linework first, the temperature
+wash rubbed out the isobaths underneath it; the bands sit with the other fills
+now, and only the isotherms draw on top.
 
 ## Not for navigation
 

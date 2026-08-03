@@ -179,6 +179,7 @@ public enum SourceID {
     public static let gibsImagery = "gibs_imagery"
     public static let usgsEarthquakes = "usgs_earthquakes"
     public static let satelliteTracks = "satellite_tracks"
+    public static let seaTemperature = erddapProviderIDPrefix + "sst"
     public static let simulatedTerrain = "simulated_terrain"
     public static let localOSMPBF = "local_osm_pbf"
     public static let vectorTiles = "vector_tiles"
@@ -287,6 +288,27 @@ public struct SourceStack: Sendable, Equatable {
                               attribute: "maxSatellites"),
                 SourceSetting("window", "Ahead", .number, .number(200), suffix: "min",
                               attribute: "windowMinutes"),
+            ]
+        ),
+        SourceDefinition(
+            id: SourceID.seaTemperature,
+            label: "Sea temperature",
+            subtitle: "NOAA ERDDAP · MUR analysis",
+            provenance: .measured,
+            settings: [
+                // Fewer isotherms than a terrain sheet gets contours: sea surface
+                // temperature varies by a few degrees across a frame this size,
+                // and forty lines through three degrees is a moiré rather than a
+                // reading.
+                SourceSetting("lines", "Isotherms", .number, .integer(14),
+                              attribute: "targetLineCount"),
+                SourceSetting("bands", "Bands", .number, .integer(8),
+                              attribute: "bandCount"),
+                // Server-side striding, which is the thing ERDDAP is good at:
+                // more samples means a finer field and a slower fetch, and the
+                // subsetting happens before anything crosses the network.
+                SourceSetting("samples", "Samples across", .number, .integer(220),
+                              attribute: "targetSamples"),
             ]
         ),
         SourceDefinition(

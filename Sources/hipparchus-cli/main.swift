@@ -82,6 +82,8 @@ func usage() -> Never {
       --shade-bands <n>  tones between shadow and light (default: 7)
       --relief-on-top    draw the shading over the buildings rather than under
                          them, for a city dense enough to bury it
+      --sea-temperature  stack sea surface temperature over the elevation, as
+                         isotherms and filled bands, from NOAA ERDDAP
       --simulated        a generated field instead of measured elevation. Needs
                          no network and is not a measurement of anywhere.
       --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
@@ -120,6 +122,7 @@ struct Options {
     var palette: Palette?
     var hillshade = false
     var reliefOnTop = false
+    var seaTemperature = false
     var simulated = false
     var streets = false
     var sun = SunPosition()
@@ -219,6 +222,8 @@ while argumentIndex < arguments.count {
     case "--relief-on-top":
         options.reliefOnTop = true
         options.hillshade = true
+    case "--sea-temperature":
+        options.seaTemperature = true
     case "--simulated":
         options.simulated = true
     case "--sun":
@@ -361,6 +366,19 @@ func run(_ place: Place, options: Options) async throws {
         field.hillshadeExaggeration = options.exaggeration
         field.hillshadeBandCount = options.shadeBands
         collection = try await SimulatedFieldProvider(settings: field).fetch(BBoxQuery(bbox: place.bbox))
+    } else if options.seaTemperature {
+        // The same manager the app fetches through, so the merge and the
+        // weakest-provenance rule are the shipped ones. Stacked on the
+        // elevation, because a temperature field over a blank sheet says
+        // nothing about where it is.
+        let manager = DataSourceManager(providers: [terrain, ERDDAPProvider()])
+        collection = try await manager.fetch(
+            BBoxQuery(bbox: place.bbox),
+            plan: FetchPlan(base: SourceID.terrainTiles, extras: [SourceID.seaTemperature])
+        )
+        if let failures = collection.metadata["provider_errors"]?.stringValue {
+            print("  some sources failed: \(failures)")
+        }
     } else if options.streets {
         // The same manager the app fetches through, so the merge, the layer
         // precedence and the weakest-provenance-wins rule are the shipped ones

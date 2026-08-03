@@ -165,6 +165,15 @@ def sheet(
         "satellite_footprints": style(stroke=0.4, strokeColor=mix(ink, ground, 0.5),
                                       fill=ink, fillAlpha=30, opacity=0.5),
 
+        # An ocean scalar -- sea surface temperature today, whatever ERDDAP is
+        # pointed at next. Warm reads as the pack's land and cool as its water,
+        # which is not a physical claim but is the association every reader
+        # already has, and it keeps the sheet inside its eight colours.
+        "sst_bands": style(stroke=0, fill=mix(water, ink, 0.35),
+                           fillHigh=mix(land, ink, 0.15), opacity=0.42),
+        "sst_contours": style(stroke=0.4 * contourWeight,
+                              strokeColor=mix(water, ink, 0.5), opacity=0.65),
+
         # Sea marks. The twin of the block in `PaletteSheet.swift`, mix for mix.
         # A chart's own hierarchy in the pack's own colours: the rules are
         # ground, the marks are ink, and the emphasis runs from a restricted

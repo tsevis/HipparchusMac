@@ -63,8 +63,19 @@ public struct SceneBuilder: Sendable {
         // relief they resemble — the panel already groups them under Terrain.
         // (The Python's `_ordered_layers` omits them, so they painted over every
         // label; ranking them is a deliberate divergence in the port's favour.)
-        "elevation_bands", "depth_bands", "terrain_hillshade", "bathymetry",
+        "elevation_bands", "depth_bands",
+        // An ocean scalar's fill goes here, with the other fills — over the sea
+        // floor it describes the surface of, and *under* every line. Ranked
+        // above the linework first, it washed the isobaths out; this file's own
+        // rule says fills go under contours or the fills paint over the lines,
+        // and a temperature is no exception to it.
+        "sst_bands",
+        "terrain_hillshade", "bathymetry",
         "terrain_contours", "terrain_index_contours", "night_lights",
+        // The isotherms, though, sit above the depth linework: they are the
+        // subject when this source is on, and they are sparse enough not to
+        // crowd what they cross.
+        "sst_contours",
         // Rules drawn as ground: restricted areas, traffic separation, fairways,
         // and the harbours a vessel is heading for. Above the relief rather than
         // under it, because a hypsometric band fill is opaque and would paint

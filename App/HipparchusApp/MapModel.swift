@@ -1078,6 +1078,17 @@ final class MapModel {
                 }
                 providers.append(SatelliteTrackProvider(settings: settings, cache: cache))
 
+            case SourceID.seaTemperature:
+                var settings = ERDDAPSettings()
+                if let lines = overrides["targetLineCount"]?.intValue {
+                    settings.targetLineCount = lines
+                }
+                if let bands = overrides["bandCount"]?.intValue { settings.bandCount = bands }
+                if let samples = overrides["targetSamples"]?.intValue {
+                    settings.targetSamples = samples
+                }
+                providers.append(ERDDAPProvider(settings: settings))
+
             case SourceID.gibsImagery:
                 var settings = SatelliteImagerySettings()
                 if let layer = overrides["layer"]?.stringValue { settings.layer = layer }

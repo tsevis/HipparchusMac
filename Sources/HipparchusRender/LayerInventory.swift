@@ -36,6 +36,8 @@ public enum LayerInventory {
         "landuse": "Land use",
         "coastline": "Coastline / sea",
         "ferry_routes": "Ferry routes",
+        "sst_contours": "Sea temperature",
+        "sst_bands": "Sea temperature bands",
         "seamark_lights": "Lights",
         "seamark_buoys": "Buoys",
         "seamark_beacons": "Beacons",
@@ -65,7 +67,7 @@ public enum LayerInventory {
     /// navigation — and on a sheet that carries both, a reader turning marks off
     /// wants one place to do it.
     public static let groupOrder = [
-        "Terrain", "Water & land", "Sea marks", "Built", "Movement", "Labels", "Derived",
+        "Terrain", "Water & land", "Sea marks", "Ocean", "Built", "Movement", "Labels", "Derived",
     ]
 
     static let groups: [String: String] = [
@@ -93,6 +95,8 @@ public enum LayerInventory {
         "seamark_hazards": "Sea marks",
         "seamark_harbours": "Sea marks",
         "seamark_areas": "Sea marks",
+        "sst_contours": "Ocean",
+        "sst_bands": "Ocean",
         "buildings": "Built",
         "barriers": "Built",
         "power": "Built",
