@@ -48,15 +48,16 @@ targets:
         # Modest on purpose: the model behind the window is well tested, and the
         # window itself has never been reviewed by anyone. A minor bump here
         # marks a layer the application never had — relief shading at 0.2.0, the
-        # sea at 0.3.0 — and never a milestone in confidence. 0.3.1 put real
-        # bathymetry under the sea 0.3.0 drew, and 0.3.2 makes the sheet say how
-        # much of that sea floor anybody actually surveyed.
+        # sea at 0.3.0 — and never a milestone in confidence. The patches after
+        # it are that sea getting honest: 0.3.1 put real bathymetry under it,
+        # 0.3.2 said how much of that floor anybody had surveyed, and 0.3.3 says
+        # on the sheet itself that none of it is a chart.
         #
         # `CURRENT_PROJECT_VERSION` is the only number here that must be
         # monotonic. `make-dmg.sh` reads the version out of the built Info.plist,
         # so this file is the one place it is stated.
-        MARKETING_VERSION: "0.3.2"
-        CURRENT_PROJECT_VERSION: "9"
+        MARKETING_VERSION: "0.3.3"
+        CURRENT_PROJECT_VERSION: "10"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
