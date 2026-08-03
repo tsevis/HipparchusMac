@@ -66,8 +66,12 @@ targets:
         # is that 0.4.0 shipped four marine sources whose credits had never been
         # written down, and exports that carried no attribution at all despite
         # the About panel promising they did.
-        MARKETING_VERSION: "0.4.1"
-        CURRENT_PROJECT_VERSION: "12"
+        # 0.4.2 is the first release with any automated check on the window at
+        # all, and the first to fix something those checks found: whether the
+        # Locator opened at launch was a coin toss, and anybody who turned the
+        # splash off was living with it.
+        MARKETING_VERSION: "0.4.2"
+        CURRENT_PROJECT_VERSION: "13"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
