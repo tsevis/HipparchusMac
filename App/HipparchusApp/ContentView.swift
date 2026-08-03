@@ -15,6 +15,11 @@ struct ContentView: View {
     @Bindable var model: MapModel
     /// The menu bar's way in. Filled in below as the window appears.
     let actions: AppActions
+    /// The splash, owned by the app because it outlives any window.
+    ///
+    /// **Handed in rather than shown by the app**, because *when* it appears has
+    /// to be ordered against this view's own wiring — see `openOnLaunch()`.
+    let about: AboutWindowController
     @State private var viewport = ViewportState()
     /// A handle onto the live canvas, so Render map can ask what is actually
     /// on screen — turning the view is deliberately kept out of the requested
@@ -69,15 +74,7 @@ struct ContentView: View {
             model.undoManager = undoManager
             wireUpMenuCommands()
             model.startIfRequestedOnLaunch()
-            // `--locator` opens the floating Locator straight away, without
-            // anyone having to find the toolbar button first. A toolbar's
-            // trailing items are the first thing macOS folds away into an
-            // overflow menu when a window is narrow, so "the button is not
-            // there" and "the window does not work" look identical from the
-            // outside — this tells them apart.
-            if ProcessInfo.processInfo.arguments.contains("--locator") {
-                locatorPanel.show(model: model, onRender: renderChosenArea)
-            }
+            openOnLaunch()
         }
         .onAppear { model.undoManager = undoManager }
         .onDisappear { model.save() }
@@ -176,6 +173,45 @@ struct ContentView: View {
     /// Done once as the window appears. Each closure captures this view's
     /// state boxes, which are stable across redraws, so the menu keeps working
     /// without being rewired on every update.
+    /// What opens by itself when the window appears: the splash, then the
+    /// Locator behind it.
+    ///
+    /// **This used to live on a second `.task`, attached to this view by the
+    /// app, and the two raced.** That one called `actions.openLocator`, which
+    /// *this* view's task assigns — and SwiftUI does not specify which of two
+    /// `.task` modifiers runs first. When the app's won, `openLocator` was still
+    /// nil, the call did nothing, and the Locator never appeared. Two identical
+    /// launches produced two different windows.
+    ///
+    /// The splash hid it in ordinary use by giving the wiring time to land, so
+    /// it only showed when "Show About on launch" was off — which is how the
+    /// layout tests launch, and how they found it.
+    ///
+    /// The fix is not a delay or a guess about ordering: it is putting the
+    /// sequence in **one** task, after the wiring, where the order is program
+    /// order. It calls the panel directly rather than through `AppActions` for
+    /// the same reason — `AppActions` exists because the menu bar outlives the
+    /// view tree, and reaching back through it from inside the view that fills
+    /// it in was the indirection that allowed the race.
+    private func openOnLaunch() {
+        // `--locator` opens the floating Locator straight away, without anyone
+        // having to find the toolbar button first. A toolbar's trailing items
+        // are the first thing macOS folds away into an overflow menu when a
+        // window is narrow, so "the button is not there" and "the window does
+        // not work" look identical from the outside — this tells them apart.
+        if ProcessInfo.processInfo.arguments.contains("--locator") {
+            locatorPanel.show(model: model, onRender: renderChosenArea)
+            return
+        }
+        // The splash first, then the Locator behind it — the Locator floats, so
+        // opening both at once would bury the splash under it. With the splash
+        // turned off the completion runs immediately, which is the case that
+        // used to be a coin toss.
+        about.showOnLaunchIfWanted {
+            locatorPanel.show(model: model, onRender: renderChosenArea)
+        }
+    }
+
     private func wireUpMenuCommands() {
         actions.renderMap = { renderMap() }
         actions.openLocator = { locatorPanel.show(model: model, onRender: renderChosenArea) }

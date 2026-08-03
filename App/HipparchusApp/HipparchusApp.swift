@@ -16,14 +16,15 @@ struct HipparchusApp: App {
     @State private var about = AboutWindowController()
 
     var body: some Scene {
+        // What opens at launch is `ContentView.openOnLaunch()`, deliberately.
+        //
+        // The splash used to be shown from a `.task` here, calling
+        // `actions.openLocator` — which the view's *own* task assigns. SwiftUI
+        // does not specify which of two `.task` modifiers runs first, so whether
+        // the Locator appeared was a coin toss. Ordering it against the wiring
+        // means being in the same task as the wiring.
         Window("Hipparchus", id: "map") {
-            ContentView(model: model, actions: actions)
-                .task {
-                    // The splash first, then the Locator behind it — the
-                    // Locator floats, so opening both at once would bury the
-                    // splash under it.
-                    about.showOnLaunchIfWanted { actions.openLocator?() }
-                }
+            ContentView(model: model, actions: actions, about: about)
         }
         .defaultSize(width: 1100, height: 800)
         .commands {
