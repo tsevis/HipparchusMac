@@ -70,8 +70,12 @@ targets:
         # all, and the first to fix something those checks found: whether the
         # Locator opened at launch was a coin toss, and anybody who turned the
         # splash off was living with it.
-        MARKETING_VERSION: "0.4.2"
-        CURRENT_PROJECT_VERSION: "13"
+        # 0.4.3 changes nothing a user of this build can see: it repairs the
+        # signing path, which only runs once a Developer ID certificate exists.
+        # It is cut anyway so that the first notarised image is built by a
+        # released version rather than by whatever happened to be on `main`.
+        MARKETING_VERSION: "0.4.3"
+        CURRENT_PROJECT_VERSION: "14"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
