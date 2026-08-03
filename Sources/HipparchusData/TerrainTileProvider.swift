@@ -94,12 +94,6 @@ public struct TerrainTileSettings: Sendable {
     /// show.
     public var emitElevationBands = true
     public var elevationBandCount = 10
-    /// Band the sea floor apart from the land, on its own ramp.
-    ///
-    /// On by default, and this is a correction rather than an addition: the sea
-    /// floor was always being banded, in the land's colours. Off restores the
-    /// single ramp every sheet had before, for comparing an old render to a new
-    /// one.
     /// Put EMODnet's ~115 m bathymetry under the sea, where it reaches.
     ///
     /// On by default in European waters and a no-op everywhere else. The mosaic
@@ -108,6 +102,12 @@ public struct TerrainTileSettings: Sendable {
     /// confident and be interpolation. See `EMODnetBathymetry`.
     public var useEMODnetBathymetry = true
     public var emodnet = EMODnetSettings()
+    /// Band the sea floor apart from the land, on its own ramp.
+    ///
+    /// On by default, and this is a correction rather than an addition: the sea
+    /// floor was always being banded, in the land's colours. Off restores the
+    /// single ramp every sheet had before, for comparing an old render to a new
+    /// one.
     public var separateDepthBands = true
     /// Fewer than the land gets. Depth on these sheets spans further than height
     /// and matters less finely — the interesting part of a coastal sheet is the
@@ -173,6 +173,10 @@ public struct TerrainTileProvider: MapProvider {
         // array, so every one of them improves without knowing anything happened.
         var blended = cropped
         var emodnetCells = 0
+        // How much of each cell anybody surveyed, carried down to the features
+        // so a contour can say what it is standing on. Zero everywhere until
+        // proven otherwise, which is the honest default.
+        var surveyed = Field2D.zeros(like: cropped)
         if settings.useEMODnetBathymetry, EMODnetBathymetry.covers(bounds) {
             let service = EMODnetBathymetry(settings: settings.emodnet, http: http)
             if let finer = await service.grid(
@@ -180,6 +184,7 @@ public struct TerrainTileProvider: MapProvider {
             ) {
                 let result = blendSeaFloor(cropped, with: finer, over: bounds)
                 blended = result.field
+                surveyed = result.surveyed
                 emodnetCells = result.replaced
             }
         }
@@ -220,24 +225,50 @@ public struct TerrainTileProvider: MapProvider {
                     let oriented = orientUphillLeft(coordinates, sample: sample, level: level, probe: probe)
 
                     let target = settings.separateBathymetry && level < 0 ? TerrainLayer.bathymetry : layer
+
+                    // What this line is standing on. Land keeps its SRTM claim;
+                    // a sub-sea line claims `measured` only where every point of
+                    // it sits on surveyed ground, and `approximate` otherwise —
+                    // a contour that runs off the survey and onto the global
+                    // grid is not a surveyed contour.
+                    var claim = Provenance.measured
+                    var surveyedShare = 1.0
+                    if level < 0 {
+                        let samples = polyline.map {
+                            surveyed.clamped(row: Int($0.row), column: Int($0.column))
+                        }
+                        claim = BlendedSeaFloor.claim(forSamples: samples)
+                        surveyedShare = samples.isEmpty
+                            ? 0 : samples.reduce(0, +) / Double(samples.count)
+                    }
+
+                    var properties: [String: PropertyValue] = [
+                        "elevation": .double(level),
+                        "contour_interval": .double(interval),
+                        "index_contour": .bool(layer == TerrainLayer.indexContours),
+                    ]
+                    if level < 0 {
+                        properties["surveyed_share"] = .double(surveyedShare)
+                        properties["depth_source"] = .string(
+                            surveyedShare >= 0.999 ? "survey"
+                                : surveyedShare <= 0.001 ? "global_grid" : "mixed"
+                        )
+                    }
+
                     featuresByLayer[target, default: []].append(Feature(
                         id: "\(providerID)/\(target)/\(String(format: "%.1f", level))/\(featuresByLayer[target]?.count ?? 0)",
                         layer: target,
                         source: providerID,
                         geometry: .lineString(LineString(oriented)),
-                        provenance: .measured,
-                        properties: [
-                            "elevation": .double(level),
-                            "contour_interval": .double(interval),
-                            "index_contour": .bool(layer == TerrainLayer.indexContours),
-                        ]
+                        provenance: claim,
+                        properties: properties
                     ))
                 }
             }
         }
 
         if settings.emitElevationBands {
-            let banded = try bandFeatures(grid: grid, window: window, zoom: zoom)
+            let banded = try bandFeatures(grid: grid, window: window, zoom: zoom, surveyed: surveyed)
             featuresByLayer[TerrainLayer.elevationBands] = banded.land
             featuresByLayer[TerrainLayer.depthBands] = banded.depth
         }
@@ -291,6 +322,18 @@ public struct TerrainTileProvider: MapProvider {
                 "bathymetry_source": .string(
                     emodnetCells > 0 ? "emodnet+terrarium" : "terrarium"
                 ),
+                // The closest thing to GEBCO's TID grid this can honestly say.
+                // TID is published as a picture and not as values — GEBCO's WCS
+                // offers no coverages, and EMODnet's quality index is WMS only —
+                // so rather than reverse-engineer a colour ramp, this states the
+                // one thing it knows per cell: which grid the depth came from.
+                //
+                // Deliberately not called "predicted": the global grid is
+                // measured along ship tracks and interpolated between them, and
+                // without TID there is no telling which any one cell is.
+                "sea_floor_surveyed_share": .double(surveyedShareOfSea(
+                    grid: grid, surveyed: surveyed
+                )),
             ],
             bbox: bounds,
             provenance: .measured
@@ -410,7 +453,7 @@ public struct TerrainTileProvider: MapProvider {
     /// colours of a hill. That is the same mistake `separateBathymetry` was
     /// added to stop for the contours, one level up.
     private func bandFeatures(
-        grid: Field2D, window: PixelWindow, zoom: Int
+        grid: Field2D, window: PixelWindow, zoom: Int, surveyed: Field2D
     ) throws -> (land: [Feature], depth: [Feature]) {
         guard settings.elevationBandCount >= 2 else { return ([], []) }
 
@@ -449,7 +492,8 @@ public struct TerrainTileProvider: MapProvider {
                 boundaries: depthBandBoundaries(
                     minimum: range.minimum, maximum: range.maximum,
                     count: settings.depthBandCount, mode: settings.depthBandMode
-                )
+                ),
+                surveyed: surveyed
             )
         )
     }
@@ -461,7 +505,8 @@ public struct TerrainTileProvider: MapProvider {
         zoom: Int,
         geos: GEOSContext,
         layer: String,
-        boundaries: [Double]
+        boundaries: [Double],
+        surveyed: Field2D? = nil
     ) throws -> [Feature] {
         guard boundaries.count >= 2 else { return [] }
         let bands = try elevationBands(coarse, boundaries: boundaries, using: geos)
@@ -478,22 +523,49 @@ public struct TerrainTileProvider: MapProvider {
                 )
             }
             if geometry.isEmpty { continue }
+
+            // A depth band is a region, so it is sampled at its own vertices in
+            // the mask's index space — the mask is the full grid and the band
+            // was traced on a decimated copy, which is what `sampleScaled` is
+            // reconciling.
+            var claim = Provenance.measured
+            var surveyedShare = 1.0
+            if let surveyed {
+                let samples = band.geometry.mapCoordinatesToArray { point in
+                    surveyed.sampleScaled(
+                        row: point.y, column: point.x,
+                        ofRows: coarse.rows, ofColumns: coarse.columns
+                    )
+                }
+                claim = BlendedSeaFloor.claim(forSamples: samples)
+                surveyedShare = samples.isEmpty ? 0 : samples.reduce(0, +) / Double(samples.count)
+            }
+
+            var properties: [String: PropertyValue] = [
+                "elevation_low": .double(band.lower),
+                "elevation_high": .double(band.upper),
+                "band_index": .int(index),
+                "band_count": .int(bands.count),
+                // A depth band states the water over it, which is the number
+                // a reader wants and the opposite sign from the ground.
+                "depth_low": .double(-band.upper),
+                "depth_high": .double(-band.lower),
+            ]
+            if surveyed != nil {
+                properties["surveyed_share"] = .double(surveyedShare)
+                properties["depth_source"] = .string(
+                    surveyedShare >= 0.999 ? "survey"
+                        : surveyedShare <= 0.001 ? "global_grid" : "mixed"
+                )
+            }
+
             features.append(Feature(
                 id: "\(providerID)/\(layer)/\(index)",
                 layer: layer,
                 source: providerID,
                 geometry: geometry,
-                provenance: .measured,
-                properties: [
-                    "elevation_low": .double(band.lower),
-                    "elevation_high": .double(band.upper),
-                    "band_index": .int(index),
-                    "band_count": .int(bands.count),
-                    // A depth band states the water over it, which is the number
-                    // a reader wants and the opposite sign from the ground.
-                    "depth_low": .double(-band.upper),
-                    "depth_high": .double(-band.lower),
-                ]
+                provenance: claim,
+                properties: properties
             ))
         }
         return features

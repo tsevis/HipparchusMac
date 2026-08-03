@@ -20,7 +20,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->839<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->846<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -348,12 +348,12 @@ expected. Every one currently matches:
 | San Francisco | `−122.53, 37.70 → −122.35, 37.84` | tops at 284 m | −114 m to 284 m |
 | Addis Ababa | `38.65, 8.90 → 38.88, 9.10` | never below 2,075 m | 2075 m to 3127 m |
 | Everest | `86.85, 27.93 → 87.05, 28.06` | 5,060 m to 8,746 m | 5060 m to 8746 m |
-| Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | deeper than −1,300 m | −1350 m, 802 contours |
+| Myrtoan Sea | `23.2, 36.3 → 24.2, 37.1` | deeper than −1,300 m | −1356 m, 883 contours |
 
 **Three of the sea figures moved when EMODnet arrived**, and the movement is the
 point rather than a regression: Santorini's floor went from −79 m to −85 m,
-Athens's from −4 m to −11 m, and the Myrtoan Sea's from −1,310 m to −1,350 m
-with 546 sub-sea contours becoming 802. The land columns did not move at all,
+Athens's from −4 m to −11 m, and the Myrtoan Sea's from −1,310 m to −1,356 m
+with 546 sub-sea contours becoming 883. The land columns did not move at all,
 which is what you would expect from a change that only touches the sea. The
 expected column is stated as the thing that is actually known — a summit height,
 a floor deeper than some figure — rather than as the number this app last
@@ -369,10 +369,10 @@ summits rather than two dozen.
 Santorini's Illustrator layers, counted out of the SVG that
 `hipparchus-cli santorini` writes, are
 **<!--santorini:contours-->178<!--/santorini:contours--> contours,
-<!--santorini:index-->889<!--/santorini:index--> index contours,
-<!--santorini:bathymetry-->142<!--/santorini:bathymetry--> bathymetry and
+<!--santorini:index-->884<!--/santorini:index--> index contours,
+<!--santorini:bathymetry-->130<!--/santorini:bathymetry--> bathymetry and
 <!--santorini:summits-->17<!--/santorini:summits--> summit labels**, and its
-longest contour is <!--santorini:longest-->6,658<!--/santorini:longest-->
+longest contour is <!--santorini:longest-->6,729<!--/santorini:longest-->
 vertices, arriving whole. `Scripts/update-santorini-counts.sh` derives them; it
 draws a real Santorini, so unlike the test count it needs the network.
 
@@ -478,16 +478,16 @@ pipeline — `--bbox … --preset … --render-to`, not screenshots of a window.
 
 **A sheet that is mostly sea.** The Myrtoan Sea, between the Peloponnese and the
 Cyclades: Serifos and its neighbours as the only land in a thousand square
-kilometres, and the sea floor drawn as filled depth bands with 802 sub-sea
+kilometres, and the sea floor drawn as filled depth bands with 883 sub-sea
 contours over them. This is the same frame the verification table above uses,
 and it has been redrawn twice — once when the sea stopped borrowing the land's
 ramp, and again when the depths themselves stopped being interpolation.
 
 <p align="center">
-  <img src="Docs/assets/gallery-myrtoan-sea-coastal-survey.png" width="70%" alt="The Myrtoan Sea drawn from EMODnet bathymetry as filled depth bands with 802 sub-sea contours over them, showing ridges, channels and basin structure; Serifos at 120 metres and two smaller islands are the only land in the frame">
+  <img src="Docs/assets/gallery-myrtoan-sea-coastal-survey.png" width="70%" alt="The Myrtoan Sea drawn from EMODnet bathymetry as filled depth bands with 883 sub-sea contours over them, showing ridges, channels and basin structure; Serifos at 120 metres and two smaller islands are the only land in the frame">
 </p>
 
-<p align="center"><em>Myrtoan Sea · Coastal Survey · Admiralty · −1,350 m · six depth bands, 802 contours, EMODnet</em></p>
+<p align="center"><em>Myrtoan Sea · Coastal Survey · Admiralty · −1,356 m · six depth bands, 883 contours, EMODnet</em></p>
 
 Three cities in three of the palettes named after people who drew the world, or
 went and looked at it. One preset — Fragmented Urban — supplying the geometry
@@ -909,6 +909,46 @@ The sheet says which it is. `bathymetry_source` in the diagnostics is
 `emodnet+terrarium` or `terrarium`, and `emodnet_cells` counts what was replaced,
 because a reader is entitled to know whether they are looking at 115 m or at a
 kilometre. Outside European waters nothing is requested at all.
+
+### What a depth is standing on
+
+GEBCO publishes a **TID grid** beside its depths: a code per cell saying whether
+that depth was multibeamed, singlebeamed, interpolated, or predicted from
+satellite gravity. It is the right answer to "how much should I trust this", and
+**it is not available as values.** GEBCO's coverage service offers no coverages
+at all; its TID is a WMS layer, which is a picture. EMODnet's `quality_index` and
+`source_references` are WMS too. The only route to the codes would be
+reverse-engineering a colour ramp out of a rendered image, which is the thing
+this codebase refuses by name elsewhere — a picture of bathymetry is not
+bathymetry.
+
+What *is* known per cell, without asking anybody, is which of two grids a depth
+came from. So:
+
+- Sub-sea contours and depth bands carry `depth_source` — `survey`,
+  `global_grid` or `mixed` — and `surveyed_share`.
+- Their **`Provenance` follows the weakest-claim rule** the whole map already
+  uses: a contour claims `measured` only where every point of it sits on
+  surveyed ground, and `approximate` otherwise. A line that runs off the survey
+  and onto the global grid is not a surveyed line.
+- `sea_floor_surveyed_share` in the diagnostics is that share across the frame's
+  sea, averaged over water only — a mostly-land sheet would otherwise report a
+  low figure and read as though its water were poorly known.
+
+Note what this deliberately does **not** say. A cell outside the coverage is
+*unsurveyed*, not *predicted*: the global grid is measured along ship tracks and
+interpolated between them, and without TID there is no telling which any one cell
+is. Calling it predicted would invent the certainty the whole mechanism exists to
+avoid.
+
+Building it caught a bug in the blend, which is what provenance is for. The
+Myrtoan Sea — a frame sitting well inside EMODnet's coverage — reported 89% of
+its sea floor surveyed when the true figure was all of it. The feather ramps from
+the edge of whatever coverage comes back, and what comes back is exactly what was
+asked for, so every sheet had a diluted margin with nothing to feather against.
+The request is wider than the frame now, which moves that margin off the page and
+leaves the feather meaning what it was written to mean: the place where the
+service genuinely runs out of data. The share reads 0.9996.
 
 ## Depth, as mass rather than as linework
 

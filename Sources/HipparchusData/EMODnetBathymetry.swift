@@ -55,6 +55,19 @@ public struct EMODnetBathymetry {
         self.http = http
     }
 
+    /// The frame plus the margin the feather needs, clamped to the service's own
+    /// extent — asking outside it returns a complaint rather than a coverage.
+    static func widened(_ bbox: BoundingBox) -> BoundingBox {
+        let lonMargin = (bbox.maxLon - bbox.minLon) * requestMargin
+        let latMargin = (bbox.maxLat - bbox.minLat) * requestMargin
+        return BoundingBox(
+            minLon: Swift.max(emodnetCoverage.minLon, bbox.minLon - lonMargin),
+            minLat: Swift.max(emodnetCoverage.minLat, bbox.minLat - latMargin),
+            maxLon: Swift.min(emodnetCoverage.maxLon, bbox.maxLon + lonMargin),
+            maxLat: Swift.min(emodnetCoverage.maxLat, bbox.maxLat + latMargin)
+        )
+    }
+
     /// Whether it is worth asking at all.
     ///
     /// A frame entirely outside European waters gets nothing, and this is how it
@@ -70,8 +83,23 @@ public struct EMODnetBathymetry {
     /// with something unreadable: this is an *improvement* to a map that already
     /// works, and a sheet is better drawn from the global mosaic than not drawn.
     /// The caller records what happened in the diagnostics either way.
+    /// How much wider than the frame to ask for.
+    ///
+    /// **The feather has to fall outside the drawing.** It ramps from the edge of
+    /// whatever coverage comes back, and what comes back is exactly what was
+    /// asked for — so asking for the frame alone put a diluted margin around
+    /// every sheet, including sheets sitting in the middle of EMODnet's coverage
+    /// with nothing to feather against. The Myrtoan Sea reported 89% of its sea
+    /// floor surveyed when the true figure was all of it.
+    ///
+    /// Asking wider moves that margin off the page, and leaves the bounds-based
+    /// feather meaning what it was written to mean: the place where the service
+    /// genuinely runs out of data, which is where it clips the request.
+    static let requestMargin = 0.09
+
     public func grid(for bbox: BoundingBox, rows: Int, columns: Int) async -> GeoTIFFGrid? {
         guard Self.covers(bbox) else { return nil }
+        let bbox = Self.widened(bbox)
 
         let width = Swift.max(2, Swift.min(columns, settings.maximumPixels))
         let height = Swift.max(2, Swift.min(rows, settings.maximumPixels))
@@ -136,17 +164,25 @@ public func blendSeaFloor(
     with finer: GeoTIFFGrid,
     over bbox: BoundingBox,
     featherFraction: Double = 0.06
-) -> (field: Field2D, replaced: Int) {
+) -> BlendedSeaFloor {
     guard base.rows > 0, base.columns > 0,
-          finer.field.rows > 0, finer.field.columns > 0 else { return (base, 0) }
+          finer.field.rows > 0, finer.field.columns > 0 else {
+        return BlendedSeaFloor(field: base, surveyed: .zeros(like: base), replaced: 0)
+    }
 
     let coverage = finer.bounds
     let lonSpan = coverage.maxLon - coverage.minLon
     let latSpan = coverage.maxLat - coverage.minLat
-    guard lonSpan > 0, latSpan > 0 else { return (base, 0) }
+    guard lonSpan > 0, latSpan > 0 else {
+        return BlendedSeaFloor(field: base, surveyed: .zeros(like: base), replaced: 0)
+    }
 
     let feather = Swift.max(1e-9, Swift.min(lonSpan, latSpan) * Swift.max(0, featherFraction))
     var values = base.values
+    // How much of each cell's depth came from the survey compilation. Not a
+    // flag: a feathered cell is genuinely part one grid and part the other, and
+    // rounding that to "surveyed" would be the same overclaim in miniature.
+    var surveyed = ContiguousArray<Double>(repeating: 0, count: base.count)
     var replaced = 0
 
     for row in 0..<base.rows {
@@ -173,6 +209,7 @@ public func blendSeaFloor(
                 // Nothing to disagree with: a hole in the mosaic is filled
                 // outright, because something is better than nothing.
                 values[index] = depth
+                surveyed[index] = 1
                 replaced += 1
                 continue
             }
@@ -193,9 +230,110 @@ public func blendSeaFloor(
             guard weight > 0 else { continue }
 
             values[index] = existing + (depth - existing) * weight
+            surveyed[index] = weight
             replaced += 1
         }
     }
 
-    return (Field2D(rows: base.rows, columns: base.columns, values: values), replaced)
+    return BlendedSeaFloor(
+        field: Field2D(rows: base.rows, columns: base.columns, values: values),
+        surveyed: Field2D(rows: base.rows, columns: base.columns, values: surveyed),
+        replaced: replaced
+    )
+}
+
+/// A grid, and how much of each cell anybody actually surveyed.
+///
+/// **This is as close to GEBCO's TID grid as this application can honestly get.**
+/// TID says, per cell, whether a depth was measured by multibeam, by singlebeam,
+/// interpolated, or predicted from satellite gravity — and it is published as a
+/// picture and not as values. GEBCO's WCS offers no coverages at all, and
+/// EMODnet's `quality_index` and `source_references` are WMS layers, so the only
+/// route to the codes would be reverse-engineering a colour ramp out of a
+/// rendered image. That is the thing this codebase refuses elsewhere by name.
+///
+/// What *is* known per cell, without asking anybody, is which of two grids a
+/// depth came from: a survey compilation at about 115 m, or a global grid at a
+/// kilometre or two. That is the distinction a reader is actually making a
+/// decision on, and it is derived rather than claimed.
+///
+/// Note what this deliberately does **not** say. A cell outside the coverage is
+/// `unsurveyed` here, not "predicted" — the global grid is measured along ship
+/// tracks and interpolated between them, and without TID there is no way to know
+/// which any one cell is. Saying "predicted" would be inventing the very
+/// certainty this type exists to avoid.
+public struct BlendedSeaFloor: Sendable {
+    public let field: Field2D
+    /// 1 where the depth is the survey compilation's, 0 where it is the global
+    /// grid's, and in between across the feathered edge of coverage.
+    public let surveyed: Field2D
+    public let replaced: Int
+
+    /// What a feature crossing these cells may claim.
+    ///
+    /// The weakest-claim rule, the same one `Provenance.merged` applies to a
+    /// whole map: a contour that runs from surveyed ground onto the global grid
+    /// is not a surveyed contour. `measured` requires every sample to be.
+    public static func claim(forSamples samples: [Double]) -> Provenance {
+        guard !samples.isEmpty else { return .approximate }
+        return samples.allSatisfy { $0 >= 0.999 } ? .measured : .approximate
+    }
+}
+
+/// What share of a frame's *sea floor* anybody surveyed.
+///
+/// Sea only, and that is the point: averaging the mask over the whole grid would
+/// dilute the answer with land, which is not what the number is about and would
+/// read lower the more coast a sheet contains.
+public func surveyedShareOfSea(grid: Field2D, surveyed: Field2D) -> Double {
+    guard grid.count == surveyed.count, grid.count > 0 else { return 0 }
+    var total = 0.0
+    var cells = 0
+    for index in 0..<grid.count {
+        let depth = grid.values[index]
+        guard depth.isFinite, depth < 0 else { continue }
+        total += surveyed.values[index]
+        cells += 1
+    }
+    return cells == 0 ? 0 : total / Double(cells)
+}
+
+extension Geometry {
+    /// Every coordinate in this geometry, put through `sample`.
+    ///
+    /// `mapCoordinates` rebuilds a geometry; this only wants to look at the
+    /// points, which for a band means sampling a mask under each vertex of the
+    /// ring. Only the exterior of a polygon is walked: a hole is somewhere the
+    /// band is not, so what the mask says under it describes other ground.
+    func mapCoordinatesToArray(_ sample: (Coordinate) -> Double) -> [Double] {
+        switch self {
+        case .empty: []
+        case .point(let coordinate): [sample(coordinate)]
+        case .multiPoint(let coordinates): coordinates.map(sample)
+        case .lineString(let line): line.coordinates.map(sample)
+        case .multiLineString(let lines): lines.flatMap { $0.coordinates.map(sample) }
+        case .polygon(let polygon): polygon.exterior.coordinates.map(sample)
+        case .multiPolygon(let polygons):
+            polygons.flatMap { $0.exterior.coordinates.map(sample) }
+        case .collection(let parts): parts.flatMap { $0.mapCoordinatesToArray(sample) }
+        }
+    }
+}
+
+extension Field2D {
+    static func zeros(like other: Field2D) -> Field2D {
+        Field2D(rows: other.rows, columns: other.columns, repeating: 0)
+    }
+
+    /// The value at a fractional position in another grid's index space.
+    ///
+    /// Depth bands are traced on a decimated copy, so a band's coordinates are
+    /// in a smaller grid than the mask. Scaling here rather than resampling the
+    /// mask keeps one array and no interpolation nobody asked for.
+    func sampleScaled(row: Double, column: Double, ofRows: Int, ofColumns: Int) -> Double {
+        guard rows > 0, columns > 0, ofRows > 0, ofColumns > 0 else { return 0 }
+        let r = Int((row / Double(ofRows) * Double(rows)).rounded(.down))
+        let c = Int((column / Double(ofColumns) * Double(columns)).rounded(.down))
+        return clamped(row: r, column: c)
+    }
 }
