@@ -53,11 +53,17 @@ targets:
         # 0.3.2 said how much of that floor anybody had surveyed, and 0.3.3 says
         # on the sheet itself that none of it is a chart.
         #
+        # 0.4.0 is a minor rather than a patch because the sea stopped being a
+        # coastline with depths under it. One ERDDAP client reaches a federated
+        # network of ocean data, and the currents are integrated into
+        # streamlines — a drawn flow field, which no amount of patching the
+        # bathymetry would have produced.
+        #
         # `CURRENT_PROJECT_VERSION` is the only number here that must be
         # monotonic. `make-dmg.sh` reads the version out of the built Info.plist,
         # so this file is the one place it is stated.
-        MARKETING_VERSION: "0.3.3"
-        CURRENT_PROJECT_VERSION: "10"
+        MARKETING_VERSION: "0.4.0"
+        CURRENT_PROJECT_VERSION: "11"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
