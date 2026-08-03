@@ -94,13 +94,50 @@ IDENTITY="${DEVELOPER_ID:-$(security find-identity -v -p codesigning 2>/dev/null
 NOTARY_PROFILE="${NOTARY_PROFILE:-hipparchus-notary}"
 NOTARISED=false
 
+ENTITLEMENTS="$(cd "$(dirname "$0")/.." && pwd)/App/HipparchusApp/Hipparchus.entitlements"
+
 if [ -n "$IDENTITY" ]; then
     echo "Signing with: $IDENTITY"
-    # Deep, and the runtime hardened — notarisation refuses anything less.
-    # Nested code first, the app last, which is the order codesign requires.
-    codesign --force --deep --options runtime --timestamp \
+    test -f "$ENTITLEMENTS" || { echo "error: no entitlements at $ENTITLEMENTS" >&2; exit 1; }
+
+    # `--entitlements` is not optional, and leaving it out is a bug that can only
+    # ever appear on the *first* notarised build — which is the worst possible
+    # time to find it.
+    #
+    # `codesign --force` replaces a signature; it does not carry the old
+    # entitlements across. Without this flag the app ships with none: no
+    # `app-sandbox`, and so no container redirection, which moves the session,
+    # the saved styles and the cache somewhere else entirely. An upgrading user
+    # would open a build that had apparently forgotten everything. Verified by
+    # re-signing a copy and reading the entitlements back — they were gone.
+    #
+    # Passing the project's own file also drops `com.apple.security.get-task-allow`,
+    # which Xcode adds when it signs ad-hoc and which the notary service rejects
+    # outright. Two problems, one flag.
+    #
+    # No `--deep`: there is exactly one binary in this bundle, Apple discourages
+    # it for signing, and it would apply these entitlements to nested code that
+    # should not have them. If a framework is ever added it must be signed
+    # first, on its own — and until then, an unsigned one fails loudly here
+    # rather than being signed wrongly and quietly.
+    codesign --force --options runtime --timestamp \
+        --entitlements "$ENTITLEMENTS" \
         --sign "$IDENTITY" "$STAGING/Hipparchus.app"
     codesign --verify --strict --verbose=2 "$STAGING/Hipparchus.app" 2>&1 | tail -2
+
+    # Read back what was actually signed in, rather than trusting the flag.
+    if codesign -d --entitlements - --xml "$STAGING/Hipparchus.app" 2>/dev/null \
+        | grep -q "app-sandbox"; then
+        echo "  entitlements: sandbox present"
+    else
+        echo "error: the signed app has no sandbox entitlement — refusing to ship it" >&2
+        exit 1
+    fi
+    if codesign -d --entitlements - --xml "$STAGING/Hipparchus.app" 2>/dev/null \
+        | grep -q "get-task-allow"; then
+        echo "error: get-task-allow survived; the notary service will reject this" >&2
+        exit 1
+    fi
 else
     echo "No Developer ID certificate found — leaving the ad-hoc signature in place."
 fi

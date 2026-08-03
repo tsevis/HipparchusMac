@@ -106,18 +106,43 @@ bash Scripts/make-dmg.sh
 With the certificate and the credentials in place it will:
 
 1. Build in release and stage the app.
-2. Sign the app deep, with the hardened runtime and a secure timestamp —
-   notarisation rejects anything less.
-3. Create the disk image, and sign the image too, so it is the image Gatekeeper
+2. Sign the app with the hardened runtime, a secure timestamp **and the
+   project's entitlements** — notarisation rejects anything less.
+3. Read the entitlements back off the signed app and refuse to continue if the
+   sandbox is missing or `get-task-allow` survived.
+4. Create the disk image, and sign the image too, so it is the image Gatekeeper
    trusts rather than only its contents.
-4. Submit for notarisation and wait. Apple decides when; a few minutes is
+5. Submit for notarisation and wait. Apple decides when; a few minutes is
    normal.
-5. Staple the ticket into the image, so it opens on a Mac that is offline or
+6. Staple the ticket into the image, so it opens on a Mac that is offline or
    behind a firewall blocking Apple's check.
-6. Print `spctl`'s verdict.
+7. Print `spctl`'s verdict.
 
 The last line should read **"Signed with a Developer ID and notarised."** If it
 says signed but not notarised, the submission failed and the error is above.
+
+### Two bugs that were waiting for this step, and are now fixed
+
+Both were latent for as long as there was no certificate, because the script
+leaves an ad-hoc signature alone and only re-signs when it finds a Developer ID.
+They would therefore both have appeared on the *first* notarised build, which is
+the worst possible time. Recorded here because the shape of them will recur:
+**anything the signing branch does has never run.**
+
+- **`codesign --force` does not carry entitlements across.** The script re-signed
+  without `--entitlements`, and re-signing a copy and reading them back showed
+  every one of them gone: no `app-sandbox`, so no container redirection, so the
+  session, the saved styles and the cache all move. An upgrading user would open
+  a build that had apparently forgotten everything — and it would have been
+  signed, notarised and perfectly trusted while doing it.
+- **Xcode's ad-hoc signature adds `com.apple.security.get-task-allow`**, even in
+  Release, and the notary service rejects any submission carrying it. Passing the
+  project's own entitlements file removes it, since the file does not list it.
+
+The script now reads the entitlements back off the signed bundle and exits rather
+than build an image it cannot vouch for. **Do not replace that check with a
+comment**; it is the only thing standing between a wrong flag and a shipped
+build, and neither symptom is visible by looking at the app.
 
 ## Step 6 — Check it as a stranger would
 
