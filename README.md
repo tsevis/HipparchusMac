@@ -637,6 +637,25 @@ window. Without it, renaming an identifier would not fail; every other test woul
 quietly stop finding its element and report "does not exist", which reads like a
 broken window rather than a stale string.
 
+**The first run failed eight ways, and both causes had to be seen rather than
+reasoned about.** `HierarchyDumpTests` is what saw them — it asserts nothing and
+prints the window tree, which is the same move as rendering a sheet and reading
+the PNG:
+
+- **`app.windows.firstMatch` is whichever window macOS fronted.** The Locator is
+  a floating panel, so eight tests were asserting against *its* tree — continent
+  buttons and all. The window is addressed by its scene identifier now.
+- **SwiftUI stamps a container's `accessibilityIdentifier` onto every
+  descendant.** `frame_panel` matches a Map, a Button and an Outline;
+  `map_column` matches the zoom buttons floating at the map's *trailing* edge, so
+  a naive "is the map left of the inspector" compared 1513 against 1539 and meant
+  nothing. Container identifiers are not single elements, and the structural
+  assertions go through the two sidebar `Outline`s instead.
+
+One test also **passed for the wrong reason**: it skipped elements it could not
+find, so it sailed through against the wrong window entirely. A test that cannot
+fail is worse than no test, because it reports confidence it never earned.
+
 This closes the first part of the largest gap in the project. **It is not the
 whole gap.** Nothing here judges whether the window looks right — only that its
 parts are present, placed and alive.

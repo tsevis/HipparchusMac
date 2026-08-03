@@ -62,6 +62,11 @@ enum LaunchedApp {
 /// `UITestID.swift` that is not mirrored here fails loudly instead of turning
 /// every other test into a silent "element does not exist".
 enum ID {
+    /// The `Window(id:)` of the map scene. Addressing the window by this rather
+    /// than by `firstMatch` is what stops the Locator — a floating panel that
+    /// comes to the front — being mistaken for the window under test.
+    static let mainWindow = "map"
+
     static let framePanel = "frame_panel"
     static let mapColumn = "map_column"
     static let inspector = "inspector"

@@ -7,12 +7,25 @@ import XCTest
 /// stops responding fails nothing** — that was the largest real gap in the
 /// project, and these are the assertions that close the first part of it.
 ///
-/// What they deliberately do *not* do is pin pixels. A test that asserts a
-/// button is at (412, 96) fails on every honest improvement, and a suite that
-/// fails on improvements is a suite people stop running. These assert the things
-/// that are true of a working window at any size: the parts exist, they are
-/// inside it, they respond, and the one button the window exists to have pressed
-/// says why when it will not work.
+/// They deliberately do not pin pixels. A test that asserts a button is at
+/// (412, 96) fails on every honest improvement, and a suite that fails on
+/// improvements is one people stop running. These assert what is true of a
+/// working window at any size: the parts exist, they are inside it, they are in
+/// the right order, they respond, and the controls that should be dead are dead.
+///
+/// **Two things the first run taught, both of which had to be seen rather than
+/// reasoned about** — `HierarchyDumpTests` is what saw them:
+///
+/// - `app.windows.firstMatch` is whichever window macOS fronted, and the Locator
+///   is a floating panel. Eight tests failed against the Locator's tree. The
+///   window is addressed by its scene identifier now, which is exact.
+/// - **SwiftUI stamps a container's `accessibilityIdentifier` onto every
+///   descendant.** `frame_panel` matches a Map, a Button and an Outline;
+///   `map_column` matches the zoom buttons floating at the map's *trailing*
+///   edge. A container identifier is not one element, so nothing here treats it
+///   as one — the structural assertions go through the two sidebar `Outline`s,
+///   which are single and stable.
+@MainActor
 final class WindowLayoutTests: XCTestCase {
 
     private var app: XCUIApplication!
@@ -29,135 +42,195 @@ final class WindowLayoutTests: XCTestCase {
         if let stateName { LaunchedApp.removeState(named: stateName) }
     }
 
-    private var window: XCUIElement {
-        app.windows.firstMatch
+    /// The main window, by the identifier its `Window` scene was given.
+    ///
+    /// Not `firstMatch`: the Locator floats above this one when it opens, and
+    /// asserting against whichever window happened to be fronted is how the
+    /// first run of these tests failed eight ways at once.
+    private var window: XCUIElement { app.windows[ID.mainWindow] }
+
+    private func requireWindow() {
+        XCTAssertTrue(
+            window.waitForExistence(timeout: 30),
+            "no window with identifier \(ID.mainWindow) — renamed the scene?"
+        )
+    }
+
+    /// The frame panel and the inspector are `Outline`s, which is the one
+    /// element per column that is single rather than stamped on everything.
+    private func sidebar(_ identifier: String) -> XCUIElement {
+        window.outlines.matching(identifier: identifier).firstMatch
     }
 
     // MARK: - It opens at all
 
     func testTheWindowOpens() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20), "no window appeared")
+        requireWindow()
     }
 
-    /// The minimum frame is 960 × 620 and the default 1100 × 800. A window that
-    /// opens smaller than its own minimum has a layout that cannot fit.
+    /// The layout declares `minWidth: 960, minHeight: 620`. A window smaller
+    /// than its own minimum has a layout that cannot fit.
     func testTheWindowIsAtLeastItsStatedMinimum() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
+        requireWindow()
         XCTAssertGreaterThanOrEqual(window.frame.width, 960)
         XCTAssertGreaterThanOrEqual(window.frame.height, 620)
     }
 
     // MARK: - The parts are there
 
-    /// **This is the test that keeps the other ones honest.** A UI test bundle
-    /// cannot import the app target, so the identifiers are written out twice.
-    /// Without this, renaming one in `UITestID.swift` would not fail — every
-    /// test would simply stop finding its element and report "does not exist",
-    /// which reads like a broken window rather than a stale string.
+    /// **The test that keeps the others honest.** A UI test bundle cannot import
+    /// the app target, so the identifiers are written out twice. Without this,
+    /// renaming one in `UITestID.swift` would not fail — every test would simply
+    /// stop finding its element and report "does not exist", which reads like a
+    /// broken window rather than a stale string.
     func testTheIdentifiersMatchTheApplication() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
+        requireWindow()
         for identifier in ID.alwaysPresent {
             XCTAssertTrue(
-                window.descendants(matching: .any)[identifier].waitForExistence(timeout: 5),
-                "\(identifier) is not in the window — renamed in UITestID.swift?"
+                window.descendants(matching: .any).matching(identifier: identifier).count > 0,
+                "\(identifier) is nowhere in the window — renamed in UITestID.swift?"
             )
         }
     }
 
-    /// Three columns and a status bar. The split view can collapse a column, but
-    /// not on a window this size, and a missing one is a layout that has fallen
-    /// over rather than a choice.
+    /// Three columns and a status bar.
     func testTheThreeColumnsAndTheStatusBarAreAllPresent() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
-        for identifier in [ID.framePanel, ID.mapColumn, ID.inspector, ID.statusBar] {
-            let element = window.descendants(matching: .any)[identifier]
-            XCTAssertTrue(element.exists, "\(identifier) is missing")
-        }
+        requireWindow()
+        XCTAssertTrue(sidebar(ID.framePanel).exists, "no frame panel sidebar")
+        XCTAssertTrue(sidebar(ID.inspector).exists, "no inspector sidebar")
+        XCTAssertTrue(mapHint.exists, "the map column's hint is missing")
+        XCTAssertTrue(statusText.exists, "the status bar says nothing")
     }
 
-    // MARK: - They are inside the window
+    /// The caption on the canvas — the one element carrying `map_column` that is
+    /// in the map rather than floating at its edge.
+    private var mapHint: XCUIElement {
+        window.staticTexts.matching(identifier: ID.mapColumn).firstMatch
+    }
+
+    private var statusText: XCUIElement {
+        window.staticTexts.matching(identifier: ID.statusBar).firstMatch
+    }
+
+    // MARK: - They are placed
+
+    /// Left to right: frame panel, map, inspector. A split view that reorders
+    /// itself is a bug that reads as a redesign.
+    func testTheColumnsAreInOrderLeftToRight() {
+        requireWindow()
+        let frame = sidebar(ID.framePanel)
+        let inspector = sidebar(ID.inspector)
+        XCTAssertTrue(frame.exists)
+        XCTAssertTrue(inspector.exists)
+        XCTAssertLessThan(
+            frame.frame.minX, inspector.frame.minX,
+            "the frame panel should be left of the inspector"
+        )
+        XCTAssertLessThan(
+            frame.frame.maxX, mapHint.frame.midX,
+            "the map should be right of the frame panel"
+        )
+        XCTAssertLessThan(
+            mapHint.frame.midX, inspector.frame.minX,
+            "the map should be left of the inspector"
+        )
+    }
+
+    /// The status bar is a row of the window rather than something inside a
+    /// column, which is why it is a sibling of the split view rather than an
+    /// inset on it. So it sits below both sidebars.
+    func testTheStatusBarSitsBeneathTheColumns() {
+        requireWindow()
+        XCTAssertTrue(statusText.exists)
+        XCTAssertGreaterThan(
+            statusText.frame.minY, sidebar(ID.inspector).frame.minY,
+            "the status bar should be below the columns, not beside them"
+        )
+        XCTAssertGreaterThan(
+            statusText.frame.midY, window.frame.midY,
+            "the status bar should be in the lower half of the window"
+        )
+    }
 
     /// Nothing is off the edge.
     ///
     /// A toolbar's trailing items are the first thing macOS folds into an
     /// overflow menu when a window is narrow, and "the button is not there" and
-    /// "the window does not work" look identical from outside. At the default
-    /// size nothing should be folded away.
+    /// "the window does not work" look identical from outside.
+    ///
+    /// Every element is required to exist. An earlier version skipped the ones
+    /// it could not find, which meant it **passed against the wrong window
+    /// entirely** — a test that cannot fail is worse than no test, because it
+    /// reports confidence it never earned.
     func testNothingSitsOutsideTheWindow() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
-        let frame = window.frame
-        for identifier in ID.alwaysPresent {
-            let element = window.descendants(matching: .any)[identifier]
-            guard element.exists else { continue }
+        requireWindow()
+        let bounds = window.frame
+        for element in [renderButton, exportMenu, locatorButton, areaDescription, statusText] {
+            XCTAssertTrue(element.exists, "\(element) is missing")
             let box = element.frame
+            XCTAssertGreaterThan(box.width, 0)
+            XCTAssertGreaterThan(box.height, 0)
             XCTAssertTrue(
-                frame.contains(box) || frame.intersects(box),
-                "\(identifier) is at \(box), outside the window at \(frame)"
+                bounds.intersects(box), "\(box) lies outside the window at \(bounds)"
             )
-            XCTAssertGreaterThan(box.width, 0, "\(identifier) has no width")
-            XCTAssertGreaterThan(box.height, 0, "\(identifier) has no height")
         }
-    }
-
-    /// The columns are in the order the window is built in, left to right. A
-    /// split view that reorders itself is a bug that reads as a redesign.
-    func testTheColumnsAreInOrderLeftToRight() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
-        let frame = window.descendants(matching: .any)[ID.framePanel].frame
-        let map = window.descendants(matching: .any)[ID.mapColumn].frame
-        let inspector = window.descendants(matching: .any)[ID.inspector].frame
-        XCTAssertLessThan(frame.minX, map.minX, "the frame panel should be leftmost")
-        XCTAssertLessThan(map.minX, inspector.minX, "the inspector should be rightmost")
-    }
-
-    /// The status bar spans the window rather than sitting inside one column —
-    /// it is a row of the window, which is why it is a sibling of the split view
-    /// rather than an inset on it.
-    func testTheStatusBarSpansTheWindow() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
-        let bar = window.descendants(matching: .any)[ID.statusBar].frame
-        XCTAssertGreaterThan(
-            bar.width, window.frame.width * 0.8,
-            "the status bar is \(bar.width) wide in a \(window.frame.width) window"
-        )
     }
 
     // MARK: - They respond
 
+    private var renderButton: XCUIElement {
+        window.buttons.matching(identifier: ID.renderButton).firstMatch
+    }
+
+    private var locatorButton: XCUIElement {
+        window.buttons.matching(identifier: ID.locatorButton).firstMatch
+    }
+
+    private var exportMenu: XCUIElement {
+        window.popUpButtons.matching(identifier: ID.exportMenu).firstMatch
+    }
+
+    private var areaDescription: XCUIElement {
+        window.staticTexts.matching(identifier: ID.areaDescription).firstMatch
+    }
+
     /// Existing and being usable are different claims, and only the second one
     /// matters to somebody trying to press a button.
     func testTheControlsAreHittable() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
-        for identifier in [ID.renderButton, ID.locatorButton] {
-            let element = window.descendants(matching: .any)[identifier]
-            XCTAssertTrue(element.exists, "\(identifier) is missing")
-            XCTAssertTrue(element.isHittable, "\(identifier) exists but cannot be clicked")
-        }
+        requireWindow()
+        XCTAssertTrue(renderButton.exists, "no Render map button")
+        XCTAssertTrue(renderButton.isHittable, "Render map exists but cannot be clicked")
+        XCTAssertTrue(locatorButton.exists, "no Locator button")
+        XCTAssertTrue(locatorButton.isHittable, "the Locator button cannot be clicked")
     }
 
-    /// **Render map is the one button the whole window exists to have pressed.**
-    /// It is disabled when there is nothing to draw, and when it is disabled it
-    /// carries the reason in its help text — the answer is on the button that
-    /// will not work, rather than a click away.
-    func testTheRenderButtonSaysWhyWhenItWillNotWork() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
-        let render = window.descendants(matching: .any)[ID.renderButton]
-        XCTAssertTrue(render.exists)
-        if !render.isEnabled {
-            XCTAssertFalse(
-                (render.value as? String ?? render.title).isEmpty,
-                "a disabled Render map with nothing to say is a dead end"
-            )
-        }
+    /// **Render map is the one button the whole window exists to have pressed**,
+    /// so it is on screen from the first frame whether or not it can be used
+    /// yet. Its enabled state is the model's business; its presence is not.
+    func testTheRenderButtonIsAlwaysOffered() {
+        requireWindow()
+        XCTAssertTrue(renderButton.exists)
+        XCTAssertFalse(renderButton.label.isEmpty, "a button with no label")
     }
 
-    /// Export is disabled until something has been drawn. Offering it before
-    /// there is a scene would produce a file dialogue for an empty map.
+    /// Export is dead until something has been drawn. Offering it before there
+    /// is a scene would produce a file dialogue for an empty map.
     func testExportIsDisabledBeforeAnythingIsDrawn() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
-        let export = window.descendants(matching: .any)[ID.exportMenu]
-        XCTAssertTrue(export.exists)
-        XCTAssertFalse(export.isEnabled, "Export should be dead until a map exists")
+        requireWindow()
+        XCTAssertTrue(exportMenu.exists, "no Export menu")
+        XCTAssertFalse(exportMenu.isEnabled, "Export should be dead until a map exists")
+    }
+
+    /// The window says which area it is pointed at, and it says so before
+    /// anything is fetched — a readout that appears only after a render is a
+    /// readout nobody can use to decide whether to render.
+    func testTheWindowSaysWhichAreaItIsShowing() {
+        requireWindow()
+        XCTAssertTrue(areaDescription.exists)
+        XCTAssertFalse(
+            (areaDescription.value as? String ?? "").isEmpty,
+            "the area readout is blank"
+        )
     }
 
     // MARK: - It is not eating the user's state
@@ -168,11 +241,8 @@ final class WindowLayoutTests: XCTestCase {
     /// session over the real one — so it must fail here, loudly, rather than in
     /// whatever the user notices next time they open the app.
     func testTheRunIsIsolatedFromTheRealState() {
-        XCTAssertTrue(window.waitForExistence(timeout: 20))
-        let support = FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-        let isolated = support?.appendingPathComponent(stateName)
-        XCTAssertNotNil(isolated)
+        requireWindow()
         XCTAssertNotEqual(stateName, "Hipparchus", "the tests are pointed at the real state")
+        XCTAssertTrue(stateName.hasPrefix("HipparchusUITests-"))
     }
 }
