@@ -20,7 +20,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->898<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->922<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -1451,6 +1451,47 @@ Every source declares what it is — `measured`, `synthetic`, `uncalibrated` or
 `approximate` — on its features, on the merged metadata, on the scene and in the
 exported diagnostics. This is what stops a generated map being mistaken for a
 survey. It is a guarantee, not decoration; a new source needs the same.
+
+## Attribution, which is data rather than prose
+
+Credits used to live in a hand-written paragraph in the About panel, and **prose
+does not survive a new source**. Every source added was one somebody had to
+remember to type there. Four marine sources arrived in a day; the paragraph
+gained a line for none of them, and NOAA's two were simply missing — which is a
+licence breach nobody notices until somebody else does.
+
+So attribution is a registry keyed by the source that owes it, and the panel
+renders the registry rather than restating it. A test asserts that **every
+shipped source either carries a credit or is explicitly declared exempt**, with
+no third state — "nobody has added it yet" is not one. Adding a provider without
+answering the question now fails the suite, which is the only thing that turns
+*remember to* into *cannot forget*. A generated field and a file the user opened
+are the exempt cases, and they are recorded as decisions rather than left as
+omissions that look like decisions.
+
+**The second half matters more.** The About panel said the attributions "travel
+with anything you publish", and nothing travelled — no export carried a credit of
+any kind, so that sentence was simply false. Now every sheet carries the sources
+that actually drew *it*:
+
+- `data-hipparchus-attribution` on the SVG root, for anything that parses;
+- `<metadata id="attribution">`, which is where an editor looks and what
+  Illustrator keeps — this exporter exists so the file gets opened elsewhere;
+- an `attribution` array in the diagnostics written beside **every** export,
+  which is the only place a PNG or a PDF can carry one.
+
+A sheet credits what it used and nothing else. A map of Everest does not owe
+EMODnet a line, and padding the list with sources that drew nothing makes the
+true entries harder to trust. A source nobody has registered is dropped rather
+than guessed at: an invented credit is worse than a missing one, because it is
+wrong on purpose.
+
+**EMODnet is the awkward case, and it is the one whose licence explicitly asks
+for a line.** It has no provider of its own — it is blended into the elevation
+grid inside `TerrainTileProvider` — so a sheet standing on it reports
+`terrain_tiles` and would otherwise credit nobody. What the sheet does record is
+which grid the depths came from, so that is what the credit is derived from, and
+a sheet that fell back to the global grid does not claim EMODnet.
 
 ## Licence
 

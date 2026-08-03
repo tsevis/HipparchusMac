@@ -1,3 +1,4 @@
+import HipparchusData
 import SwiftUI
 
 /// What this is, who made it, and what it owes.
@@ -127,13 +128,22 @@ struct AboutView: View {
     private var footer: some View {
         VStack(spacing: 0) {
             DisclosureGroup {
-                Text(Self.legal)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-                    .lineSpacing(1.5)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 6)
+                // Scrolled and capped. The registry grows every time a source is
+                // added, and this window is a fixed 640 × 580 — text that simply
+                // expanded would eventually push the Continue button off the
+                // bottom, which is the kind of breakage nobody sees until the
+                // source after next.
+                ScrollView {
+                    Text(Self.legal)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                        .lineSpacing(1.5)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                }
+                .frame(maxHeight: 120)
+                .padding(.top, 6)
             } label: {
                 Text("Data, licences and credits")
                     .font(.system(size: 11, weight: .medium))
@@ -189,17 +199,27 @@ struct AboutView: View {
     generated map must never be mistaken for a survey.
     """
 
-    private static let legal = """
-    Map data © OpenStreetMap contributors, under the Open Database License \
-    (ODbL). Elevation from Mapzen/AWS Terrain Tiles. Bathymetry in European \
-    seas from EMODnet Bathymetry (emodnet-bathymetry.eu). Imagery from NASA \
-    GIBS. Earthquakes from the U.S. Geological Survey. Satellite elements from \
-    CelesTrak. Geocoding by Nominatim and Apple MapKit; Locator basemap © \
-    Apple. Rendered with GEOS.
-
-    Maps you make are yours. The attributions above travel with anything you \
-    publish from them.
-    """
+    /// Built from `AttributionRegistry` rather than written out here.
+    ///
+    /// **This was a hand-written paragraph, and that is why it was wrong.** Every
+    /// source added had to be remembered into it; four marine sources arrived in
+    /// a day and NOAA's two never appeared, which is a licence breach nobody
+    /// notices until somebody else does. A panel that renders the registry cannot
+    /// drift from it, and the completeness test makes the registry itself the
+    /// thing that fails when a source is added without a credit.
+    private static let legal: String = {
+        // One line per source rather than a paragraph each: the registry will
+        // keep growing, and this sits inside a window of fixed height.
+        let sources = AttributionRegistry.all
+            .map { "\($0.statement) — \($0.licence). \($0.url)" }
+        let tools = AttributionRegistry.tools.map { "\($0.statement) — \($0.licence)." }
+        return (sources + tools).joined(separator: "\n")
+            + "\n\nMaps you make are yours. Each exported sheet carries the "
+            + "attributions for the sources that actually drew it — in the SVG's "
+            + "metadata and root attributes, and in the diagnostics written "
+            + "beside every export, including the formats with nowhere to print "
+            + "a credit."
+    }()
 }
 
 // MARK: - Its window

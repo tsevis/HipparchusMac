@@ -116,6 +116,15 @@ public struct SVGExporter: Sendable {
         }
         out += ">\n"
 
+        // A data attribute satisfies a machine and nobody else. `<metadata>` is
+        // where SVG puts a credit a person or an editor can find, and Illustrator
+        // keeps it — which matters, because the whole point of this exporter is
+        // that the file gets opened and worked on somewhere else.
+        let credit = SheetAttribution.statement(for: scene)
+        if !credit.isEmpty {
+            out += "  <metadata id=\"attribution\">\(escape(credit))</metadata>\n"
+        }
+
         if options.includeBackground {
             out += "  <rect id=\"map_background\" x=\"0\" y=\"0\""
             out += " width=\"\(options.width)\" height=\"\(options.height)\""
@@ -476,6 +485,14 @@ public struct SVGExporter: Sendable {
         if NotForNavigation.applies(to: scene) {
             attributes["data-hipparchus-not-for-navigation"] = "true"
         }
+        // **Also unconditional, and for the same reason.** The About panel says
+        // the attributions travel with anything published from here, and for as
+        // long as no export carried a credit that sentence was simply untrue.
+        // It names only the sources that drew this sheet.
+        let credit = SheetAttribution.statement(for: scene)
+        if !credit.isEmpty {
+            attributes["data-hipparchus-attribution"] = credit
+        }
         if let bbox = scene.bbox {
             attributes["data-hipparchus-bbox"] =
                 "\(bbox.minLon),\(bbox.minLat),\(bbox.maxLon),\(bbox.maxLat)"
@@ -509,7 +526,8 @@ public struct SVGExporter: Sendable {
             },
             metadata: scene.metadata.compactMapValues { $0.stringValue },
             diagnostics: scene.diagnostics.compactMapValues { $0.stringValue },
-            composition: options.composition
+            composition: options.composition,
+            attribution: SheetAttribution.attributions(for: scene)
         )
     }
 
@@ -572,6 +590,13 @@ public struct ExportDiagnostics: Codable, Sendable, Equatable {
     /// How the page was composed, when the exporter was told. Optional so a
     /// diagnostics file from before composition existed still decodes.
     public let composition: SVGExporter.Composition?
+    /// What this sheet owes, source by source.
+    ///
+    /// The diagnostics are the one export that accompanies *every* format, so a
+    /// PNG or a PDF — neither of which has anywhere to put a credit of its own —
+    /// still has its attribution beside it. Optional so a file written before
+    /// the registry existed still decodes.
+    public let attribution: [Attribution]?
 
     public var totalGeometries: Int { layers.reduce(0) { $0 + $1.geometries } }
 
