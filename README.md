@@ -367,18 +367,38 @@ Athens, Addis Ababa and Everest yield no bathymetry; the Myrtoan Sea yields five
 summits rather than two dozen.
 
 Santorini's Illustrator layers, counted out of the SVG that
-`hipparchus-cli santorini` writes, are **178 contours, 889 index contours, 142
-bathymetry and 34 summit labels**, and its longest contour is 8,097 vertices,
-arriving whole. The 178 is the figure this port has always produced and the one
-the Python's own screenshot shows.
+`hipparchus-cli santorini` writes, are
+**<!--santorini:contours-->178<!--/santorini:contours--> contours,
+<!--santorini:index-->889<!--/santorini:index--> index contours,
+<!--santorini:bathymetry-->142<!--/santorini:bathymetry--> bathymetry and
+<!--santorini:summits-->17<!--/santorini:summits--> summit labels**, and its
+longest contour is <!--santorini:longest-->6,658<!--/santorini:longest-->
+vertices, arriving whole. `Scripts/update-santorini-counts.sh` derives them; it
+draws a real Santorini, so unlike the test count it needs the network.
 
-The other three no longer match that screenshot, and only one of them has an
-explanation I am sure of: **bathymetry was 7 and is 142**, because the sea around
-the caldera is now EMODnet's 115 m rather than a kilometre-scale global grid, and
-that structure is real. The index-contour and summit-label figures had already
-drifted from the 798 and 24 published here before today — measured, not
-explained, and written down that way rather than given a cause I have not
-established.
+The 178 is the figure this port has always produced and the one the Python's own
+screenshot shows. Two of the others no longer match it, for reasons worth
+stating:
+
+- **Bathymetry was 7 and is 142**, because the water round the caldera is now
+  EMODnet's 115 m rather than a kilometre-scale global grid. That structure is
+  real, and it is the clearest single demonstration of what the change bought.
+- **The index contours were published as 798 and are 889.** That drift predates
+  the sea work; it is measured rather than explained, and nothing here has
+  established when it happened.
+
+The summit figure counts **labels, not text elements**. It was published as 24,
+then briefly as 34, and both were counting the wrong thing: every label is
+written twice, once for its halo and once for its fill, so 34 elements are 17
+labels. The longest contour had drifted too — published as 8,097 vertices, it is
+6,658. Deriving these is what caught both, which is the argument for deriving
+them: of the five figures in this paragraph, four were wrong and none of the
+four announced itself.
+
+Two counts of one layer can disagree honestly, too. The CLI reports what it
+*drew* — 887 index contours — where the file holds 889 paths, because
+`SVGExporter` writes one path per component and clipping had split two contours
+in two. The file is what Illustrator opens, so the file is what these count.
 
 Beyond that, fixtures compare this port against something other than my reading
 of it. Most are the Python itself:
