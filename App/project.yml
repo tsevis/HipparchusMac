@@ -62,8 +62,12 @@ targets:
         # `CURRENT_PROJECT_VERSION` is the only number here that must be
         # monotonic. `make-dmg.sh` reads the version out of the built Info.plist,
         # so this file is the one place it is stated.
-        MARKETING_VERSION: "0.4.0"
-        CURRENT_PROJECT_VERSION: "11"
+        # 0.4.1 is a patch, and the honest kind: it adds no layer. What it fixes
+        # is that 0.4.0 shipped four marine sources whose credits had never been
+        # written down, and exports that carried no attribution at all despite
+        # the About panel promising they did.
+        MARKETING_VERSION: "0.4.1"
+        CURRENT_PROJECT_VERSION: "12"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
