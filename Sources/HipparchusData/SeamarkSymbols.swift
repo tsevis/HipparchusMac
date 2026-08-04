@@ -121,12 +121,24 @@ public enum SeamarkSymbols {
     /// The light flare, which is the one symbol on a chart everybody recognises:
     /// a teardrop leaning away from the structure, and a dot at the position
     /// itself so the light is still *somewhere* exact.
+    ///
+    /// **Drawn larger than a buoy, and with a smaller dot than looks right on
+    /// paper.** The first version read cleanly on a 1600-pixel sheet and turned
+    /// into a starburst on a 900-pixel one: the flare and the position dot are a
+    /// fraction of a millimetre apart at chart scale, so the dot filled the
+    /// throat of the teardrop and the two merged. A chart draws the flare big
+    /// for the same reason — it is the symbol you find from a distance — so the
+    /// outline runs past the unit box and the dot is pulled in until the gap
+    /// survives being small.
+    ///
+    /// Found in the Python port first, at its lower plate resolution, and
+    /// brought back here so both applications draw one symbol rather than two.
     static let light: [Part] = [
         Part([
-            (0, 0), (0.30, 0.55), (0.62, 0.90), (0.86, 1.02),
-            (0.72, 0.68), (0.44, 0.30),
+            (0, 0), (0.42, 0.78), (0.88, 1.28), (1.22, 1.45),
+            (1.02, 0.97), (0.62, 0.43),
         ], closed: true),
-        circle(radius: 0.16, segments: 12),
+        circle(radius: 0.10, segments: 12),
     ]
 
     /// A wreck, drawn the way a chart draws one: the hull as a line at the
