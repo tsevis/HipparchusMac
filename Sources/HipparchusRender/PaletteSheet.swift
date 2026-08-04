@@ -48,9 +48,27 @@ extension Palette {
         // this runs dark water up to the shallows — the opposite direction from
         // the land, which is what makes the two meet at the coast instead of
         // colliding there.
+        // **Deep is darker, and which mix *is* darker depends on the palette.**
+        //
+        // On a dark sheet the ink is pale and the paper is near-black, so naming
+        // the ends "toward ink" and "toward ground" inverts the ramp and draws
+        // the deep water bright — every colour still defensible, the sea floor
+        // read inside out. Five of the seventeen shipped that way from the day
+        // the depth bands landed: Tsevis Nocturne, Slate, Pytheas, Vespucci and
+        // High Contrast Dark. It survived being looked at because the twelve
+        // light palettes agree with the naming, and those are the ones anybody
+        // renders.
+        //
+        // So the two mixes are computed and sorted by luminance rather than
+        // assigned by name. Found by a test written for the Python port, run
+        // against this one on the suspicion the formula had been copied — it
+        // had.
+        let towardInk = Self.mix(water, ink, 0.5)
+        let towardGround = Self.mix(water, ground, 0.55)
+        let deep = Self.luma(towardInk) <= Self.luma(towardGround) ? towardInk : towardGround
+        let shallow = deep == towardInk ? towardGround : towardInk
         styles["depth_bands"] = style(
-            stroke: 0, fill: Self.mix(water, ink, 0.5),
-            fillHigh: Self.mix(water, ground, 0.55), opacity: 0.9
+            stroke: 0, fill: deep, fillHigh: shallow, opacity: 0.9
         )
         styles["buildings"] = style(
             stroke: 0.35, strokeColor: Self.mix(land, ink, 0.4),
@@ -215,6 +233,12 @@ extension Palette {
     /// that lands on 40.5 is 40 there and would be 41 here. One unit of red is
     /// invisible and would make this engine and the shipped packs quietly
     /// different, which is the whole thing the parity fixture exists to prevent.
+    /// Rec. 601 luma, the cheap standard answer to "is this light or dark".
+    /// The same one `derivedHillshade` uses to decide which way relief shades.
+    static func luma(_ colour: RGBAColor) -> Double {
+        (299 * Double(colour.r) + 587 * Double(colour.g) + 114 * Double(colour.b)) / 1000
+    }
+
     static func mix(_ a: RGBAColor, _ b: RGBAColor, _ t: Double) -> RGBAColor {
         func channel(_ from: UInt8, _ to: UInt8) -> UInt8 {
             let value = Double(from) + (Double(to) - Double(from)) * t

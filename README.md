@@ -20,7 +20,7 @@ here that disagrees with it is a bug here.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->943<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->946<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks

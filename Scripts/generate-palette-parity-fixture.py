@@ -51,10 +51,18 @@ def build_style_packs():
 def palettes(packs) -> dict[str, dict]:
     """The palettes the fixture pins, with the colours the Swift twins use.
 
-    Two of the seventeen, and deliberately these two: `Tsevis Daylight` is the
-    pale sheet the derivation was designed against, and `Admiralty` is the one
-    whose `seaFill`, `roadScale` and `contourWeight` are all off the default, so
-    between them every branch of `sheet()` is exercised.
+    Three of the seventeen, and deliberately these three: `Tsevis Daylight` is
+    the pale sheet the derivation was designed against, `Admiralty` is the one
+    whose `seaFill`, `roadScale` and `contourWeight` are all off the default, and
+    `Slate` is dark.
+
+    **The dark one was added after a bug that only a dark sheet could have.**
+    The depth ramp was named rather than measured — one end "toward ink", the
+    other "toward ground" — and on a dark palette the ink is pale and the paper
+    near-black, so five of the seventeen drew deep water bright. Two light
+    palettes could not catch it: they agree with the naming. Any derivation that
+    asks "is this light or dark" needs a sheet of each on the pin, or it is
+    pinned only where it was already right.
 
     The Nautical pack overrides four layers *after* calling `sheet()` -- a
     heavier sounding, a firmer coast, quieter buildings and summits. Those are
@@ -83,6 +91,13 @@ def palettes(packs) -> dict[str, dict]:
             vegetation=mix(paper, (170, 180, 140), 0.35),
             contour=mix(paper, chart_ink, 0.30),
             roadScale=0.55, contourWeight=1.6,
+        ),
+        # Dark paper, pale ink: the polarity every "is this light or dark"
+        # derivation turns on. Colours copied from `Palettes.swift`.
+        "Slate": packs.sheet(
+            ground=(30, 34, 38), ink=(226, 232, 236), water=(52, 76, 92),
+            land=(58, 64, 70), road=(188, 196, 202), roadCasing=(24, 28, 32),
+            vegetation=(58, 78, 62), contour=(96, 108, 118),
         ),
     }
 

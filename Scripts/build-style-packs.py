@@ -134,8 +134,15 @@ def sheet(
         # `PaletteSheet.swift`. Index 0 is the deepest band, so this runs dark
         # water up to the shallows, the opposite direction from the land, which
         # is what makes the two meet at the coast instead of colliding there.
-        "depth_bands": style(stroke=0, fill=mix(water, ink, 0.5),
-                             fillHigh=mix(water, ground, 0.55), opacity=0.9),
+        # Deep is darker, and which mix *is* darker depends on the palette: on a
+        # dark sheet the ink is pale and the paper near-black, so naming the ends
+        # inverts the ramp. Sorted rather than named — see the matching comment
+        # in PaletteSheet.swift, which this has to agree with exactly or the
+        # parity fixture says so.
+        "depth_bands": style(stroke=0,
+                             fill=min(mix(water, ink, 0.5), mix(water, ground, 0.55), key=luma),
+                             fillHigh=max(mix(water, ink, 0.5), mix(water, ground, 0.55), key=luma),
+                             opacity=0.9),
         "buildings": style(stroke=0.35, strokeColor=mix(land, ink, 0.4), fill=land, opacity=0.95),
         "parks": style(fill=mix(ground, vegetation, 0.30)),
         "forests": style(fill=mix(ground, vegetation, 0.42)),
