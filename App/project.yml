@@ -74,8 +74,11 @@ targets:
         # signing path, which only runs once a Developer ID certificate exists.
         # It is cut anyway so that the first notarised image is built by a
         # released version rather than by whatever happened to be on `main`.
-        MARKETING_VERSION: "0.4.3"
-        CURRENT_PROJECT_VERSION: "14"
+        # 0.4.4 is four fixes to how the sea is drawn, and every one of them was
+        # found by rendering a sheet and looking at it rather than by a test.
+        # Two are the same inverted depth ramp in two copies of one formula.
+        MARKETING_VERSION: "0.4.4"
+        CURRENT_PROJECT_VERSION: "15"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
