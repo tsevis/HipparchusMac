@@ -101,6 +101,31 @@ final class DepthBandStyleTests: XCTestCase {
         XCTAssertLessThan(luma(style.fillColor), luma(shallow))
     }
 
+    /// **And on a dark sheet too**, which is where naming the ends rather than
+    /// measuring them goes wrong: the ink is pale, the paper is near-black, and
+    /// "toward ink" becomes the *lighter* mix. Five palettes shipped inverted
+    /// that way before it was caught (`c08424b`); this is the same formula in
+    /// the preset path, so it is the same trap.
+    func testTheDeepEndIsDarkerOnADarkSheetToo() throws {
+        let sheet = preset(
+            bands: filledBands(),
+            water: filledWater(RGBAColor(28, 44, 62)),
+            bathymetry: {
+                var style = LayerStyle()
+                // Pale ink, because a dark sheet draws its lines light.
+                style.strokeColor = RGBAColor(190, 205, 218)
+                return style
+            }(),
+            background: RGBAColor(14, 17, 24)
+        )
+        let style = sheet.style(for: TerrainLayer.depthBands)
+        let shallow = try XCTUnwrap(style.fillColorHigh)
+        XCTAssertLessThan(
+            luma(style.fillColor), luma(shallow),
+            "the deep end came out brighter than the shallow — the ramp is inverted"
+        )
+    }
+
     private func luma(_ colour: RGBAColor) -> Double {
         (299.0 * Double(colour.r) + 587.0 * Double(colour.g) + 114.0 * Double(colour.b)) / 1000.0
     }

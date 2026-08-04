@@ -123,8 +123,22 @@ public struct StyleProfile: Sendable {
             ?? layerStyles["coastline"]?.strokeColor
             ?? RGBAColor(40, 60, 80)
 
-        style.fillColor = water.mixed(towards: ink, amount: 0.5)
-        style.fillColorHigh = water.mixed(towards: background, amount: 0.55)
+        // **Deep is darker, and which mix *is* darker depends on the sheet.**
+        //
+        // On a dark preset the ink is pale and the paper near-black, so naming
+        // the ends "toward ink" and "toward ground" inverts the ramp and draws
+        // the deep water bright. `PaletteSheet` shipped exactly that bug in five
+        // of its seventeen palettes (`c08424b`); this is the same formula, so it
+        // was the same bug, and it was still here after that fix because the
+        // palette path and the preset path are two copies of one idea.
+        //
+        // So the mixes are computed and sorted by luminance rather than assigned
+        // by name.
+        let towardInk = water.mixed(towards: ink, amount: 0.5)
+        let towardGround = water.mixed(towards: background, amount: 0.55)
+        let inkIsDarker = Palette.luma(towardInk) <= Palette.luma(towardGround)
+        style.fillColor = inkIsDarker ? towardInk : towardGround
+        style.fillColorHigh = inkIsDarker ? towardGround : towardInk
         style.opacity = bands?.opacity ?? 0.9
         return style
     }
