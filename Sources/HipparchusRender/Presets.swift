@@ -71,15 +71,62 @@ public struct StyleProfile: Sendable {
     /// instead of silently not rendering.
     public func style(for layer: String) -> LayerStyle {
         if let style = layerStyles[layer] { return style }
-        // The one layer with a better answer than a hairline: a hairline round
-        // every tone of a hillshade would draw the seams and none of the shade.
+        // The layers with a better answer than a hairline. Both are band fills,
+        // and a hairline round every tone of one draws the seams and none of
+        // the tones.
         if layer == TerrainLayer.hillshade { return derivedHillshade }
+        if layer == TerrainLayer.depthBands { return derivedDepthBands }
 
         var fallback = LayerStyle()
         fallback.fillEnabled = false
         fallback.strokeWidth = 0.5
         fallback.strokeColor = RGBAColor(120, 120, 120, 200)
         return fallback
+    }
+
+    /// Depth bands for a preset that has never heard of them.
+    ///
+    /// **Eleven of the built-in presets fill the land's bands and not one
+    /// mentions the sea's**, for the same reason none mentions the hillshade:
+    /// `PresetTables.swift` is generated from the Python registry, and the
+    /// Python has no depth bands to name. So a hypsometric sheet drawn from a
+    /// preset alone gave the land graduated mass and left the Elbe as bare
+    /// hairline contours on white paper — the exact asymmetry the depth bands
+    /// were built to end, surviving in the one path nobody had rendered.
+    ///
+    /// **It follows the land rather than overruling it.** `Contour Study` fills
+    /// nothing, on purpose: it is linework, and forcing a filled sea onto it
+    /// would be this fallback deciding what the sheet is. So the fill is enabled
+    /// only where `elevation_bands` is filled, and a linework preset keeps its
+    /// invisible depth bands — which is correct there and was never the bug.
+    ///
+    /// The two stops are read off what the preset already chose: its water for
+    /// the hue, darkened towards its own contour ink for the deep end and
+    /// lightened towards its paper for the shallow. Deep is darker, which is the
+    /// one thing about a depth ramp a reader assumes without being told.
+    public var derivedDepthBands: LayerStyle {
+        var style = LayerStyle()
+        // Bands share their edges. Stroking them draws every seam between tones.
+        style.strokeWidth = 0.0
+
+        let bands = layerStyles[TerrainLayer.elevationBands]
+        style.fillEnabled = bands?.fillEnabled ?? false
+        guard style.fillEnabled else { return style }
+
+        // The sea's own colour, however the preset stated it: a filled water
+        // layer carries it as a fill, an outlined one as a stroke.
+        let water = layerStyles["water"].map { $0.fillEnabled ? $0.fillColor : $0.strokeColor }
+            ?? RGBAColor(150, 180, 200)
+        // The darkest line the preset draws on the sea, for the deep end. The
+        // sub-sea contours if it has them, the coastline if not.
+        let ink = layerStyles[TerrainLayer.bathymetry]?.strokeColor
+            ?? layerStyles["coastline"]?.strokeColor
+            ?? RGBAColor(40, 60, 80)
+
+        style.fillColor = water.mixed(towards: ink, amount: 0.5)
+        style.fillColorHigh = water.mixed(towards: background, amount: 0.55)
+        style.opacity = bands?.opacity ?? 0.9
+        return style
     }
 
     /// Relief shading for a preset that has never heard of it.
