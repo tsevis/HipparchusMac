@@ -71,11 +71,13 @@ public struct StyleProfile: Sendable {
     /// instead of silently not rendering.
     public func style(for layer: String) -> LayerStyle {
         if let style = layerStyles[layer] { return style }
-        // The layers with a better answer than a hairline. Both are band fills,
-        // and a hairline round every tone of one draws the seams and none of
-        // the tones.
+        // The layers with a better answer than a hairline. The bands are band
+        // fills, and a hairline round every tone of one draws the seams and
+        // none of the tones; the sea marks are chart symbols, and a hairline
+        // draws a mark that reads as nothing in particular.
         if layer == TerrainLayer.hillshade { return derivedHillshade }
         if layer == TerrainLayer.depthBands { return derivedDepthBands }
+        if let seamark = derivedSeamarkStyle(for: layer) { return seamark }
 
         var fallback = LayerStyle()
         fallback.fillEnabled = false
@@ -141,6 +143,122 @@ public struct StyleProfile: Sendable {
         style.fillColorHigh = inkIsDarker ? towardGround : towardInk
         style.opacity = bands?.opacity ?? 0.9
         return style
+    }
+
+    /// Sea marks for a preset that has never heard of them, or `nil` for any
+    /// other layer.
+    ///
+    /// **The same gap `derivedDepthBands` closed, and the same shape of bug.**
+    /// `PresetTables.swift` is generated from the Python registry, and the
+    /// Python has no sea marks either, so every one of the sixteen built-in
+    /// presets falls through to the generic hairline: a translucent grey
+    /// stroke round a chart symbol that needs to read as a can, a cone or a
+    /// light's flare, not as an unstyled shape. `PaletteSheet.styleProfile()`
+    /// already styles these six layers properly, in a palette's raw water,
+    /// ink, ground and land — this reads the same four off what the preset
+    /// itself already chose, the way `derivedDepthBands` reads its water and
+    /// ink, so a preset with no palette override gets marks in its own voice
+    /// rather than none at all.
+    ///
+    /// **Areas and harbours follow the land rather than overrule it**, the
+    /// same rule `derivedDepthBands` follows for the sea's own fill: a
+    /// linework preset that leaves `buildings` unfilled — `Contour Study` is
+    /// exactly that — gets unfilled seamark areas too, because a solid area
+    /// wash is precisely the kind of mass a linework sheet has decided not to
+    /// draw. The four point marks — beacons, buoys, hazards, lights — are
+    /// strokes and halos regardless of that choice, the same way a coastline
+    /// is stroked on every preset whether or not it fills the sea: a chart
+    /// symbol has to be there to be read at all, filled preset or not.
+    private func derivedSeamarkStyle(for layer: String) -> LayerStyle? {
+        guard Seamarks.allLayers.contains(layer) else { return nil }
+
+        // The same water and ink `derivedDepthBands` reads, plus the ground
+        // and the preset's own land, however it stated `buildings`.
+        let water = layerStyles["water"].map { $0.fillEnabled ? $0.fillColor : $0.strokeColor }
+            ?? RGBAColor(150, 180, 200)
+        let ink = layerStyles[TerrainLayer.bathymetry]?.strokeColor
+            ?? layerStyles["coastline"]?.strokeColor
+            ?? RGBAColor(40, 60, 80)
+        let land = layerStyles["buildings"].map { $0.fillEnabled ? $0.fillColor : $0.strokeColor }
+            ?? RGBAColor(200, 190, 175)
+        let ground = background
+        let fillsAreas = layerStyles["buildings"]?.fillEnabled ?? true
+
+        switch layer {
+        case Seamarks.areas:
+            var style = LayerStyle()
+            style.strokeWidth = 0.7
+            style.strokeColor = water.mixed(towards: ink, amount: 0.55)
+            style.fillEnabled = fillsAreas
+            if fillsAreas {
+                let fill = water.mixed(towards: ink, amount: 0.3)
+                style.fillColor = RGBAColor(fill.r, fill.g, fill.b, 28)
+            }
+            style.opacity = 0.75
+            return style
+
+        case Seamarks.harbours:
+            var style = LayerStyle()
+            style.strokeWidth = 0.8
+            style.strokeColor = land.mixed(towards: ink, amount: 0.45)
+            style.fillEnabled = fillsAreas
+            if fillsAreas {
+                let fill = ground.mixed(towards: land, amount: 0.35)
+                style.fillColor = RGBAColor(fill.r, fill.g, fill.b, 70)
+            }
+            style.opacity = 0.85
+            return style
+
+        // Fixed to the ground, and drawn like it. Linework, not a fill: a
+        // point is its stroke to this renderer, and the shape (not the
+        // weight) is what makes a beacon read as a beacon.
+        case Seamarks.beacons:
+            var style = LayerStyle()
+            style.strokeWidth = 1.0
+            style.strokeColor = land.mixed(towards: ink, amount: 0.6)
+            style.fillEnabled = false
+            style.labelHaloColor = RGBAColor(ground.r, ground.g, ground.b, 225)
+            style.labelHaloWidth = 2.0
+            return style
+
+        // Afloat, and lighter on the page for it.
+        case Seamarks.buoys:
+            var style = LayerStyle()
+            style.strokeWidth = 0.9
+            style.strokeColor = water.mixed(towards: ink, amount: 0.65)
+            style.fillEnabled = false
+            style.labelHaloColor = RGBAColor(ground.r, ground.g, ground.b, 225)
+            style.labelHaloWidth = 2.0
+            return style
+
+        // Danger reads as weight. A wreck is the one mark that exists to say
+        // "not here", so it takes the ink undiluted.
+        case Seamarks.hazards:
+            var style = LayerStyle()
+            style.strokeWidth = 1.05
+            style.strokeColor = ink
+            style.fillEnabled = false
+            style.opacity = 0.95
+            style.labelHaloColor = RGBAColor(ground.r, ground.g, ground.b, 225)
+            style.labelHaloWidth = 2.0
+            return style
+
+        // What a reader looks for first. The flare is filled, so its weight
+        // comes from its area rather than from its edge.
+        case Seamarks.lights:
+            var style = LayerStyle()
+            style.strokeWidth = 0.9
+            style.strokeColor = ink
+            style.fillEnabled = true
+            let fill = ground.mixed(towards: ink, amount: 0.15)
+            style.fillColor = RGBAColor(fill.r, fill.g, fill.b, 210)
+            style.labelHaloColor = RGBAColor(ground.r, ground.g, ground.b, 225)
+            style.labelHaloWidth = 2.0
+            return style
+
+        default:
+            return nil
+        }
     }
 
     /// Relief shading for a preset that has never heard of it.
