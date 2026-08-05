@@ -225,11 +225,31 @@ struct ContentView: View {
     /// menu and Mission Control read; there is no SwiftUI modifier for
     /// `titleVisibility`, the property that hides the *drawn* text without
     /// touching the title itself, so reaching it needs the window — via
-    /// `canvasHandle`, the same route `LocatorPanel` already uses. Run from
-    /// the same `.task` as the rest of the launch wiring, after the map's
-    /// view has appeared and is in it.
+    /// `canvasHandle`, the same route `LocatorPanel` already uses.
+    ///
+    /// **Dispatched, not run in line with the rest of `.task`.** Setting
+    /// `titleVisibility` does not just flip a flag — AppKit's own docs say
+    /// it moves the toolbar up into the space the title used to occupy,
+    /// which relays out the window's whole content area. Done synchronously
+    /// in the same breath as `openOnLaunch()`, that relayout intermittently
+    /// stepped on the Locator's own `panel.makeKeyAndOrderFront(nil)` a few
+    /// lines above it — a `.floating` panel of its own, mid-ordering —
+    /// and `LaunchOrderTests` caught it: reproducible, not a one-off, three
+    /// launches in five losing the Locator entirely. Reordering ahead of
+    /// `openOnLaunch()` inside the same synchronous task cut the failure
+    /// rate but did not clear it. Letting the window's own launch-time
+    /// layout finish before touching its chrome does: **the plain fix that
+    /// is not "add a delay"** — see `openOnLaunch()`'s own doc comment for
+    /// the fix that was ruled out there for wrapping a race in more
+    /// guessing. This is not that: it defers *unrelated* work off the
+    /// launch-critical path, onto whatever run loop turn follows it,
+    /// rather than trying to out-guess an ordering between two things that
+    /// both need to happen now.
     private func hideTitleText() {
-        canvasHandle.window()?.titleVisibility = .hidden
+        let handle = canvasHandle
+        DispatchQueue.main.async {
+            handle.window()?.titleVisibility = .hidden
+        }
     }
 
     private func wireUpMenuCommands() {
