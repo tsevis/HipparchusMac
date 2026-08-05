@@ -308,6 +308,32 @@
             "casing_width": 0.0,
             "fill_enabled": false
           },
+          "depth_bands": {
+            "stroke_width": 0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 0.9,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 30,
+              "g": 118,
+              "b": 132,
+              "a": 255
+            },
+            "fill_color_high": {
+              "r": 148,
+              "g": 216,
+              "b": 212,
+              "a": 255
+            }
+          },
           "buildings": {
             "stroke_width": 0.35,
             "stroke_color": {
@@ -765,6 +791,190 @@
               "b": 100,
               "a": 30
             }
+          },
+          "sst_bands": {
+            "stroke_width": 0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 0.42,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 29,
+              "g": 135,
+              "b": 142,
+              "a": 255
+            },
+            "fill_color_high": {
+              "r": 52,
+              "g": 92,
+              "b": 151,
+              "a": 255
+            }
+          },
+          "sst_contours": {
+            "stroke_width": 0.4,
+            "stroke_color": {
+              "r": 30,
+              "g": 118,
+              "b": 132,
+              "a": 255
+            },
+            "opacity": 0.65,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "current_streamlines": {
+            "stroke_width": 0.75,
+            "stroke_color": {
+              "r": 32,
+              "g": 96,
+              "b": 120,
+              "a": 255
+            },
+            "opacity": 0.85,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "seamark_areas": {
+            "stroke_width": 0.7,
+            "stroke_color": {
+              "r": 30,
+              "g": 113,
+              "b": 129,
+              "a": 255
+            },
+            "opacity": 0.75,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 28,
+              "g": 141,
+              "b": 146,
+              "a": 28
+            }
+          },
+          "seamark_harbours": {
+            "stroke_width": 0.8,
+            "stroke_color": {
+              "r": 46,
+              "g": 81,
+              "b": 133,
+              "a": 255
+            },
+            "opacity": 0.85,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 180,
+              "g": 196,
+              "b": 219,
+              "a": 70
+            }
+          },
+          "seamark_beacons": {
+            "stroke_width": 1.0,
+            "stroke_color": {
+              "r": 42,
+              "g": 76,
+              "b": 124,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 247,
+              "g": 249,
+              "b": 251,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "seamark_buoys": {
+            "stroke_width": 0.9,
+            "stroke_color": {
+              "r": 31,
+              "g": 102,
+              "b": 123,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 247,
+              "g": 249,
+              "b": 251,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "seamark_hazards": {
+            "stroke_width": 1.05,
+            "stroke_color": {
+              "r": 34,
+              "g": 62,
+              "b": 100,
+              "a": 255
+            },
+            "opacity": 0.95,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 247,
+              "g": 249,
+              "b": 251,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "seamark_lights": {
+            "stroke_width": 0.9,
+            "stroke_color": {
+              "r": 34,
+              "g": 62,
+              "b": 100,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 215,
+              "g": 221,
+              "b": 228,
+              "a": 210
+            },
+            "label_halo_color": {
+              "r": 247,
+              "g": 249,
+              "b": 251,
+              "a": 225
+            },
+            "label_halo_width": 2.0
           }
         }
       }
@@ -1074,6 +1284,32 @@
             "visible": true,
             "casing_width": 0.0,
             "fill_enabled": false
+          },
+          "depth_bands": {
+            "stroke_width": 0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 0.9,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 25,
+              "g": 76,
+              "b": 95,
+              "a": 255
+            },
+            "fill_color_high": {
+              "r": 104,
+              "g": 168,
+              "b": 168,
+              "a": 255
+            }
           },
           "buildings": {
             "stroke_width": 0.35,
@@ -1532,6 +1768,190 @@
               "b": 228,
               "a": 30
             }
+          },
+          "sst_bands": {
+            "stroke_width": 0,
+            "stroke_color": {
+              "r": 17,
+              "g": 34,
+              "b": 51,
+              "a": 255
+            },
+            "opacity": 0.42,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 79,
+              "g": 148,
+              "b": 150,
+              "a": 255
+            },
+            "fill_color_high": {
+              "r": 62,
+              "g": 96,
+              "b": 133,
+              "a": 255
+            }
+          },
+          "sst_contours": {
+            "stroke_width": 0.4,
+            "stroke_color": {
+              "r": 104,
+              "g": 168,
+              "b": 168,
+              "a": 255
+            },
+            "opacity": 0.65,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "current_streamlines": {
+            "stroke_width": 0.75,
+            "stroke_color": {
+              "r": 137,
+              "g": 193,
+              "b": 192,
+              "a": 255
+            },
+            "opacity": 0.85,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false
+          },
+          "seamark_areas": {
+            "stroke_width": 0.7,
+            "stroke_color": {
+              "r": 112,
+              "g": 174,
+              "b": 174,
+              "a": 255
+            },
+            "opacity": 0.75,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 71,
+              "g": 142,
+              "b": 144,
+              "a": 28
+            }
+          },
+          "seamark_harbours": {
+            "stroke_width": 0.8,
+            "stroke_color": {
+              "r": 106,
+              "g": 144,
+              "b": 166,
+              "a": 255
+            },
+            "opacity": 0.85,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 32,
+              "g": 60,
+              "b": 95,
+              "a": 70
+            }
+          },
+          "seamark_beacons": {
+            "stroke_width": 1.0,
+            "stroke_color": {
+              "r": 128,
+              "g": 167,
+              "b": 183,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 28,
+              "g": 53,
+              "b": 84,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "seamark_buoys": {
+            "stroke_width": 0.9,
+            "stroke_color": {
+              "r": 129,
+              "g": 187,
+              "b": 186,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 28,
+              "g": 53,
+              "b": 84,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "seamark_hazards": {
+            "stroke_width": 1.05,
+            "stroke_color": {
+              "r": 186,
+              "g": 231,
+              "b": 228,
+              "a": 255
+            },
+            "opacity": 0.95,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": false,
+            "label_halo_color": {
+              "r": 28,
+              "g": 53,
+              "b": 84,
+              "a": 225
+            },
+            "label_halo_width": 2.0
+          },
+          "seamark_lights": {
+            "stroke_width": 0.9,
+            "stroke_color": {
+              "r": 186,
+              "g": 231,
+              "b": 228,
+              "a": 255
+            },
+            "opacity": 1.0,
+            "line_cap": "round",
+            "visible": true,
+            "casing_width": 0.0,
+            "fill_enabled": true,
+            "fill_color": {
+              "r": 52,
+              "g": 80,
+              "b": 106,
+              "a": 210
+            },
+            "label_halo_color": {
+              "r": 28,
+              "g": 53,
+              "b": 84,
+              "a": 225
+            },
+            "label_halo_width": 2.0
           }
         }
       }

@@ -11,7 +11,7 @@ import Foundation
 /// `Scripts/build-style-packs.py` already solved this, at build time: its
 /// `sheet()` derives all thirty-seven styles from eight named colours, which is
 /// exactly a palette engine, run once by a script and frozen into JSON. This is
-/// that function, in Swift, at runtime. The four packs stay as they are —
+/// that function, in Swift, at runtime. The style packs stay as they are —
 /// generated, editable, and free to disagree with this — but any palette can now
 /// be applied to any preset without a build step and without a combinatorial
 /// explosion of shipped presets.
