@@ -204,7 +204,21 @@ extension Palette {
         Palette(
             name: "Coronelli",
             ground: mix(white, rgb(234, 170, 163), 0.18),
-            ink: rgb(22, 67, 177),
+            // The swatch set's ink, taken down towards the deep ink. Straight,
+            // at rgb(22, 67, 177), it was within a few units of this palette's
+            // own water — every derivation that mixes a line "towards ink" for
+            // something sitting on the sea (the coastline, the bathymetry
+            // contours, the deep end of the depth ramp, a hazard's stroke)
+            // barely moved, and the water drew as one flat wash with no
+            // coastline in it at all. Judged on a terrain-only sheet, where the
+            // sea is a third of the drawing rather than a border round a city,
+            // this was the weakest of the seventeen.
+            //
+            // Halfway to the deep ink keeps the hue — it is still recognisably
+            // Coronelli's blue, not a neutral grey — while separating its luma
+            // and saturation from the water enough that a line mixed towards
+            // it actually reads as a line.
+            ink: mix(rgb(22, 67, 177), deepInk, 0.5),
             water: rgb(28, 94, 178),
             land: rgb(203, 119, 6),
             road: white,

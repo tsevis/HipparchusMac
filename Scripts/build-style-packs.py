@@ -414,7 +414,12 @@ def cartographers() -> dict:
             # king of France, and a cosmographer's taste for colour that a
             # modern atlas would call excessive.
             preset("Coronelli", mix(WHITE, (234, 170, 163), 0.18), sheet(
-                ground=mix(WHITE, (234, 170, 163), 0.18), ink=(22, 67, 177),
+                ground=mix(WHITE, (234, 170, 163), 0.18),
+                # The swatch set's ink, taken down towards the deep ink --
+                # straight, it sat a few units from this palette's own water,
+                # and every line mixed "towards ink" over the sea barely
+                # moved. See `Palettes.swift` for the render that found it.
+                ink=mix((22, 67, 177), INK, 0.5),
                 water=(28, 94, 178), land=(203, 119, 6),
                 road=WHITE, roadCasing=(241, 128, 101),
                 vegetation=mix((42, 172, 9), WHITE, 0.45),

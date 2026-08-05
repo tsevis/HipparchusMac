@@ -2218,8 +2218,8 @@
             "stroke_width": 0.6,
             "stroke_color": {
               "r": 26,
-              "g": 87,
-              "b": 178,
+              "g": 83,
+              "b": 162,
               "a": 255
             },
             "opacity": 1.0,
@@ -2237,9 +2237,9 @@
           "coastline": {
             "stroke_width": 1.6,
             "stroke_color": {
-              "r": 25,
-              "g": 82,
-              "b": 178,
+              "r": 24,
+              "g": 74,
+              "b": 149,
               "a": 255
             },
             "opacity": 1.0,
@@ -2276,9 +2276,9 @@
             "casing_width": 0.0,
             "fill_enabled": true,
             "fill_color": {
-              "r": 25,
-              "g": 80,
-              "b": 178,
+              "r": 24,
+              "g": 72,
+              "b": 146,
               "a": 255
             },
             "fill_color_high": {
@@ -2291,9 +2291,9 @@
           "buildings": {
             "stroke_width": 0.35,
             "stroke_color": {
-              "r": 131,
-              "g": 98,
-              "b": 74,
+              "r": 130,
+              "g": 91,
+              "b": 49,
               "a": 255
             },
             "opacity": 0.95,
@@ -2411,9 +2411,9 @@
           "railways": {
             "stroke_width": 0.7,
             "stroke_color": {
-              "r": 103,
-              "g": 90,
-              "b": 100,
+              "r": 102,
+              "g": 81,
+              "b": 65,
               "a": 255
             },
             "opacity": 1.0,
@@ -2425,9 +2425,9 @@
           "ferry_routes": {
             "stroke_width": 0.6,
             "stroke_color": {
-              "r": 27,
-              "g": 89,
-              "b": 178,
+              "r": 26,
+              "g": 85,
+              "b": 165,
               "a": 255
             },
             "opacity": 0.7,
@@ -2439,9 +2439,9 @@
           "barriers": {
             "stroke_width": 0.4,
             "stroke_color": {
-              "r": 171,
-              "g": 179,
-              "b": 217,
+              "r": 170,
+              "g": 174,
+              "b": 195,
               "a": 255
             },
             "opacity": 0.7,
@@ -2454,8 +2454,8 @@
             "stroke_width": 0.4,
             "stroke_color": {
               "r": 182,
-              "g": 188,
-              "b": 220,
+              "g": 183,
+              "b": 201,
               "a": 255
             },
             "opacity": 0.6,
@@ -2487,9 +2487,9 @@
           "terrain_hillshade": {
             "stroke_width": 0.0,
             "stroke_color": {
-              "r": 22,
-              "g": 67,
-              "b": 177,
+              "r": 20,
+              "g": 50,
+              "b": 114,
               "a": 0
             },
             "fill_enabled": true,
@@ -2498,15 +2498,15 @@
             "casing_width": 0.0,
             "opacity": 0.55,
             "fill_color": {
-              "r": 22,
-              "g": 67,
-              "b": 177,
+              "r": 20,
+              "g": 50,
+              "b": 114,
               "a": 140
             },
             "fill_color_high": {
-              "r": 22,
-              "g": 67,
-              "b": 177,
+              "r": 20,
+              "g": 50,
+              "b": 114,
               "a": 0
             }
           },
@@ -2527,9 +2527,9 @@
           "terrain_index_contours": {
             "stroke_width": 0.7,
             "stroke_color": {
-              "r": 73,
-              "g": 44,
-              "b": 123,
+              "r": 72,
+              "g": 39,
+              "b": 104,
               "a": 255
             },
             "opacity": 0.9,
@@ -2541,9 +2541,9 @@
           "summits": {
             "stroke_width": 0.5,
             "stroke_color": {
-              "r": 22,
-              "g": 67,
-              "b": 177,
+              "r": 20,
+              "g": 50,
+              "b": 114,
               "a": 255
             },
             "opacity": 0.85,
@@ -2556,8 +2556,8 @@
             "stroke_width": 0.8,
             "stroke_color": {
               "r": 176,
-              "g": 111,
-              "b": 32,
+              "g": 109,
+              "b": 22,
               "a": 255
             },
             "opacity": 0.55,
@@ -2589,9 +2589,9 @@
           "places": {
             "stroke_width": 0.0,
             "stroke_color": {
-              "r": 22,
-              "g": 67,
-              "b": 177,
+              "r": 20,
+              "g": 50,
+              "b": 114,
               "a": 255
             },
             "opacity": 1.0,
@@ -2610,9 +2610,9 @@
           "street_names": {
             "stroke_width": 0.0,
             "stroke_color": {
-              "r": 79,
-              "g": 110,
-              "b": 192,
+              "r": 78,
+              "g": 98,
+              "b": 145,
               "a": 255
             },
             "opacity": 1.0,
@@ -2631,9 +2631,9 @@
           "amenities": {
             "stroke_width": 0.0,
             "stroke_color": {
-              "r": 167,
-              "g": 109,
-              "b": 40,
+              "r": 166,
+              "g": 105,
+              "b": 28,
               "a": 255
             },
             "opacity": 1.0,
@@ -2652,9 +2652,9 @@
           "shops": {
             "stroke_width": 0.0,
             "stroke_color": {
-              "r": 167,
-              "g": 109,
-              "b": 40,
+              "r": 166,
+              "g": 105,
+              "b": 28,
               "a": 255
             },
             "opacity": 1.0,
@@ -2715,9 +2715,9 @@
           "satellite_tracks": {
             "stroke_width": 0.6,
             "stroke_color": {
-              "r": 114,
-              "g": 136,
-              "b": 201,
+              "r": 112,
+              "g": 126,
+              "b": 164,
               "a": 255
             },
             "opacity": 0.8,
@@ -2730,8 +2730,8 @@
             "stroke_width": 0.4,
             "stroke_color": {
               "r": 136,
-              "g": 154,
-              "b": 208,
+              "g": 145,
+              "b": 176,
               "a": 255
             },
             "opacity": 0.5,
@@ -2740,9 +2740,9 @@
             "casing_width": 0.0,
             "fill_enabled": true,
             "fill_color": {
-              "r": 22,
-              "g": 67,
-              "b": 177,
+              "r": 20,
+              "g": 50,
+              "b": 114,
               "a": 30
             }
           },
@@ -2760,24 +2760,24 @@
             "casing_width": 0.0,
             "fill_enabled": true,
             "fill_color": {
-              "r": 26,
-              "g": 85,
-              "b": 178,
+              "r": 25,
+              "g": 79,
+              "b": 156,
               "a": 255
             },
             "fill_color_high": {
               "r": 176,
-              "g": 111,
-              "b": 32,
+              "g": 109,
+              "b": 22,
               "a": 255
             }
           },
           "sst_contours": {
             "stroke_width": 0.4,
             "stroke_color": {
-              "r": 25,
-              "g": 80,
-              "b": 178,
+              "r": 24,
+              "g": 72,
+              "b": 146,
               "a": 255
             },
             "opacity": 0.65,
@@ -2789,9 +2789,9 @@
           "current_streamlines": {
             "stroke_width": 0.75,
             "stroke_color": {
-              "r": 24,
-              "g": 75,
-              "b": 177,
+              "r": 22,
+              "g": 63,
+              "b": 133,
               "a": 255
             },
             "opacity": 0.85,
@@ -2803,9 +2803,9 @@
           "seamark_areas": {
             "stroke_width": 0.7,
             "stroke_color": {
-              "r": 25,
-              "g": 79,
-              "b": 177,
+              "r": 24,
+              "g": 70,
+              "b": 143,
               "a": 255
             },
             "opacity": 0.75,
@@ -2815,17 +2815,17 @@
             "fill_enabled": true,
             "fill_color": {
               "r": 26,
-              "g": 86,
-              "b": 178,
+              "g": 81,
+              "b": 159,
               "a": 28
             }
           },
           "seamark_harbours": {
             "stroke_width": 0.8,
             "stroke_color": {
-              "r": 122,
-              "g": 96,
-              "b": 83,
+              "r": 121,
+              "g": 88,
+              "b": 55,
               "a": 255
             },
             "opacity": 0.85,
@@ -2843,9 +2843,9 @@
           "seamark_beacons": {
             "stroke_width": 1.0,
             "stroke_color": {
-              "r": 94,
-              "g": 88,
-              "b": 109,
+              "r": 93,
+              "g": 78,
+              "b": 71,
               "a": 255
             },
             "opacity": 1.0,
@@ -2864,9 +2864,9 @@
           "seamark_buoys": {
             "stroke_width": 0.9,
             "stroke_color": {
-              "r": 24,
-              "g": 76,
-              "b": 177,
+              "r": 23,
+              "g": 65,
+              "b": 136,
               "a": 255
             },
             "opacity": 1.0,
@@ -2885,9 +2885,9 @@
           "seamark_hazards": {
             "stroke_width": 1.05,
             "stroke_color": {
-              "r": 22,
-              "g": 67,
-              "b": 177,
+              "r": 20,
+              "g": 50,
+              "b": 114,
               "a": 255
             },
             "opacity": 0.95,
@@ -2906,9 +2906,9 @@
           "seamark_lights": {
             "stroke_width": 0.9,
             "stroke_color": {
-              "r": 22,
-              "g": 67,
-              "b": 177,
+              "r": 20,
+              "g": 50,
+              "b": 114,
               "a": 255
             },
             "opacity": 1.0,
@@ -2917,9 +2917,9 @@
             "casing_width": 0.0,
             "fill_enabled": true,
             "fill_color": {
-              "r": 217,
-              "g": 214,
-              "b": 229,
+              "r": 216,
+              "g": 212,
+              "b": 219,
               "a": 210
             },
             "label_halo_color": {
