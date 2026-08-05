@@ -59,17 +59,31 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 380)
                 .accessibilityIdentifier(UITestID.inspector)
             }
-            // The real title, but not drawn: macOS used to draw it in the
-            // toolbar, between the search field and the area — a word that
-            // told you which application you were already looking at, in the
-            // space where the controls live. The app's name is in the menu bar
-            // and on the Dock icon; it does not need saying a third time.
+            // A real title, drawn. An *empty* title once hid it from the
+            // toolbar, between the search field and the area — the app's name
+            // is in the menu bar and on the Dock icon, so a third place felt
+            // like one too many. But an empty title is also what the Window
+            // menu and Mission Control read, and a blank entry there reads as
+            // a bug rather than as restraint.
             //
-            // An *empty* title said the same thing to the toolbar and also to
-            // the Window menu, which has no controls to crowd and reads a
-            // blank entry as a bug rather than as restraint. `hideTitleText()`
-            // below hides only the on-screen text, once the window exists to
-            // hide it on.
+            // Hiding only the *drawn* text without clearing the title itself
+            // needs `NSWindow.titleVisibility`, reached through the map's own
+            // view the way `LocatorPanel` already reaches the window — tried
+            // once (`203e4a0`) and once more after that (`bcfa95c`), and both
+            // times it raced the Locator panel's own launch-time ordering.
+            // `titleVisibility` relays out the window, and that relayout goes
+            // through the window server asynchronously — outside the app's own
+            // run loop, so nothing this process can schedule sequences against
+            // it reliably. `bcfa95c` cut the failure rate with a dispatched
+            // update and looked fixed at 8 clean runs; asked to verify again
+            // before a release, five of the next six failed, one of them
+            // losing the main window entirely. Not a fluke either time — a
+            // real race neither fix reached the true cause of.
+            //
+            // So the toolbar shows the name again. A real, visible title and
+            // a working Window menu, at the cost of the word "Hipparchus"
+            // sitting where the toolbar's controls live — a smaller price than
+            // a launch that sometimes drops a window.
             .navigationTitle("Hipparchus")
             .toolbar { toolbar }
 
@@ -81,7 +95,6 @@ struct ContentView: View {
             wireUpMenuCommands()
             model.startIfRequestedOnLaunch()
             openOnLaunch()
-            hideTitleText()
         }
         .onAppear { model.undoManager = undoManager }
         .onDisappear { model.save() }
@@ -216,39 +229,6 @@ struct ContentView: View {
         // used to be a coin toss.
         about.showOnLaunchIfWanted {
             locatorPanel.show(model: model, onRender: renderChosenArea)
-        }
-    }
-
-    /// Keeps the toolbar clean without leaving the Window menu blank.
-    ///
-    /// `.navigationTitle` sets `NSWindow.title`, which is what the Window
-    /// menu and Mission Control read; there is no SwiftUI modifier for
-    /// `titleVisibility`, the property that hides the *drawn* text without
-    /// touching the title itself, so reaching it needs the window — via
-    /// `canvasHandle`, the same route `LocatorPanel` already uses.
-    ///
-    /// **Dispatched, not run in line with the rest of `.task`.** Setting
-    /// `titleVisibility` does not just flip a flag — AppKit's own docs say
-    /// it moves the toolbar up into the space the title used to occupy,
-    /// which relays out the window's whole content area. Done synchronously
-    /// in the same breath as `openOnLaunch()`, that relayout intermittently
-    /// stepped on the Locator's own `panel.makeKeyAndOrderFront(nil)` a few
-    /// lines above it — a `.floating` panel of its own, mid-ordering —
-    /// and `LaunchOrderTests` caught it: reproducible, not a one-off, three
-    /// launches in five losing the Locator entirely. Reordering ahead of
-    /// `openOnLaunch()` inside the same synchronous task cut the failure
-    /// rate but did not clear it. Letting the window's own launch-time
-    /// layout finish before touching its chrome does: **the plain fix that
-    /// is not "add a delay"** — see `openOnLaunch()`'s own doc comment for
-    /// the fix that was ruled out there for wrapping a race in more
-    /// guessing. This is not that: it defers *unrelated* work off the
-    /// launch-critical path, onto whatever run loop turn follows it,
-    /// rather than trying to out-guess an ordering between two things that
-    /// both need to happen now.
-    private func hideTitleText() {
-        let handle = canvasHandle
-        DispatchQueue.main.async {
-            handle.window()?.titleVisibility = .hidden
         }
     }
 
