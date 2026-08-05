@@ -13,14 +13,19 @@ layered, Illustrator-editable SVG.
   </tr>
 </table>
 
-The Python application is the specification. It is finished, it works, and its
-454 tests are an executable description of the behaviour being ported. Anything
-here that disagrees with it is a bug here.
+For most of this project's life the Python was the specification. **That
+stopped being true once the sea was built.** Presets and the contour/band/field
+maths still flow from the Python; palettes, hillshade, line weight, the page
+model and the whole marine layer — sea marks, depth bands, EMODnet provenance,
+surface currents, sea surface temperature — now flow the other way, ported
+back onto the Python once they existed here first. The two applications are
+upstream of each other in different places, checked where it matters by a
+fixture rather than by narrowing to one direction of truth.
 
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->947<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->956<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -44,7 +49,7 @@ model behind the window is verified continuously and the window is not, and
 
 ## Download
 
-[**Hipparchus 0.3.3**](https://github.com/tsevis/HipparchusMac/releases/latest)
+[**Hipparchus 0.4.5**](https://github.com/tsevis/HipparchusMac/releases/latest)
 — a disk image, on the releases page. Drag the app to Applications.
 
 The build is **signed ad-hoc: no Developer ID, no notarisation.** It opens on
@@ -119,7 +124,7 @@ Scripts/install-app.sh
 And for a disk image, named for the version and the commit it came from:
 
 ```sh
-Scripts/make-dmg.sh          # → dist/Hipparchus-0.3.3-<sha>.dmg
+Scripts/make-dmg.sh          # → dist/Hipparchus-0.4.5-<sha>.dmg
 ```
 
 The signature is **ad-hoc**, and that matters more for the image than for the
@@ -1283,12 +1288,13 @@ is gained is that a plugin cannot crash the app or read your files.
 
 ## What is not here
 
-The Python is the specification, and a port that quietly drops things is worse
-than one that says which. Everything below exists there and not here **on
-purpose**; anything not listed is either ported or a bug. This list was
-assembled by auditing the Python module by module, because until that audit
-three layers were styled by every preset and populated by nothing, and nobody
-had noticed.
+Neither application is the specification any more — see the note near the
+top — but the discipline this section keeps is the same one that framing
+earned: a port that quietly drops things is worse than one that says which.
+Everything below exists in the Python and not here **on purpose**; anything
+not listed is either ported or a bug. This list was assembled by auditing the
+Python module by module, because until that audit three layers were styled by
+every preset and populated by nothing, and nobody had noticed.
 
 Three entries have since left it, because they stopped being true: **saved
 presets**, **plugins** and most of the **settings store** all exist now. A list
