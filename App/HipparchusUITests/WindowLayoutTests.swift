@@ -76,6 +76,15 @@ final class WindowLayoutTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(window.frame.height, 620)
     }
 
+    /// An empty `NSWindow.title` hid the toolbar's redundant text but also
+    /// left a blank entry in the Window menu, with nothing to tell this
+    /// window apart from any other. The title stays real; only the on-screen
+    /// text is hidden, via `titleVisibility` on the window itself.
+    func testTheWindowHasARealTitle() {
+        requireWindow()
+        XCTAssertEqual(window.title, "Hipparchus")
+    }
+
     // MARK: - The parts are there
 
     /// **The test that keeps the others honest.** A UI test bundle cannot import

@@ -38,6 +38,16 @@ final class MapCanvasHandle {
         guard let view, view.bounds.height > 0, view.bounds.width > 0 else { return nil }
         return view.bounds.width / view.bounds.height
     }
+
+    /// The scene's own window, once the map's view is actually in it.
+    ///
+    /// A SwiftUI `Window` scene exposes no `NSWindow` of its own; the map's
+    /// view is the one `NSViewRepresentable` that is always inside it, so
+    /// its `.window` is the way in — the same route `LocatorPanel` already
+    /// uses to tell its own panel apart from this one.
+    func window() -> NSWindow? {
+        view?.window
+    }
 }
 
 struct MapCanvas: NSViewRepresentable {

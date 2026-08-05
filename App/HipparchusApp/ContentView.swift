@@ -59,12 +59,18 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 380)
                 .accessibilityIdentifier(UITestID.inspector)
             }
-            // Deliberately empty. The name was set here and macOS drew it in
-            // the toolbar, between the search field and the area — a word that
+            // The real title, but not drawn: macOS used to draw it in the
+            // toolbar, between the search field and the area — a word that
             // told you which application you were already looking at, in the
             // space where the controls live. The app's name is in the menu bar
             // and on the Dock icon; it does not need saying a third time.
-            .navigationTitle("")
+            //
+            // An *empty* title said the same thing to the toolbar and also to
+            // the Window menu, which has no controls to crowd and reads a
+            // blank entry as a bug rather than as restraint. `hideTitleText()`
+            // below hides only the on-screen text, once the window exists to
+            // hide it on.
+            .navigationTitle("Hipparchus")
             .toolbar { toolbar }
 
             statusBar
@@ -75,6 +81,7 @@ struct ContentView: View {
             wireUpMenuCommands()
             model.startIfRequestedOnLaunch()
             openOnLaunch()
+            hideTitleText()
         }
         .onAppear { model.undoManager = undoManager }
         .onDisappear { model.save() }
@@ -210,6 +217,19 @@ struct ContentView: View {
         about.showOnLaunchIfWanted {
             locatorPanel.show(model: model, onRender: renderChosenArea)
         }
+    }
+
+    /// Keeps the toolbar clean without leaving the Window menu blank.
+    ///
+    /// `.navigationTitle` sets `NSWindow.title`, which is what the Window
+    /// menu and Mission Control read; there is no SwiftUI modifier for
+    /// `titleVisibility`, the property that hides the *drawn* text without
+    /// touching the title itself, so reaching it needs the window — via
+    /// `canvasHandle`, the same route `LocatorPanel` already uses. Run from
+    /// the same `.task` as the rest of the launch wiring, after the map's
+    /// view has appeared and is in it.
+    private func hideTitleText() {
+        canvasHandle.window()?.titleVisibility = .hidden
     }
 
     private func wireUpMenuCommands() {
