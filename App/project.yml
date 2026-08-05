@@ -87,8 +87,12 @@ targets:
         # back — fixing that once cost a second, launch-order regression before
         # it held, caught only by running the layout tests twice rather than
         # once.
-        MARKETING_VERSION: "0.4.5"
-        CURRENT_PROJECT_VERSION: "16"
+        # 0.4.6 changes nothing a user of the app can see: the README stopped
+        # calling the Python "the specification" — stale since the sea started
+        # flowing the other way — and its test count, download link and build
+        # example caught up to 0.4.5.
+        MARKETING_VERSION: "0.4.6"
+        CURRENT_PROJECT_VERSION: "17"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
