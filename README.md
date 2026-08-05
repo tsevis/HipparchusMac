@@ -49,7 +49,7 @@ model behind the window is verified continuously and the window is not, and
 
 ## Download
 
-[**Hipparchus 0.4.5**](https://github.com/tsevis/HipparchusMac/releases/latest)
+[**Hipparchus 0.4.6**](https://github.com/tsevis/HipparchusMac/releases/latest)
 — a disk image, on the releases page. Drag the app to Applications.
 
 The build is **signed ad-hoc: no Developer ID, no notarisation.** It opens on
@@ -124,7 +124,7 @@ Scripts/install-app.sh
 And for a disk image, named for the version and the commit it came from:
 
 ```sh
-Scripts/make-dmg.sh          # → dist/Hipparchus-0.4.5-<sha>.dmg
+Scripts/make-dmg.sh          # → dist/Hipparchus-0.4.6-<sha>.dmg
 ```
 
 The signature is **ad-hoc**, and that matters more for the image than for the
