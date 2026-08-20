@@ -27,18 +27,30 @@ final class HierarchyDumpTests: XCTestCase {
             LaunchedApp.removeState(named: stateName)
         }
 
-        // **Not `.runningForeground`.** Printing a window tree does not need the
-        // application frontmost, and frontmost is the most contended thing in
-        // this suite — sixteen tests launch and quit applications in sequence,
-        // and each handover is the window server deciding who gets activated.
-        // This asserted on that, on the shortest timeout in the bundle, for a
-        // property none of the printing below uses.
+        // **Not `.runningForeground`.** This used to wait for the front, on the
+        // shortest timeout in the bundle, and under load it was the timeout
+        // that lost — sixteen tests launch and quit applications in sequence,
+        // and each handover is an argument about who gets activated.
         //
-        // What the dump does need is something to dump. It waits on *any*
-        // window rather than on `ID.mainWindow`, because this is the test you
-        // run when an identifier has stopped resolving: a diagnostic that
-        // asserts the identifier it exists to investigate would go red exactly
-        // when it is needed, and print nothing.
+        // Being in front was never incidental, though, and that is the part
+        // worth writing down: the Locator is an `NSPanel`,
+        // `NSPanel.hidesOnDeactivate` defaults to `true`, and a dump taken from
+        // the background is a dump with the floating panels missing. **This
+        // test never saw that bug precisely because it waited for the front**,
+        // while `LaunchOrderTests`, which did not, spent three rounds of
+        // investigation calling a hidden panel a broken launch.
+        //
+        // The panel now stops hiding under the harness, so the tree is complete
+        // whether or not this app is frontmost — see
+        // `LocatorPanelController.show()`. Which means the front can stop being
+        // demanded here, and this suite is that much less of an imposition on
+        // whoever is trying to use the machine.
+        //
+        // What is left is the real requirement: something to dump. *Any*
+        // window, rather than `ID.mainWindow`, because this is the test you run
+        // when an identifier has stopped resolving — a diagnostic that asserts
+        // the identifier it exists to investigate would go red exactly when it
+        // is needed, and print nothing.
         XCTAssertTrue(
             app.windows.firstMatch.waitForExistence(timeout: 30),
             "the application opened no window at all — nothing to dump"

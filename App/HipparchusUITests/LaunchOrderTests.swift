@@ -44,20 +44,33 @@ final class LaunchOrderTests: XCTestCase {
                 app.windows[ID.mainWindow].waitForExistence(timeout: 30),
                 "launch \(attempt): no main window"
             )
-            // Thirty seconds, the same budget the main window above is given,
-            // because the Locator opens strictly *after* it and a smaller one
-            // was never defensible. **This is tidiness, not the fix** — it is
-            // written down because it was tried as the fix and did not work.
+            // **This test does not ask to be in front, on purpose.** The
+            // Locator is an `NSPanel`, `NSPanel.hidesOnDeactivate` defaults to
+            // `true`, and the panel therefore drops out of the window tree
+            // whenever the application is not the active one — which is what
+            // made this test intermittent, and which reads from outside as
+            // "the launch never opened it".
             //
-            // Fifteen seconds was the only wait in the suite below thirty, so
-            // it looked like the cause when this went red on a loaded machine.
-            // Raising it to thirty moved the failure from 19s to 34s and
-            // changed nothing else: the thing being waited for was not late,
-            // it was absent. See `locator(in:)` for what it actually was.
+            // The obvious repair is for the test to take the front and hold
+            // it. That was tried and rejected: holding the front means calling
+            // `activate()` every couple of seconds for as long as the wait
+            // lasts, and this suite already takes over the screen of whoever
+            // runs it. A test that also snatches the keyboard back every two
+            // seconds is one nobody can run while working.
+            //
+            // So the panel stops hiding instead, and only under the harness —
+            // see `LocatorPanelController.show()`. Detection is untouched: if
+            // the ordering comes apart, `show()` is never called and there is
+            // no panel to keep on screen.
+            //
+            // Thirty seconds matches every other window wait here. It is
+            // tidiness rather than a fix, recorded because it was tried as the
+            // fix first and only moved the failure from 19s to 34s.
             if !locator(in: app).waitForExistence(timeout: 30) {
                 XCTFail(
                     "launch \(attempt) of \(Self.attempts): the Locator did not open. "
                         + "The windows that were open instead: \(describeWindows(of: app)). "
+                        + "\(describeFront(of: app)) "
                         + "If this passes sometimes and fails others, the launch "
                         + "ordering has come apart again — see ContentView.openOnLaunch()."
                 )
@@ -81,6 +94,19 @@ final class LaunchOrderTests: XCTestCase {
                 "launch \(attempt): no main window"
             )
         }
+    }
+
+    /// Whether the application was in front, which is half the answer on its own.
+    ///
+    /// A panel missing from an application that is not frontmost has not been
+    /// shown to be missing at all — `hidesOnDeactivate` explains it without any
+    /// bug being involved. Saying so in the message keeps the next person from
+    /// re-deriving it, which took three runs the first time.
+    private func describeFront(of app: XCUIApplication) -> String {
+        app.state == .runningForeground
+            ? "The application was in front, so the panel had nowhere to hide."
+            : "The application was NOT in front — an NSPanel hides itself on "
+                + "deactivate, which empties the panel out of the tree on its own."
     }
 
     /// Every window that is actually open, for the failure message.

@@ -74,6 +74,23 @@ final class LocatorPanelController: NSObject {
         // which would otherwise lose its region and start over at the whole
         // world every time.
         panel.isReleasedWhenClosed = false
+        // `NSPanel.hidesOnDeactivate` defaults to `true` where `NSWindow`'s
+        // defaults to `false`, and for this window that default is right: the
+        // panel is `.floating`, which is above every *other* application's
+        // windows too, so one that stayed put would sit over whatever you
+        // switched to. It is left alone for anybody actually using the app.
+        //
+        // Under the UI tests it is switched off, because there the default
+        // makes the panel unobservable: a window that is not on screen is not
+        // in the accessibility tree, so "the app was not frontmost" and "the
+        // launch never opened the Locator" become the same reading. That cost
+        // three rounds of investigation once, and the alternative — having the
+        // test take the front and hold it — means snatching focus every couple
+        // of seconds from whoever is at the machine, on a suite that is already
+        // hard to run while working.
+        if ProcessInfo.processInfo.environment["HIPPARCHUS_UI_TESTS"] == "1" {
+            panel.hidesOnDeactivate = false
+        }
         panel.contentView = NSHostingView(
             rootView: LocatorPanelContent(
                 model: model, handle: handle, trace: trace, mode: mode,
