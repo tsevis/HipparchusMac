@@ -1,0 +1,43 @@
+name: Tests
+
+# The headless suite: everything that can be checked without a window.
+#
+# This is the cheap half and it runs on every push. The other half — the
+# XCUITest bundle, which opens real windows — is a separate workflow that only
+# runs when asked. See ui-tests.yml for why.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  headless:
+    name: swift test
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Printed rather than pinned. The package is swift-tools-version 6.0 and
+      # targets macOS 15, so the runner's default Xcode should serve; if a
+      # future image moves past what this builds against, this line is where
+      # you will see it first, and `sudo xcode-select -s` is the fix.
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # GEOS is a committed binary target — Vendor/geos/geos.xcframework — so
+      # there is nothing to compile from source here and no Homebrew step.
+      - name: Build tests
+        run: swift build --build-tests
+
+      - name: Run tests
+        run: swift test

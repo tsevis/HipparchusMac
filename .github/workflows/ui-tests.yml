@@ -1,0 +1,116 @@
+name: UI tests
+
+# The XCUITest bundle, run somewhere that is not your desk.
+#
+# **This is the whole point of the file.** An XCUITest run launches the real
+# application and drives it through the accessibility API, on a logged-in GUI
+# session. macOS has no headless mode for it — Scripts/ui-test.sh says as much,
+# and it is not a setting anybody has failed to find. So a local run takes over
+# the screen of whoever started it for two or three minutes, sixteen launches
+# deep, and cannot be worked through.
+#
+# A hosted macOS runner has its own session and its own screen. Nobody is
+# sitting at it.
+#
+# **It is manual on purpose.** This repository is private, so macOS runner
+# minutes bill at ten times the Linux rate, and running the suite on every
+# commit would spend real money to save screen time on the commits that never
+# needed it. Ask for it when you want it:
+#
+#     gh workflow run "UI tests"
+#     gh workflow run "UI tests" -f repeats=5
+#     gh run watch
+#
+# `repeats` exists because one green run proves very little here. The suite has
+# a history of passing and then failing on the same commit — the launch-order
+# case was a genuine intermittent for months — so a real answer is several
+# passes in a row, and this is the one place they cost nobody's attention.
+
+on:
+  workflow_dispatch:
+    inputs:
+      repeats:
+        description: "Passes over the suite. One proves little; five is a sample."
+        required: false
+        default: "1"
+
+concurrency:
+  group: ui-tests-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ui:
+    name: xcodebuild test
+    runs-on: macos-15
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      # The .xcodeproj is generated rather than committed — App/project.yml is
+      # the source of truth — so it has to be made before anything can build it.
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate the project
+        run: xcodegen generate --spec App/project.yml
+
+      # Built once, up front, so a compile failure is reported as a compile
+      # failure rather than as a mysterious first-pass test failure — and so the
+      # repeats below are timing the tests rather than the build.
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing \
+            -project App/HipparchusMac.xcodeproj \
+            -scheme HipparchusUITests \
+            -configuration Debug \
+            -destination 'platform=macOS'
+
+      # `repeats` arrives as a string from the dispatch form, so it is read
+      # through printf rather than interpolated into the script: a workflow
+      # input is untrusted text, and this one ends up next to a shell.
+      - name: Run the suite
+        env:
+          REPEATS: ${{ inputs.repeats }}
+        run: |
+          set -uo pipefail
+          count=$(printf '%d' "$REPEATS" 2>/dev/null || echo 1)
+          if [ "$count" -lt 1 ] || [ "$count" -gt 20 ]; then count=1; fi
+          echo "Running the suite $count time(s)."
+
+          failed=0
+          for pass in $(seq 1 "$count"); do
+            echo "::group::pass $pass of $count"
+            if xcodebuild test-without-building \
+              -project App/HipparchusMac.xcodeproj \
+              -scheme HipparchusUITests \
+              -configuration Debug \
+              -destination 'platform=macOS' \
+              -resultBundlePath "results-$pass.xcresult"; then
+              echo "pass $pass: green"
+            else
+              echo "pass $pass: RED"
+              failed=$((failed + 1))
+            fi
+            echo "::endgroup::"
+          done
+
+          echo "----------------------------------------"
+          echo "$((count - failed)) of $count passes green."
+          [ "$failed" -eq 0 ]
+
+      # The result bundle carries the failure messages and the per-attempt
+      # launch log, which is what turned this suite's last intermittent from
+      # guesswork into an answer. Kept whenever anything went red.
+      - name: Keep the result bundles
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcresult-bundles
+          path: "*.xcresult"
+          retention-days: 14
