@@ -91,8 +91,12 @@ targets:
         # calling the Python "the specification" — stale since the sea started
         # flowing the other way — and its test count, download link and build
         # example caught up to 0.4.5.
-        MARKETING_VERSION: "0.4.6"
-        CURRENT_PROJECT_VERSION: "17"
+        # 0.4.7 changes nothing a user of the app can see either: the PDF
+        # provenance test carried an outer `try` around a call that does not
+        # throw, which the compiler said so in both configurations. It is the
+        # one thing a read-only review of both repositories found on this side.
+        MARKETING_VERSION: "0.4.7"
+        CURRENT_PROJECT_VERSION: "18"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
