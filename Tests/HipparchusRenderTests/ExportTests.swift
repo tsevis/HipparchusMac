@@ -275,7 +275,7 @@ final class PDFExportTests: XCTestCase {
 
         // A printed map that cannot say whether it was measured or generated is the
         // thing provenance exists to prevent.
-        let raw = try String(decoding: try Data(contentsOf: url), as: UTF8.self)
+        let raw = String(decoding: try Data(contentsOf: url), as: UTF8.self)
         XCTAssertTrue(raw.contains("provenance"), "the PDF metadata should name the provenance")
     }
 
