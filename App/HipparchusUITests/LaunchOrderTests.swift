@@ -44,12 +44,25 @@ final class LaunchOrderTests: XCTestCase {
                 app.windows[ID.mainWindow].waitForExistence(timeout: 30),
                 "launch \(attempt): no main window"
             )
-            XCTAssertTrue(
-                locator(in: app).waitForExistence(timeout: 15),
-                "launch \(attempt) of \(Self.attempts): the Locator did not open. "
-                    + "If this passes sometimes and fails others, the launch "
-                    + "ordering has come apart again — see ContentView.openOnLaunch()."
-            )
+            // Thirty seconds, the same budget the main window above is given,
+            // because the Locator opens strictly *after* it and a smaller one
+            // was never defensible. **This is tidiness, not the fix** — it is
+            // written down because it was tried as the fix and did not work.
+            //
+            // Fifteen seconds was the only wait in the suite below thirty, so
+            // it looked like the cause when this went red on a loaded machine.
+            // Raising it to thirty moved the failure from 19s to 34s and
+            // changed nothing else: the thing being waited for was not late,
+            // it was absent. See `locator(in:)` for what it actually was.
+            if !locator(in: app).waitForExistence(timeout: 30) {
+                XCTFail(
+                    "launch \(attempt) of \(Self.attempts): the Locator did not open. "
+                        + "The windows that were open instead: \(describeWindows(of: app)). "
+                        + "If this passes sometimes and fails others, the launch "
+                        + "ordering has come apart again — see ContentView.openOnLaunch()."
+                )
+                return
+            }
         }
     }
 
@@ -70,13 +83,45 @@ final class LaunchOrderTests: XCTestCase {
         }
     }
 
-    /// The Locator, found by something only it has.
+    /// Every window that is actually open, for the failure message.
     ///
-    /// It carries a `Locator` title and a world map of continent buttons, and
-    /// the continents are the part the main window has no equivalent of.
+    /// **A failure that names only what it wanted is a failure you have to
+    /// reproduce before you can read it.** This test spent two rounds of
+    /// investigation being read as "the Locator is missing" when the question
+    /// worth asking first was "then what *is* on screen, and under which
+    /// attribute?" — so it now says so itself, and the next person gets the
+    /// answer in the log rather than from a second run.
+    private func describeWindows(of app: XCUIApplication) -> String {
+        let windows = app.windows.allElementsBoundByIndex.map { window in
+            "title=\(window.title.debugDescription) "
+                + "identifier=\(window.identifier.debugDescription) "
+                + "label=\(window.label.debugDescription)"
+        }
+        return windows.isEmpty ? "none at all" : windows.joined(separator: "; ")
+    }
+
+    /// The Locator, found by the title its own panel sets.
+    ///
+    /// **Not by a continent button, which is what made this test flaky.** It
+    /// used to match a window *containing* a button titled "Europe", reasoning
+    /// that continents are the one thing the main window has no equivalent of.
+    /// That much is true. The trouble is that "Europe" is not Hipparchus's
+    /// button — the string does not occur anywhere in the app. The panel holds a
+    /// live `MKMapView`, and that is MapKit's own accessibility element for a
+    /// **rendered** piece of map.
+    ///
+    /// So the assertion was really "MapKit has fetched and drawn tiles and
+    /// published their labels" — in a suite that launches the app deliberately
+    /// offline, on whatever machine happens to be free. It failed on launch 1
+    /// of 5, the coldest tile cache, whenever the machine was busy, and the
+    /// message it printed blamed the launch ordering for a map render.
+    ///
+    /// The title is set in `LocatorPanelController.show()`, synchronously,
+    /// before the panel is ordered front — it is there the moment the window
+    /// is, and it is precisely what this test means to ask about. The window
+    /// tree carries two windows, "Locator" and "Hipparchus", so there is
+    /// nothing to confuse it with.
     private func locator(in app: XCUIApplication) -> XCUIElement {
-        app.windows.containing(
-            NSPredicate(format: "elementType == %d AND title == %@", XCUIElement.ElementType.button.rawValue, "Europe")
-        ).firstMatch
+        app.windows.matching(NSPredicate(format: "title == %@", "Locator")).firstMatch
     }
 }
