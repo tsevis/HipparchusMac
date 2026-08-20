@@ -21,7 +21,7 @@ final class HierarchyDumpTests: XCTestCase {
 
     func testPrintsEveryWindow() {
         let stateName = LaunchedApp.isolatedStateName(function: name)
-        let app = LaunchedApp.launch(stateName: stateName)
+        let app = LaunchedApp.launch(stateName: stateName, keepPanelsVisible: true)
         defer {
             app.terminate()
             LaunchedApp.removeState(named: stateName)
@@ -40,11 +40,18 @@ final class HierarchyDumpTests: XCTestCase {
         // while `LaunchOrderTests`, which did not, spent three rounds of
         // investigation calling a hidden panel a broken launch.
         //
-        // The panel now stops hiding under the harness, so the tree is complete
-        // whether or not this app is frontmost — see
-        // `LocatorPanelController.show()`. Which means the front can stop being
-        // demanded here, and this suite is that much less of an imposition on
-        // whoever is trying to use the machine.
+        // So this launches with `keepPanelsVisible`, and the tree is complete
+        // whether or not the app is frontmost — see
+        // `LocatorPanelController.show()`. A dump is the thing you reach for
+        // when you are already confused, and one that quietly leaves out the
+        // floating windows is worse than none. It also means the front can stop
+        // being demanded here, which makes this suite that much less of an
+        // imposition on whoever is trying to use the machine.
+        //
+        // Note that `WindowLayoutTests` deliberately does *not* pass the flag,
+        // so what it sees is not quite what is printed below: a panel that will
+        // not hide sits over the main window. If you are authoring against this
+        // dump, that is the one discrepancy to keep in mind.
         //
         // What is left is the real requirement: something to dump. *Any*
         // window, rather than `ID.mainWindow`, because this is the test you run

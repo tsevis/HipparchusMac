@@ -11,9 +11,26 @@ import XCTest
 /// test suite that silently lost its isolation would eat the user's work on the
 /// next run rather than failing.
 ///
-/// It also launches **offline**. A layout test that fetches is a test of
-/// somebody else's server: slow, flaky, and capable of failing for reasons that
-/// have nothing to do with the window.
+/// **It does not launch offline, whatever this used to say.** The wish behind
+/// that claim was sound — a layout test that fetches is a test of somebody
+/// else's server, slow and flaky and able to fail for reasons that have nothing
+/// to do with the window — but the environment variable below was set from the
+/// first day and read by *nothing at all*, so it was never more than a wish.
+///
+/// Nor could the app have granted it: the Locator holds a live `MKMapView`, and
+/// MapKit fetches its own tiles by routes an application does not get a say in.
+/// The proof is on this suite's own record. `LaunchOrderTests` used to identify
+/// the Locator by a button titled "Europe", a string that appears nowhere in
+/// Hipparchus — it is a *rendered* MapKit label, and it could only ever have
+/// been there because the tiles had come down off the network. A test built on
+/// the fetch that was supposedly prevented is as clear as this gets.
+///
+/// The variable that claimed to arrange it, `HIPPARCHUS_UI_TESTS`, is gone
+/// rather than fixed: a switch nothing reads is worse than no switch, because it
+/// reads in the source like a guarantee. What replaces it is `keepPanelsVisible`
+/// below, which is narrow, is passed by exactly one test, and says on its face
+/// what it does. The isolation that actually protects the user's work is
+/// `--state-directory`, above, and that one is real.
 enum LaunchedApp {
 
     /// A directory name unique to this run, so two runs cannot collide and a
@@ -23,18 +40,28 @@ enum LaunchedApp {
         return "HipparchusUITests-\(cleaned)-\(ProcessInfo.processInfo.processIdentifier)"
     }
 
-    static func launch(stateName: String) -> XCUIApplication {
+    /// - Parameter keepPanelsVisible: passes `--no-panel-hiding`, which stops the
+    ///   Locator taking itself off screen while the app is in the background.
+    ///
+    ///   **Only for the tests that ask what windows exist** — `LaunchOrderTests`
+    ///   and `HierarchyDumpTests` — and off by default for a reason that was
+    ///   measured rather than guessed. `NSPanel.hidesOnDeactivate` is `true` by
+    ///   default, so such a test cannot otherwise tell a panel that never opened
+    ///   from one that opened and hid.
+    ///   But a panel that will not hide is a panel left sitting over the main
+    ///   window, and turning this on for everything cost `WindowLayoutTests` its
+    ///   `testTheControlsAreHittable` — Render map exists but cannot be clicked.
+    ///   The layout tests want the window as somebody would actually meet it.
+    static func launch(stateName: String, keepPanelsVisible: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = [
+        let arguments = [
             "--state-directory", stateName,
             // The splash is a modal window over everything the tests want to
             // look at, and dismissing it in each test would be testing the
             // splash rather than the layout.
             "-ShowAboutOnLaunch", "NO",
         ]
-        // Belt and braces: nothing here should reach the network, and a test
-        // that hangs on a fetch fails as a timeout somewhere unrelated.
-        app.launchEnvironment["HIPPARCHUS_UI_TESTS"] = "1"
+        app.launchArguments = keepPanelsVisible ? arguments + ["--no-panel-hiding"] : arguments
         app.launch()
         return app
     }

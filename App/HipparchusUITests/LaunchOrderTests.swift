@@ -34,7 +34,25 @@ final class LaunchOrderTests: XCTestCase {
     func testTheLocatorOpensOnEveryLaunchWhenTheSplashIsOff() {
         for attempt in 1...Self.attempts {
             let stateName = "\(LaunchedApp.isolatedStateName(function: name))-\(attempt)"
-            let app = LaunchedApp.launch(stateName: stateName)
+            // **This passes `keepPanelsVisible`, and it is the test that most
+            // needs it.** The Locator is
+            // an `NSPanel`, `NSPanel.hidesOnDeactivate` defaults to `true`, and
+            // the panel therefore drops out of the window tree whenever the
+            // application is not the active one — which is what made this test
+            // intermittent, and which reads from outside as "the launch never
+            // opened it".
+            //
+            // The obvious repair is for the test to take the front and hold it.
+            // That was tried and rejected: holding the front means calling
+            // `activate()` every couple of seconds for as long as the wait
+            // lasts, and this suite already takes over the screen of whoever
+            // runs it. A test that also snatches the keyboard back every two
+            // seconds is one nobody can run while working.
+            //
+            // Detection is untouched by either: if the ordering comes apart,
+            // `show()` is never called and there is no panel for the flag to
+            // keep on screen.
+            let app = LaunchedApp.launch(stateName: stateName, keepPanelsVisible: true)
             defer {
                 app.terminate()
                 LaunchedApp.removeState(named: stateName)
@@ -44,25 +62,6 @@ final class LaunchOrderTests: XCTestCase {
                 app.windows[ID.mainWindow].waitForExistence(timeout: 30),
                 "launch \(attempt): no main window"
             )
-            // **This test does not ask to be in front, on purpose.** The
-            // Locator is an `NSPanel`, `NSPanel.hidesOnDeactivate` defaults to
-            // `true`, and the panel therefore drops out of the window tree
-            // whenever the application is not the active one — which is what
-            // made this test intermittent, and which reads from outside as
-            // "the launch never opened it".
-            //
-            // The obvious repair is for the test to take the front and hold
-            // it. That was tried and rejected: holding the front means calling
-            // `activate()` every couple of seconds for as long as the wait
-            // lasts, and this suite already takes over the screen of whoever
-            // runs it. A test that also snatches the keyboard back every two
-            // seconds is one nobody can run while working.
-            //
-            // So the panel stops hiding instead, and only under the harness —
-            // see `LocatorPanelController.show()`. Detection is untouched: if
-            // the ordering comes apart, `show()` is never called and there is
-            // no panel to keep on screen.
-            //
             // Thirty seconds matches every other window wait here. It is
             // tidiness rather than a fix, recorded because it was tried as the
             // fix first and only moved the failure from 19s to 34s.
@@ -96,17 +95,21 @@ final class LaunchOrderTests: XCTestCase {
         }
     }
 
-    /// Whether the application was in front, which is half the answer on its own.
+    /// Whether the application was in front, which used to be the whole answer.
     ///
-    /// A panel missing from an application that is not frontmost has not been
-    /// shown to be missing at all — `hidesOnDeactivate` explains it without any
-    /// bug being involved. Saying so in the message keeps the next person from
-    /// re-deriving it, which took three runs the first time.
+    /// A missing panel and a backgrounded application were once the same
+    /// sentence: `hidesOnDeactivate` accounted for the first without any bug
+    /// being involved, and working that out took three runs. It is reported
+    /// here so that nobody has to work it out a second time — and now that the
+    /// panel no longer hides under the harness, the two readings have come
+    /// apart again, which is what makes it worth printing.
     private func describeFront(of app: XCUIApplication) -> String {
         app.state == .runningForeground
-            ? "The application was in front, so the panel had nowhere to hide."
-            : "The application was NOT in front — an NSPanel hides itself on "
-                + "deactivate, which empties the panel out of the tree on its own."
+            ? "The application was in front."
+            : "The application was NOT in front, which should no longer matter — "
+                + "this test launches with keepPanelsVisible, so the panel is told "
+                + "not to hide on deactivate. If that flag stopped reaching the "
+                + "app, this is where it would show."
     }
 
     /// Every window that is actually open, for the failure message.
