@@ -215,13 +215,43 @@ public struct HTTPError: Error, CustomStringConvertible {
 public struct URLSessionFetcher: HTTPFetching {
     public static let userAgent = "HipparchusMac/0.1 (native map generator)"
 
-    private let session: URLSession
+    /// Whether this process was told to stay off the network, read once from its
+    /// own launch arguments.
+    ///
+    /// **A launch flag rather than an injected setting, because the thing being
+    /// fixed is an injection nobody performed.** Every provider in this module
+    /// takes an `HTTPFetching` and defaults it to this type, so a guard here is
+    /// the one place that covers all of them without twelve call sites having to
+    /// remember. A run that wants the real network simply does not pass
+    /// `--offline`.
+    ///
+    /// **It covers this application's own fetching and nothing else.** MapKit is
+    /// not affected and cannot be from in here: the Locator holds a live
+    /// `MKMapView`, which fetches its tiles by routes inside the framework.
+    /// Saying otherwise is exactly the mistake this replaces — the UI tests
+    /// carried a `HIPPARCHUS_UI_TESTS` variable documented as making the run
+    /// offline, which nothing read, for as long as they have existed.
+    public static let launchedOffline = ProcessInfo.processInfo.arguments.contains("--offline")
 
-    public init(session: URLSession = .shared) {
+    private let session: URLSession
+    private let isOffline: Bool
+
+    public init(session: URLSession = .shared, isOffline: Bool = URLSessionFetcher.launchedOffline) {
         self.session = session
+        self.isOffline = isOffline
+    }
+
+    /// Fails before the request is built, so an offline run cannot be slow.
+    private func refuseIfOffline(_ url: URL) throws {
+        guard isOffline else { return }
+        throw HTTPError(
+            url: url,
+            underlying: "refused: this process was launched with --offline"
+        )
     }
 
     public func data(from url: URL, timeout: TimeInterval) async throws -> Data {
+        try refuseIfOffline(url)
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = "GET"
         // Public tile and API endpoints ask for an identifying agent, and some
@@ -236,6 +266,7 @@ public struct URLSessionFetcher: HTTPFetching {
     }
 
     public func post(_ body: [String: String], to url: URL, timeout: TimeInterval) async throws -> Data {
+        try refuseIfOffline(url)
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue(
