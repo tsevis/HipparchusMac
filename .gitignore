@@ -14,8 +14,11 @@ xcuserdata/
 # Vendored GEOS is committed on purpose so a clean clone builds without CMake.
 # Only the intermediate build tree is ignored, and that lives under .build/.
 
-# Output from hipparchus-cli runs and manual checks
+# Output from hipparchus-cli runs and manual checks. `--out` takes any directory,
+# and a world sheet is not a small one — a single run at export quality leaves a
+# 239 MB SVG beside an 86 MB PDF, which is not a thing to notice only in a diff.
 /out/
+/out-*/
 *.png.actual
 
 # Working notes, deliberately local. The brief and the handoffs are how this
