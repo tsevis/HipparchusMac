@@ -135,7 +135,7 @@ public struct FileSourceProvider: MapProvider {
         var featuresByLayer: [String: [Feature]] = [:]
         for layer in FileLayer.all { featuresByLayer[layer] = [] }
         for feature in features {
-            featuresByLayer[feature.layer, default: []].append(feature)
+            featuresByLayer[feature.layer, default: []].append(FileProperties.naming(feature))
         }
 
         return FeatureCollection(
@@ -302,6 +302,62 @@ public enum FileLayer {
         }
         return OverpassDecode.classify(tags: tags)
     }
+}
+
+/// Translate a file's own vocabulary for a name into the one everything above
+/// this reads.
+///
+/// The layer classifier above already does this for *which layer* a feature
+/// belongs to — Natural Earth's `featurecla`, Overture's `theme`. This is the
+/// same translation for the one property the renderer reads off a feature by
+/// name: a label comes from `name`, spelled exactly that way, and a source that
+/// spells it `NAME` gets its cities classified correctly and then silently
+/// dropped at the point where they would have been drawn.
+///
+/// Additive on purpose. The source's own spelling is left in place, because the
+/// exported SVG carries a feature's properties and rewriting them would lose
+/// the provenance of the word.
+public enum FileProperties {
+
+    /// In order of preference. `name` first so a file already speaking the right
+    /// vocabulary is untouched; `admin` last because a country polygon whose
+    /// only name is its administrative one is still better labelled than not.
+    /// Matched case-insensitively, which is what makes `NAME` and `NAMEASCII`
+    /// work without listing every source's capitalisation.
+    public static let nameAliases = ["name", "name_en", "nameascii", "name_long", "admin"]
+
+    public static func named(_ properties: [String: PropertyValue]) -> [String: PropertyValue] {
+        if let existing = properties["name"]?.stringValue, !existing.trimmed.isEmpty {
+            return properties
+        }
+        for alias in nameAliases {
+            for (key, value) in properties where key.lowercased() == alias {
+                guard let text = value.stringValue, !text.trimmed.isEmpty else { continue }
+                var result = properties
+                result["name"] = .string(text.trimmed)
+                return result
+            }
+        }
+        return properties
+    }
+
+    /// The same, on a whole feature. A new one: nothing here mutates.
+    static func naming(_ feature: Feature) -> Feature {
+        let properties = named(feature.properties)
+        guard properties.count != feature.properties.count else { return feature }
+        return Feature(
+            id: feature.id,
+            layer: feature.layer,
+            source: feature.source,
+            geometry: feature.geometry,
+            provenance: feature.provenance,
+            properties: properties
+        )
+    }
+}
+
+private extension String {
+    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
 }
 
 // MARK: - GeoJSON

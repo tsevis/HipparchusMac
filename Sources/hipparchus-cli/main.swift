@@ -87,6 +87,11 @@ func usage() -> Never {
       --currents         surface currents as streamlines, thickening where the
                          water runs faster. Wants a sea-sized frame: the field
                          is 0.25 deg, so a bay is four cells across.
+      --natural-earth <path>
+                         stack Natural Earth on top: coastlines, borders,
+                         rivers, lakes and place names, from a downloaded
+                         shapefile or a folder of them. What OpenStreetMap
+                         cannot answer for at continental scale.
       --simulated        a generated field instead of measured elevation. Needs
                          no network and is not a measurement of anywhere.
       --preset <name>    style preset (default: \(SceneBuilder.Options().preset.name))
@@ -132,6 +137,7 @@ struct Options {
     var sun = SunPosition()
     var exaggeration = 1.0
     var shadeBands = TerrainTileSettings().hillshadeBandCount
+    var naturalEarth: URL?
 }
 
 /// Style packs, loaded before anything else is parsed.
@@ -230,6 +236,10 @@ while argumentIndex < arguments.count {
         options.currents = true
     case "--sea-temperature":
         options.seaTemperature = true
+    case "--natural-earth":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        options.naturalEarth = URL(fileURLWithPath: arguments[argumentIndex])
     case "--simulated":
         options.simulated = true
     case "--sun":
@@ -362,6 +372,13 @@ func run(_ place: Place, options: Options) async throws {
 
     let started = ContinuousClock.now
     let terrain = TerrainTileProvider(settings: settings)
+    // Stacked onto whatever else is being drawn rather than replacing it, which
+    // is how the sidebar treats every source: ticking Natural Earth adds
+    // coastlines and borders to a relief sheet, it does not throw the relief
+    // away.
+    let atlas: [any MapProvider] = options.naturalEarth
+        .map { [FileSourceProvider.naturalEarth(path: $0)] } ?? []
+    let atlasIDs = atlas.map(\.providerID)
     let collection: FeatureCollection
     if options.simulated {
         // Nothing measured, and nothing fetched. The one source that can draw a
@@ -373,10 +390,10 @@ func run(_ place: Place, options: Options) async throws {
         field.hillshadeBandCount = options.shadeBands
         collection = try await SimulatedFieldProvider(settings: field).fetch(BBoxQuery(bbox: place.bbox))
     } else if options.currents {
-        let manager = DataSourceManager(providers: [terrain, CurrentsProvider()])
+        let manager = DataSourceManager(providers: [terrain, CurrentsProvider()] + atlas)
         collection = try await manager.fetch(
             BBoxQuery(bbox: place.bbox),
-            plan: FetchPlan(base: SourceID.terrainTiles, extras: [currentsProviderID])
+            plan: FetchPlan(base: SourceID.terrainTiles, extras: [currentsProviderID] + atlasIDs)
         )
         if let failures = collection.metadata["provider_errors"]?.stringValue {
             print("  some sources failed: \(failures)")
@@ -386,10 +403,10 @@ func run(_ place: Place, options: Options) async throws {
         // weakest-provenance rule are the shipped ones. Stacked on the
         // elevation, because a temperature field over a blank sheet says
         // nothing about where it is.
-        let manager = DataSourceManager(providers: [terrain, ERDDAPProvider()])
+        let manager = DataSourceManager(providers: [terrain, ERDDAPProvider()] + atlas)
         collection = try await manager.fetch(
             BBoxQuery(bbox: place.bbox),
-            plan: FetchPlan(base: SourceID.terrainTiles, extras: [SourceID.seaTemperature])
+            plan: FetchPlan(base: SourceID.terrainTiles, extras: [SourceID.seaTemperature] + atlasIDs)
         )
         if let failures = collection.metadata["provider_errors"]?.stringValue {
             print("  some sources failed: \(failures)")
@@ -398,15 +415,24 @@ func run(_ place: Place, options: Options) async throws {
         // The same manager the app fetches through, so the merge, the layer
         // precedence and the weakest-provenance-wins rule are the shipped ones
         // rather than a second implementation written for a flag.
-        let manager = DataSourceManager(providers: [terrain, OverpassProvider()])
+        let manager = DataSourceManager(providers: [terrain, OverpassProvider()] + atlas)
         collection = try await manager.fetch(
             BBoxQuery(bbox: place.bbox),
-            plan: FetchPlan(base: SourceID.overpass, extras: [SourceID.terrainTiles])
+            plan: FetchPlan(base: SourceID.overpass, extras: [SourceID.terrainTiles] + atlasIDs)
         )
         // Said out loud. A city that came back with no roads and no explanation
         // is how you end up blaming the renderer.
         if let failures = collection.metadata["provider_errors"]?.stringValue {
             print("  provider errors: \(failures)")
+        }
+    } else if !atlas.isEmpty {
+        let manager = DataSourceManager(providers: [terrain] + atlas)
+        collection = try await manager.fetch(
+            BBoxQuery(bbox: place.bbox),
+            plan: FetchPlan(base: SourceID.terrainTiles, extras: atlasIDs)
+        )
+        if let failures = collection.metadata["provider_errors"]?.stringValue {
+            print("  some sources failed: \(failures)")
         }
     } else {
         collection = try await terrain.fetch(BBoxQuery(bbox: place.bbox))

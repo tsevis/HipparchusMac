@@ -487,6 +487,77 @@ final class FileSourceTests: XCTestCase {
     }
 }
 
+/// What a name is called, and who has to know.
+///
+/// The renderer speaks OpenStreetMap's vocabulary — a label comes from a
+/// feature's `name`, spelled exactly that way — and every source is translated
+/// into that vocabulary on the way in. Natural Earth writes `NAME`, and the
+/// layer classifier was already reading it case-insensitively, so its cities
+/// arrived, landed in the `places` layer, and were then dropped one step later
+/// by a renderer that found no `name` on them. Two hundred and forty-three
+/// populated places reached the world sheet and none of them was drawn.
+final class FilePropertyNameTests: XCTestCase {
+
+    private var directory = FileManager.default.temporaryDirectory
+    private let athens = BBoxQuery(
+        bbox: BoundingBox(minLon: 23.5, minLat: 37.8, maxLon: 24.0, maxLat: 38.2)
+    )
+
+    override func setUpWithError() throws {
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hipparchus-names-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    func testAShapefileNameReachesTheRenderersVocabulary() async throws {
+        let path = try ShapefileWriter.write(
+            to: directory.appendingPathComponent("ne_places.shp"),
+            points: [(Coordinate(lon: 23.73, lat: 37.98), "Athina")]
+        )
+        let collection = try await FileSourceProvider.naturalEarth(path: path).fetch(athens)
+        let place = try XCTUnwrap(collection.features(in: "places").first)
+        XCTAssertEqual(place.property("name")?.stringValue, "Athina")
+        XCTAssertEqual(place.property("NAME")?.stringValue, "Athina", "the source's own spelling stays")
+    }
+
+    func testTheSourcesOwnNameIsNeverOverwritten() {
+        let properties: [String: PropertyValue] = [
+            "name": .string("Athina"), "NAME": .string("ATHENS"),
+        ]
+        XCTAssertEqual(
+            FileProperties.named(properties)["name"]?.stringValue, "Athina",
+            "a file that already speaks the right vocabulary is left alone"
+        )
+    }
+
+    func testAFileWithNoNameAtAllGainsNothing() {
+        let properties: [String: PropertyValue] = ["featurecla": .string("Admin-0 country")]
+        XCTAssertNil(FileProperties.named(properties)["name"])
+    }
+
+    /// In alias order, so a country carries its common name rather than its
+    /// long form.
+    func testTheAliasesAreTriedInOrder() {
+        XCTAssertEqual(
+            FileProperties.named(["NAME_LONG": .string("French Republic"),
+                                  "NAME": .string("France")])["name"]?.stringValue,
+            "France"
+        )
+        XCTAssertEqual(
+            FileProperties.named(["NAMEASCII": .string("Sao Paulo")])["name"]?.stringValue,
+            "Sao Paulo"
+        )
+    }
+
+    func testAnEmptyNameIsNotAName() {
+        XCTAssertNil(FileProperties.named(["NAME": .string("  ")])["name"])
+    }
+}
+
 /// A shapefile's attributes are matched to its geometry **by position**, and a
 /// bbox query skips most of the positions.
 ///

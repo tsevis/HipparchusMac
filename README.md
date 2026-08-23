@@ -303,6 +303,7 @@ choices above were checked without a window to look at:
 | `--paper <name>` `--dpi <n>` `--portrait` | the sheet, for all three formats |
 | `--plugins <dir>` | load a style pack, so its presets and places can be named |
 | `--streets` | stack OpenStreetMap onto the elevation |
+| `--natural-earth <path>` | stack Natural Earth on top: coastlines, borders, rivers, place names |
 | `--simulated` | a generated field, needing no network at all |
 
 ```sh
@@ -361,6 +362,49 @@ any run longer than a degree before projecting; `Bounds` are now taken from the
 whole outline rather than the four corners, because a world frame is at its
 widest on the equator, *between* two corners, and bounding it by the corners
 cropped the equator off the sheet.
+
+**Coastlines, borders and names**, which elevation cannot give you: a coast in a
+relief sheet is where the ground crosses zero, and a border is not in the terrain
+at all. That is Natural Earth's job, and the source was already in the sidebar
+waiting for a file. It is public domain and needs no account:
+
+```sh
+mkdir -p ~/Documents/Hipparchus/NaturalEarth/110m
+cd ~/Documents/Hipparchus/NaturalEarth/110m
+for f in physical/ne_110m_coastline physical/ne_110m_ocean physical/ne_110m_lakes \
+         physical/ne_110m_rivers_lake_centerlines cultural/ne_110m_admin_0_countries \
+         cultural/ne_110m_admin_0_boundary_lines_land cultural/ne_110m_populated_places; do
+  curl -fsSL "https://naciscdn.org/naturalearth/110m/$f.zip" -o t.zip && unzip -oq t.zip && rm t.zip
+done
+```
+
+Point the Natural Earth row at that folder — `ShapefileReader` reads a folder of
+`.shp` files as one source — or pass `--natural-earth <path>` to the CLI. Use
+110m for a world sheet, 50m for a continent, 10m for a country. Natural Earth
+stacks like everything else: it adds coastlines and borders to a relief sheet
+rather than replacing it.
+
+One translation was missing and cost the whole layer. The renderer reads a
+label off a feature's `name`, spelled exactly that way; Natural Earth writes
+`NAME`. The layer classifier was already reading it case-insensitively, so 243
+populated places arrived on the first world sheet, landed correctly in the
+`places` layer, and were then dropped one step later by a renderer that found no
+`name` on them. `FileProperties` now translates at the boundary, where every
+other source's vocabulary is already translated, and leaves the source's own
+spelling in place beside it.
+
+Fixing that uncovered a worse one, which the reader had had for as long as it
+could read a file. **A shapefile's `.dbf` is matched to its `.shp` by
+position**, and `ShapefileReader` was indexing the attributes by how many
+features it had *kept* rather than by the record's place in the file. A bbox
+query skips nearly every record in a world-wide file, so each surviving feature
+took the attributes of one near the start of the file instead of its own. The
+first Europe sheet came back labelled Agra, Albuquerque and the Amundsen–Scott
+South Pole Station, all drawn in Europe. Nothing failed, no count looked wrong,
+and the layer classifier — which reads those same attributes — had been sorting
+features by another feature's tags the whole time. It is the kind of bug that
+only shows against real data at a real scale: the synthetic fixture had two
+points and kept them both.
 
 ## Sources are fetched together
 
@@ -1462,7 +1506,7 @@ those, so the readers are written here:
 | Format | Source | Read by |
 |---|---|---|
 | GeoJSON, GeoJSONL, or a folder of either | all four | `GeoJSONReader` |
-| Shapefile (`.shp` + `.dbf`) | Natural Earth | `ShapefileReader` |
+| Shapefile (`.shp` + `.dbf`), or a folder of them | Natural Earth | `ShapefileReader` |
 | MBTiles, PMTiles → Mapbox Vector Tiles | Vector tiles | `VectorTileReader`, `MVT` |
 | OSM PBF extract | Local OSM extract | `OSMPBFReader` |
 | GeoParquet | Overture | not directly — see below |
@@ -1470,6 +1514,11 @@ those, so the readers are written here:
 Each is written to its published layout, and each test builds a real file byte by
 byte rather than checking a recorded blob, so a failure points at the reader
 rather than at something nobody can inspect.
+
+Natural Earth is the one of the four with a specific job — coastlines, borders,
+rivers and place names at a scale no live query will answer for. Where to get it
+and what to point at are under [A continent, or the whole
+world](#a-continent-or-the-whole-world).
 
 Three details cost the most to get right, and all three are silent when wrong:
 
