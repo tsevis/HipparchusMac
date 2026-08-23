@@ -313,7 +313,10 @@ final class OverpassProviderTests: XCTestCase {
     func testAnAbsurdlyLargeAreaIsRefusedOutright() {
         let planet = BoundingBox(minLon: -180, minLat: -85, maxLon: 180, maxLat: 85)
         XCTAssertTrue(FetchCost.isTooLargeToFetch(bbox: planet))
-        XCTAssertTrue(FetchCost.refusalMessage(bbox: planet).lowercased().contains("too large"))
+        let message = FetchCost.refusalMessage(bbox: planet).lowercased()
+        XCTAssertTrue(message.contains("too large"))
+        // Not only what is wrong: the source that can actually draw it.
+        XCTAssertTrue(message.contains("natural earth"), "should name the solution")
     }
 
     func testACountrySizedAreaIsNotRefusedOnlyWarned() {

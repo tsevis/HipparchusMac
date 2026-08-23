@@ -236,9 +236,11 @@ public enum FetchCost {
     }
 
     public static func refusalMessage(bbox: BoundingBox) -> String {
-        "This area is too large for OpenStreetMap to answer. Choose something "
-            + "no bigger than roughly \(Int(refuseAboveSquareDegrees.squareRoot()))° × "
-            + "\(Int(refuseAboveSquareDegrees.squareRoot()))°, or turn OpenStreetMap off "
-            + "and use Elevation or another source instead."
+        "This area is too large for OpenStreetMap to answer. Whole countries, "
+            + "continents and the world are drawn from Natural Earth, which is built "
+            + "for exactly this scale: turn OpenStreetMap off and tick Natural Earth. "
+            + "Or choose something no bigger than roughly "
+            + "\(Int(refuseAboveSquareDegrees.squareRoot()))° × "
+            + "\(Int(refuseAboveSquareDegrees.squareRoot()))°."
     }
 }
