@@ -476,3 +476,55 @@ func linspace(_ start: Double, _ end: Double, _ count: Int) -> [Double] {
     let step = (end - start) / Double(count - 1)
     return (0..<count).map { start + Double($0) * step }
 }
+
+/// What a continental frame is allowed to ask for.
+///
+/// The tile budget and the sampling width are two different limits and were
+/// being confused for one. `targetPixels` is a request — how finely to sample the
+/// ground — and `maxTiles` is a ceiling on what that request may cost. At 64 the
+/// ceiling sat below the request for any frame larger than a country, so a world
+/// sheet silently came back at half the detail it had asked for, with nothing
+/// said about it.
+final class SamplingReachTests: XCTestCase {
+
+    private let world = BoundingBox(minLon: -180, minLat: -85, maxLon: 180, maxLat: 85)
+    private let europe = BoundingBox(minLon: -25, minLat: 34, maxLon: 45, maxLat: 72)
+
+    /// The pixels across that a zoom actually delivers for a frame.
+    private func pixelsAcross(_ bounds: BoundingBox, zoom: Int) -> Double {
+        abs(bounds.lonSpan) / 360.0 * Double(1 << zoom) * Double(WebMercator.tilePixels)
+    }
+
+    func testAWorldFrameReachesTheSamplingItAsksFor() {
+        var settings = TerrainTileSettings()
+        settings.targetPixels = 4096
+        let zoom = chooseZoom(bounds: world, settings: settings)
+        XCTAssertEqual(zoom, 4)
+        XCTAssertEqual(pixelsAcross(world, zoom: zoom), 4096, accuracy: 1)
+    }
+
+    func testAContinentalFrameReachesItToo() {
+        var settings = TerrainTileSettings()
+        settings.targetPixels = 4096
+        let zoom = chooseZoom(bounds: europe, settings: settings)
+        XCTAssertGreaterThanOrEqual(pixelsAcross(europe, zoom: zoom), 2048)
+    }
+
+    /// The ceiling is still a ceiling: asking for a sampling no frame this size
+    /// can afford gets the finest one that fits, not an unbounded fetch.
+    func testTheCeilingStillHolds() {
+        var settings = TerrainTileSettings()
+        settings.targetPixels = 100_000
+        let zoom = chooseZoom(bounds: world, settings: settings)
+        let topLeft = WebMercator.tile(lon: world.minLon, lat: world.maxLat, zoom: zoom)
+        let bottomRight = WebMercator.tile(lon: world.maxLon, lat: world.minLat, zoom: zoom)
+        let tiles = (bottomRight.x - topLeft.x + 1) * (bottomRight.y - topLeft.y + 1)
+        XCTAssertLessThanOrEqual(tiles, TerrainTileSettings().maxTiles)
+    }
+
+    /// A city frame is unaffected: it was never near the ceiling.
+    func testASmallFrameIsUnchanged() {
+        let athens = BoundingBox(minLon: 23.70, minLat: 37.95, maxLon: 23.80, maxLat: 38.02)
+        XCTAssertEqual(chooseZoom(bounds: athens, settings: TerrainTileSettings()), 14)
+    }
+}

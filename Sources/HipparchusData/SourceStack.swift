@@ -237,6 +237,16 @@ public struct SourceStack: Sendable, Equatable {
                 // window and floods a large one.
                 SourceSetting("interval", "Interval", .number, .number(0), suffix: "m",
                               attribute: "contourIntervalMetres"),
+                // How finely to sample the ground, and the only knob that means
+                // anything on a continental frame: the default of 1200 is two
+                // metres a pixel over a city and thirty kilometres over the
+                // world. Named as the sea-temperature source names its own, and
+                // it costs the same thing — more samples, a longer fetch, and
+                // the contours to trace afterwards. See `maxTiles` for where it
+                // stops.
+                SourceSetting("samples", "Samples across", .number,
+                              .integer(TerrainTileSettings().targetPixels),
+                              attribute: "targetPixels"),
                 SourceSetting("bands", "Bands", .number, .integer(10),
                               attribute: "elevationBandCount"),
                 // Off by default: shading lands under the contours and changes

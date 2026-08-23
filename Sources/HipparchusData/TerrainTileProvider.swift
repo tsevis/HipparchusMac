@@ -64,7 +64,26 @@ public struct TerrainTileSettings: Sendable {
     /// Sampling width to aim for across the area. More pixels means finer
     /// contours and more tiles to fetch.
     public var targetPixels = 1200
-    public var maxTiles = 64
+    /// The ceiling on what a request may cost, not the request itself.
+    ///
+    /// 64 tiles is eight across, which is 2048 px of mosaic — plenty for a city
+    /// and, it turned out, a silent cap on everything larger. A world frame
+    /// asked to be sampled 4096 px across would come back at 2048 and say
+    /// nothing, because the budget ran out two zoom levels before
+    /// `targetPixels` did. 256 tiles is sixteen across, or 4096 px, and that is
+    /// where the ceiling belongs because it is where the machine gives out
+    /// rather than because it is a round number. Measured, on a world frame at
+    /// 4096 px: 62 s of fetching, 7 minutes in all, 107,000 features, and
+    /// **8.4 GB of peak resident memory**. The mosaic itself is only 134 MB of
+    /// that — 16.7 million cells at eight bytes — and the rest is the copies
+    /// taken through cropping, smoothing and banding, plus the traced geometry.
+    /// Past this an 8 GB machine would be swapping, so the answer is a smaller
+    /// frame rather than a bigger fetch.
+    ///
+    /// Nothing reaches this by accident. `targetPixels` still governs, and its
+    /// default of 1200 puts a world frame at zoom 2, nine seconds and a few
+    /// hundred megabytes.
+    public var maxTiles = 256
     /// The mosaic's own limit; asking beyond it returns nothing useful.
     public var maxZoom = 15
     public var timeoutSeconds: TimeInterval = 30.0

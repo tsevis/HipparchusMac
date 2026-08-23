@@ -25,7 +25,7 @@ fixture rather than by narrowing to one direction of truth.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->956<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->992<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -304,6 +304,7 @@ choices above were checked without a window to look at:
 | `--plugins <dir>` | load a style pack, so its presets and places can be named |
 | `--streets` | stack OpenStreetMap onto the elevation |
 | `--natural-earth <path>` | stack Natural Earth on top: coastlines, borders, rivers, place names |
+| `--pixels <n>` | how finely to sample the ground; the knob that matters on a large frame |
 | `--simulated` | a generated field, needing no network at all |
 
 ```sh
@@ -333,6 +334,9 @@ Europe is nine times over the Overpass ceiling. Both of those took under a
 minute at Clean Export — twenty seconds for Europe and forty for the planet —
 and the world is not much dearer than the continent because a world frame
 settles at zoom 2, where there is less to trace than Europe gets at zoom 4.
+
+Three things had to change before those sheets were worth printing, and each of
+them is invisible at any smaller size.
 
 **The projection.** Every projection here was written for a frame small enough
 that the Earth's curvature does not show: Web Mercator for previews, and for
@@ -405,6 +409,39 @@ and the layer classifier — which reads those same attributes — had been sort
 features by another feature's tags the whole time. It is the kind of bug that
 only shows against real data at a real scale: the synthetic fixture had two
 points and kept them both.
+
+**How finely the ground is sampled.** `targetPixels` is the request and
+`maxTiles` is the ceiling on what that request may cost, and the two were being
+confused for one: at 64 tiles the ceiling sat below the request for any frame
+larger than a country, so a world sheet asked to be sampled 4096 px across came
+back at 2048 and said nothing about it. The ceiling is now 256 tiles — 4096 px
+of mosaic — and it sits there because that is where the machine gives out, not
+because it is a round number.
+
+Nothing reaches it by accident: the default of 1200 px puts a world frame at
+zoom 2 and nine seconds. Asking for more is now possible from the sidebar as
+well as from `--pixels`, as **Samples across** under Elevation, named the way the
+sea-temperature source already names its own. It is worth knowing what it costs
+before turning it up. Over a world frame, measured on an M-series Mac:
+
+| Samples across | Zoom | Grid | Ground | Features | Time | Peak memory |
+|---|---|---|---|---|---|---|
+| 1200 (default) | 2 | 1024² | 33 km/px | 8,526 | 45 s | 1.4 GB |
+| 2048 | 3 | 2048² | 16 km/px | 28,148 | 2 min | 4.2 GB |
+| 4096 (the ceiling) | 4 | 4096² | 8 km/px | 107,447 | 7 min | **8.4 GB** |
+
+One world frame, Natural Earth and relief shading on, everything else equal, on
+an M-series Mac. The mosaic is only 134 MB of that last figure — 16.7 million
+cells at eight bytes — and the rest is the copies taken through cropping,
+smoothing and banding, plus the traced geometry. An 8 GB machine would be
+swapping, so the ceiling is where it is on purpose.
+
+**More samples is not the same as a better sheet.** At 4096 the contour interval
+is still 200 m, so what the extra resolution buys is 107,000 features tracing the
+same surfaces more finely — which on a screen-sized sheet reads as noise over
+every mountain range and flattens the hypsometric tints underneath it. It is
+worth turning up for a large-format print, where those lines resolve, and worth
+leaving alone otherwise. The default is the default for a reason.
 
 ## Sources are fetched together
 

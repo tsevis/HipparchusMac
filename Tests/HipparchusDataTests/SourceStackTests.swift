@@ -169,7 +169,7 @@ final class SourceStackTests: XCTestCase {
         let settings = SourceStack().settings(for: SourceID.terrainTiles)
         XCTAssertEqual(
             settings.map(\.key),
-            ["interval", "bands", "shading", "sun", "sunheight", "relief"]
+            ["interval", "samples", "bands", "shading", "sun", "sunheight", "relief"]
         )
         XCTAssertEqual(settings.first?.value, .number(0))
         // Shading is a choice about the drawing rather than a fact about the
@@ -315,5 +315,32 @@ final class SourceStackTests: XCTestCase {
 
         stack.setEnabled(SourceID.usgsEarthquakes, true)
         XCTAssertEqual(stack.summary, "OpenStreetMap, Elevation + Earthquakes")
+    }
+}
+
+/// The sampling knob, which only starts to matter once frames get large.
+extension SourceStackTests {
+
+    func testElevationOffersTheSamplingWidthAsASetting() throws {
+        let terrain = try XCTUnwrap(SourceStack().definition(SourceID.terrainTiles))
+        let samples = try XCTUnwrap(terrain.settings.first { $0.key == "samples" })
+        XCTAssertEqual(samples.label, "Samples across")
+        XCTAssertEqual(samples.target, "targetPixels")
+        XCTAssertEqual(
+            samples.value.intValue, TerrainTileSettings().targetPixels,
+            "the sidebar must open on the provider's own default, or ticking the "
+                + "source would silently change what it fetches"
+        )
+    }
+
+    /// Only a changed setting is passed on, so a sheet nobody touched fetches
+    /// exactly what it always did.
+    func testTheSamplingWidthReachesTheProviderOnlyWhenChanged() {
+        var stack = SourceStack()
+        XCTAssertNil(stack.providerOverrides(for: SourceID.terrainTiles)["targetPixels"])
+        stack.setSetting(SourceID.terrainTiles, "samples", .integer(4096))
+        XCTAssertEqual(
+            stack.providerOverrides(for: SourceID.terrainTiles)["targetPixels"]?.intValue, 4096
+        )
     }
 }

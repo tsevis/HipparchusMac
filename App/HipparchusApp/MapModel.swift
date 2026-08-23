@@ -1059,6 +1059,9 @@ final class MapModel {
                 if let bands = overrides["elevationBandCount"]?.intValue {
                     settings.elevationBandCount = bands
                 }
+                if let samples = overrides["targetPixels"]?.intValue, samples > 0 {
+                    settings.targetPixels = samples
+                }
                 // Only a setting the user actually changed arrives here, so the
                 // shading stays off until it is asked for by name.
                 settings.emitHillshade = overrides["emitHillshade"]?.stringValue == "on"
