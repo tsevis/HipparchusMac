@@ -95,8 +95,27 @@ targets:
         # provenance test carried an outer `try` around a call that does not
         # throw, which the compiler said so in both configurations. It is the
         # one thing a read-only review of both repositories found on this side.
-        MARKETING_VERSION: "0.4.7"
-        CURRENT_PROJECT_VERSION: "18"
+        # 0.4.8 is the first release that can draw anything larger than a
+        # country. The size refusal was always Overpass's rather than the
+        # app's, but nothing else was ready for a frame that size either.
+        # Every projection here was written for ground flat enough not to
+        # curve, so a continent came out with Greenland the area of Africa;
+        # Equal Earth is the fourth, and a frame now moves to it when the one
+        # it asked for has stopped telling the truth. Elevation could not be
+        # sampled past a tile ceiling that sat below what callers asked for,
+        # so a world sheet quietly came back at half the detail requested.
+        # Coastlines and borders had no source at all: Natural Earth was in
+        # the sidebar waiting for a file and had never been driven with one.
+        # Two older bugs fall out of having done so. A shapefile's attributes
+        # were indexed by how many features had been *kept* rather than by
+        # record, so a bbox query — which skips nearly every record in a
+        # world-wide file — put the wrong name on every feature that survived
+        # it, and sorted them into layers by another feature's tags. And a
+        # launch flag skipped the size refusal along with the size warning,
+        # which is how a headless continental frame spent five minutes asking
+        # Overpass for the one thing it exists to refuse.
+        MARKETING_VERSION: "0.4.8"
+        CURRENT_PROJECT_VERSION: "19"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
