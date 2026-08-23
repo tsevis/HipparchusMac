@@ -86,6 +86,15 @@ public enum ShapefileReader {
             .appendingPathExtension("dbf"))) ?? []
 
         var features: [Feature] = []
+        // Counted separately from `features`, and that distinction is the whole
+        // of a bug this had for as long as it could read a file. The `.dbf` is
+        // matched to the `.shp` **by position**, so the attributes belong to the
+        // record's place in the file — not to how many records have been kept.
+        // A bbox query skips nearly every record in a world-wide file, and
+        // indexing by the kept count handed each surviving feature the
+        // attributes of one near the start of the file instead of its own. A
+        // European frame came back with Agra and Albuquerque drawn in Europe.
+        var recordIndex = 0
         while reader.remaining >= 8 {
             _ = try reader.readInt32(bigEndian: true)  // record number, 1-based
             let contentWords = try reader.readInt32(bigEndian: true)
@@ -96,12 +105,14 @@ public enum ShapefileReader {
             let geometry = try? shape(&reader)
             try reader.seek(to: end)
 
+            let index = recordIndex
+            recordIndex += 1
+
             guard let geometry, !geometry.isEmpty else { continue }
             // Feature bounds against the query, not "any vertex inside": a country
             // outline crossing the frame may place no vertex in it.
             guard let bounds = geometry.bounds, bounds.intersects(bbox.bounds) else { continue }
 
-            let index = features.count
             let properties = index < attributes.count ? attributes[index] : [:]
             guard let layer = FileLayer.forProperties(
                 properties, providerID: providerID, geometry: geometry
@@ -110,7 +121,10 @@ public enum ShapefileReader {
             }
 
             features.append(Feature(
-                id: "\(providerID)/\(layer)/\(firstIndex + index)",
+                // The feature's own ordinal, not the record's: ids have to stay
+                // distinct across the several files a folder source reads, and
+                // each of those starts counting records from zero again.
+                id: "\(providerID)/\(layer)/\(firstIndex + features.count)",
                 layer: layer,
                 source: providerID,
                 geometry: geometry,

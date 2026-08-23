@@ -486,3 +486,66 @@ final class FileSourceTests: XCTestCase {
         XCTAssertTrue(plan.extras.contains(SourceID.naturalEarth))
     }
 }
+
+/// A shapefile's attributes are matched to its geometry **by position**, and a
+/// bbox query skips most of the positions.
+///
+/// The reader was indexing the `.dbf` by how many features it had *kept*, so the
+/// first record inside the frame took the first record's attributes in the file
+/// rather than its own. A whole-world Natural Earth file queried for one
+/// continent skips almost everything, which put the wrong name on every city on
+/// the sheet: a European frame came back labelled Agra, Albuquerque and the
+/// Amundsen–Scott South Pole Station, all of them drawn in Europe. Nothing
+/// failed, and nothing looked broken unless you knew where those places are.
+final class ShapefileAttributePairingTests: XCTestCase {
+
+    private var directory = FileManager.default.temporaryDirectory
+
+    override func setUpWithError() throws {
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hipparchus-pairing-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    func testASkippedRecordDoesNotShiftEveryNameAfterIt() throws {
+        // Three cities, in file order. Only the last two are in the frame.
+        let path = try ShapefileWriter.write(
+            to: directory.appendingPathComponent("ne_places.shp"),
+            points: [
+                (Coordinate(lon: -99.13, lat: 19.43), "Ciudad de Mexico"),
+                (Coordinate(lon: 23.73, lat: 37.98), "Athina"),
+                (Coordinate(lon: 23.80, lat: 38.05), "Acharnes"),
+            ]
+        )
+        let features = try ShapefileReader.features(
+            at: path,
+            bbox: BoundingBox(minLon: 23.5, minLat: 37.8, maxLon: 24.0, maxLat: 38.2),
+            providerID: SourceID.naturalEarth
+        )
+        XCTAssertEqual(features.count, 2)
+        XCTAssertEqual(features.map { $0.property("NAME")?.stringValue }, ["Athina", "Acharnes"])
+    }
+
+    /// Ids stay unique across the run even though the attribute index no longer
+    /// counts features — the two were the same number before, and are not now.
+    func testIdsStayDistinct() throws {
+        let path = try ShapefileWriter.write(
+            to: directory.appendingPathComponent("ne_places.shp"),
+            points: [
+                (Coordinate(lon: -99.13, lat: 19.43), "Ciudad de Mexico"),
+                (Coordinate(lon: 23.73, lat: 37.98), "Athina"),
+                (Coordinate(lon: 23.80, lat: 38.05), "Acharnes"),
+            ]
+        )
+        let features = try ShapefileReader.features(
+            at: path,
+            bbox: BoundingBox(minLon: 23.5, minLat: 37.8, maxLon: 24.0, maxLat: 38.2),
+            providerID: SourceID.naturalEarth
+        )
+        XCTAssertEqual(Set(features.map(\.id)).count, features.count)
+    }
+}
