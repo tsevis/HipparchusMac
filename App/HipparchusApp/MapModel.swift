@@ -889,21 +889,36 @@ final class MapModel {
     /// Kickoff detail 13: a 0.32° area with every OpenStreetMap layer took 331 s, of
     /// which 325 s was Overpass. A five-minute wait nobody agreed to reads as a
     /// hang.
-    func update() {
+    /// Why this area cannot be fetched at all, or nil if it can.
+    ///
+    /// Split out of `update()` because the two checks there are different in
+    /// kind, and only one of them survives having nobody to ask. This one is a
+    /// statement — the area is not an area, or OpenStreetMap will not answer for
+    /// something this size — and it holds whoever is asking and however. The
+    /// warning below it is a question, and a question needs someone to answer.
+    ///
+    /// Refused rather than warned about: a locator that can be panned to the
+    /// whole world makes it an easy accident to ask for the entire planet, and a
+    /// warning that can be clicked through is not enough for that.
+    var refusal: String? {
         guard let bbox else {
+            return "Those coordinates do not make an area. West must be less than east, south less than north."
+        }
+        guard stack.isEnabled(SourceID.overpass), FetchCost.isTooLargeToFetch(bbox: bbox) else {
+            return nil
+        }
+        return FetchCost.refusalMessage(bbox: bbox)
+    }
+
+    func update() {
+        if let refusal {
             isError = true
-            status = "Those coordinates do not make an area. West must be less than east, south less than north."
+            status = refusal
             return
         }
-        if stack.isEnabled(SourceID.overpass), FetchCost.isTooLargeToFetch(bbox: bbox) {
-            // Refused, not warned about: a locator that can be panned to the
-            // whole world makes it an easy accident to ask for the entire
-            // planet, and a warning that can be clicked through is not enough
-            // for that.
-            isError = true
-            status = FetchCost.refusalMessage(bbox: bbox)
-            return
-        }
+        // `refusal` has already answered for a missing area; this is the unwrap,
+        // not a second opinion.
+        guard let bbox else { return }
         if stack.isEnabled(SourceID.overpass),
            FetchCost.shouldWarn(bbox: bbox, layers: []),
            pendingWarning == nil {
@@ -1229,9 +1244,20 @@ final class MapModel {
         // Tick extra sources on launch, so the composition can be checked from a
         // terminal: `--sources terrain_tiles` must *add* contours to the streets
         // rather than replace them.
+        //
+        // A leading `-` unticks instead — `--sources -overpass`. Adding was the
+        // only thing this could do, which left the refusal above giving advice a
+        // headless run could read and not follow: turning OpenStreetMap off is
+        // exactly what a continental sheet needs, and there was no way to say it
+        // without a sidebar to click.
         if let flag = arguments.firstIndex(of: "--sources"), flag + 1 < arguments.count {
-            for id in arguments[flag + 1].split(separator: ",") {
-                stack.setEnabled(String(id).trimmingCharacters(in: .whitespaces), true)
+            for entry in arguments[flag + 1].split(separator: ",") {
+                let name = entry.trimmingCharacters(in: .whitespaces)
+                if name.hasPrefix("-") {
+                    stack.setEnabled(String(name.dropFirst()), false)
+                } else {
+                    stack.setEnabled(name, true)
+                }
             }
         }
         if let flag = arguments.firstIndex(of: "--rotate"), flag + 1 < arguments.count {
@@ -1411,15 +1437,40 @@ final class MapModel {
             // No area asked for and nothing to render: open on the restored session
             // and wait to be told what to do.
             if arguments.contains("--bbox") {
-                // An area on the command line is an explicit instruction, so it
-                // skips the size warning.
-                fetch()
+                fetchAsLaunched()
             }
             return
         }
 
-        fetch()
+        // Said now rather than in five minutes' time: with nothing to fetch there
+        // is nothing to wait for, and `renderWhenReady` would wait anyway.
+        guard fetchAsLaunched() else { exit(1) }
         renderWhenReady(to: URL(fileURLWithPath: arguments[flag + 1]))
+    }
+
+    /// Fetch on the strength of a launch flag, honouring the guard the button
+    /// honours.
+    ///
+    /// An area on the command line is an explicit instruction, so it has always
+    /// skipped the size *warning* — that one is a question, and there is nobody
+    /// here to answer it. Skipping the *refusal* with it was a bug. A continental
+    /// frame launched with OpenStreetMap still ticked went to Overpass asking for
+    /// a few thousand square degrees, which is the one request `FetchCost` exists
+    /// to prevent, and then sat there until `renderWhenReady` gave up: 315
+    /// seconds, of which 2.7 were spent doing anything at all.
+    @discardableResult
+    private func fetchAsLaunched() -> Bool {
+        if let refusal {
+            isError = true
+            status = refusal
+            // To stderr as well as to the status line, because on this path the
+            // status line is not on screen and nobody is reading it.
+            FileHandle.standardError.write(Data("\(refusal)\n".utf8))
+            return false
+        }
+        pendingWarning = nil
+        fetch()
+        return true
     }
 
     /// Prove that a file chosen once is still readable after a relaunch.

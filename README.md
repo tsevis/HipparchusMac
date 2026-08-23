@@ -721,6 +721,22 @@ It prints what it measured and writes the PNG into the app's container
 app is sandboxed and may only write where it has been pointed. With no arguments
 it opens on the session it last saved.
 
+`--sources` adds to the restored session rather than replacing it, and a leading
+`-` takes one away, which is what a continental sheet needs:
+
+```bash
+Hipparchus.app/Contents/MacOS/Hipparchus --bbox -25,34,45,72 --sources -overpass,terrain_tiles --render-to europe.png
+```
+
+Without that, this path had no way to do the one thing the size refusal asks
+for, and no way to hear the refusal either: a launch flag skipped the size
+checks entirely, so a continental frame with OpenStreetMap still ticked went
+to Overpass for a few thousand square degrees and sat there until the render
+timeout gave up — 315 seconds, of which 2.7 were spent doing anything. The
+*warning* is still skipped, and should be: it is a question, and there is nobody
+here to answer it. The refusal is not a question. It now answers in under two
+seconds, and says which of the two problems it is.
+
 This exercises the path the window uses — the source stack, the manager, the
 scene builder and the renderer. It does **not** check the SwiftUI layout; the
 layout tests below do some of that, and the rest still needs a person looking.
