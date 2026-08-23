@@ -82,6 +82,17 @@ public enum ProjectionMode: String, Sendable, CaseIterable {
     /// Equirectangular scaled by the cosine of the frame's own latitude, so a
     /// city-sized frame has no visible distortion at all.
     case localAzimuthal = "local_azimuthal"
+    /// Equal area at every latitude, poles drawn as lines. The one mode here
+    /// with no frame size at which it stops working, and the only one a
+    /// continent or a world should be drawn in. See `EqualEarth`.
+    case equalEarth = "equal_earth"
+
+    /// Whether a straight line in degrees stays straight on the sheet.
+    ///
+    /// False for the three modes that map longitude and latitude onto x and y
+    /// independently, true for `equalEarth`, whose meridians converge. What
+    /// depends on it is whether geometry has to be densified before projecting.
+    public var bendsMeridians: Bool { self == .equalEarth }
 
     /// Unknown names fall back to Web Mercator rather than failing a render.
     public init(name: String) {
@@ -116,6 +127,7 @@ public struct ProjectionProfile: Sendable, Equatable {
         case .wgs84Raw: return "EPSG:4326"
         case .webMercator: return "EPSG:3857"
         case .localAzimuthal: return "LOCAL_AZIMUTHAL_EQUIRECTANGULAR"
+        case .equalEarth: return "EQUAL_EARTH"
         }
     }
 
@@ -133,6 +145,12 @@ public struct ProjectionProfile: Sendable, Equatable {
             let x = (coordinate.lon - centerLon) * scale * .pi / 180.0 * WebMercator.earthRadiusMetres
             let y = (coordinate.lat - centerLat) * .pi / 180.0 * WebMercator.earthRadiusMetres
             return Coordinate(x: x, y: y)
+        case .equalEarth:
+            let point = EqualEarth.project(
+                lon: coordinate.lon, lat: coordinate.lat,
+                centralMeridian: centerLon, radius: WebMercator.earthRadiusMetres
+            )
+            return Coordinate(x: point.x, y: point.y)
         }
     }
 
@@ -149,23 +167,44 @@ public struct ProjectionProfile: Sendable, Equatable {
             let lon = point.x / (WebMercator.earthRadiusMetres * scale) * 180.0 / .pi + centerLon
             let lat = point.y / WebMercator.earthRadiusMetres * 180.0 / .pi + centerLat
             return Coordinate(lon: lon, lat: lat)
+        case .equalEarth:
+            let coordinate = EqualEarth.unproject(
+                x: point.x, y: point.y,
+                centralMeridian: centerLon, radius: WebMercator.earthRadiusMetres
+            )
+            return Coordinate(lon: coordinate.lon, lat: coordinate.lat)
         }
     }
 
     public func project(_ geometry: Geometry) -> Geometry {
-        geometry.mapCoordinates(project)
+        // A straight run in degrees is a curve on an Equal Earth sheet, and a
+        // projection applied vertex by vertex cannot know that. See `Densify`
+        // for the rectangle that appeared over the Pacific without this.
+        guard mode.bendsMeridians else { return geometry.mapCoordinates(project) }
+        return geometry.densified().mapCoordinates(project)
     }
 
     public func project(_ bbox: BoundingBox) -> Bounds {
-        // All four corners, not just two: the projection is not axis-preserving
-        // in every mode, and a min/max of the corners is what actually bounds it.
-        let corners = [
-            Coordinate(lon: bbox.minLon, lat: bbox.minLat),
-            Coordinate(lon: bbox.maxLon, lat: bbox.minLat),
-            Coordinate(lon: bbox.maxLon, lat: bbox.maxLat),
-            Coordinate(lon: bbox.minLon, lat: bbox.maxLat),
-        ].map(project)
-        return Bounds(corners)!
+        // The whole outline, not just the corners. Corners alone were enough
+        // while every mode here mapped longitude to x and latitude to y
+        // independently; `equalEarth` bends the meridians, so a world frame is
+        // at its widest on the equator — *between* two corners, not at either
+        // of them. Bounding it by the corners cropped the equator off the sheet.
+        //
+        // Sixteen steps a side is far more than the curve needs and costs
+        // nothing: this runs once per render, not once per feature.
+        let steps = 16
+        var outline: [Coordinate] = []
+        for step in 0...steps {
+            let fraction = Double(step) / Double(steps)
+            let lon = bbox.minLon + (bbox.maxLon - bbox.minLon) * fraction
+            let lat = bbox.minLat + (bbox.maxLat - bbox.minLat) * fraction
+            outline.append(Coordinate(lon: lon, lat: bbox.minLat))
+            outline.append(Coordinate(lon: lon, lat: bbox.maxLat))
+            outline.append(Coordinate(lon: bbox.minLon, lat: lat))
+            outline.append(Coordinate(lon: bbox.maxLon, lat: lat))
+        }
+        return Bounds(outline.map(project))!
     }
 
     /// What goes into the scene metadata and the exported diagnostics.

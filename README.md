@@ -316,6 +316,52 @@ Keep a `--streets` area small: a window of 0.04° × 0.03° over San Francisco
 returns 29,000 features in about half a minute, and Overpass is shared hardware
 run on donations.
 
+## A continent, or the whole world
+
+The size limit above is Overpass's, not the app's, and it is worth being exact
+about which: `FetchCost` is consulted only when OpenStreetMap is actually
+ticked. **Untick it and every limit on frame size goes with it.** Elevation is
+tiles, and tiles go all the way out to zoom 0.
+
+```sh
+swift run -c release hipparchus-cli --bbox -25,34,45,72 --hillshade --quality export_clean
+swift run -c release hipparchus-cli --bbox -180,-89,180,89 --hillshade --quality export_clean
+```
+
+Europe is nine times over the Overpass ceiling. Both of those took under a
+minute at Clean Export — twenty seconds for Europe and forty for the planet —
+and the world is not much dearer than the continent because a world frame
+settles at zoom 2, where there is less to trace than Europe gets at zoom 4.
+
+**The projection.** Every projection here was written for a frame small enough
+that the Earth's curvature does not show: Web Mercator for previews, and for
+exports an equirectangular scaled by the cosine of the frame's own latitude,
+which is exact at the centre and near enough a few degrees either side. Neither
+survives a continent — Mercator gives Greenland the area of Africa, and the
+local scaling stretches the top of the frame by the ratio of two cosines. So
+there is now a fourth, **Equal Earth** (Šavrič, Patterson and Jenny, 2018): equal
+area exactly, poles drawn as lines, and no frame size at which it stops working.
+
+Nothing asks for it. `ProjectionMode.honest(for:)` reads the frame and moves it
+there when the projection it was given has stopped telling the truth — measured
+as the ratio between the cosine at the frame's centre and the cosine at its
+furthest edge, with the line at 12%. Santorini is 0.2% and Greece 5%, so an
+island and a small country keep the projection written for them; France is 8.6%
+and keeps it too. Europe is 49%, the contiguous United States 18%, the world
+91%. It applies to previews as well as exports, because a preview that cannot be
+trusted to show the shape of the exported sheet is not a preview.
+
+Equal Earth bends the meridians, and that broke something no earlier projection
+could: a projection is applied vertex by vertex, and everything between two
+vertices is drawn straight. The hillshade lays down a quadrilateral over the
+whole grid — four vertices, one per corner — and the first world sheet drew it
+as a hard-edged rectangle sitting over the middle of the Pacific while
+everything with real detail in it curved correctly around it. `Densify` splits
+any run longer than a degree before projecting; `Bounds` are now taken from the
+whole outline rather than the four corners, because a world frame is at its
+widest on the equator, *between* two corners, and bounding it by the corners
+cropped the equator off the sheet.
+
 ## Sources are fetched together
 
 Every ticked source is fetched **concurrently**. They used to run one after

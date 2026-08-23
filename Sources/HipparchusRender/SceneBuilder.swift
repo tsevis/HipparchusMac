@@ -126,7 +126,14 @@ public struct SceneBuilder: Sendable {
         let geometryProfile = options.preset.geometryProfile
         let styleProfile = options.preset.styleProfile
 
-        let projection = ProjectionProfile(bbox: collection.bbox, mode: quality.projectionMode)
+        // The quality profile asks for a projection; the frame decides whether it
+        // can have it. Every profile here names one written for a small frame,
+        // because until there were continental sheets there were no others.
+        // See `ProjectionMode.honest(for:)`.
+        let projection = ProjectionProfile(
+            bbox: collection.bbox,
+            mode: quality.projectionMode.honest(for: collection.bbox)
+        )
         let geos = GEOSContext()
 
         let tolerance = geometryProfile.simplifyTolerance(for: quality)
