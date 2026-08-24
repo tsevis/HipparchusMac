@@ -347,6 +347,11 @@ final class MapModel {
     /// Shown before a fetch that will take minutes rather than seconds.
     var pendingWarning: String?
 
+    /// A refusal the app can undo on the reader's behalf, raised as a question
+    /// rather than printed as a verdict. Nil when the refusal has no fix — bad
+    /// coordinates are still just wrong.
+    var pendingRefusal: String?
+
     // MARK: - Export composition
 
     /// Page and furniture for the SVG export. Transient and all off by default,
@@ -919,10 +924,43 @@ final class MapModel {
         return FetchCost.refusalMessage(bbox: bbox)
     }
 
+    /// Whether the size refusal has a source that *can* draw this area.
+    ///
+    /// **An error that names the fix should carry it out.** This one used to end
+    /// "turn OpenStreetMap off and tick Natural Earth" — a correct instruction
+    /// that still left the reader to go and do it in another panel, having been
+    /// told no. Natural Earth is the source built for exactly this scale, the
+    /// app already knows that, and `useNaturalEarthInstead()` is that sentence
+    /// with the work done.
+    ///
+    /// False when Natural Earth is not installed: offering a button that cannot
+    /// work would be worse than the instruction it replaced.
+    var canDrawWithNaturalEarth: Bool {
+        guard let bbox else { return false }
+        return stack.isEnabled(SourceID.overpass)
+            && FetchCost.isTooLargeToFetch(bbox: bbox)
+            && stack.isAvailable(SourceID.naturalEarth)
+    }
+
+    /// Turn OpenStreetMap off, tick Natural Earth, and draw the thing that was
+    /// asked for.
+    func useNaturalEarthInstead() {
+        pendingRefusal = nil
+        stack.setEnabled(SourceID.overpass, false)
+        stack.setEnabled(SourceID.naturalEarth, true)
+        isError = false
+        update()
+    }
+
     func update() {
         if let refusal {
             isError = true
             status = refusal
+            // A refusal with a way out is a question, and a question needs
+            // asking rather than printing into the status bar. Not in a batch
+            // run: there is nobody there to answer it, which is the whole
+            // reason `fetchAsLaunched` writes the refusal to stderr instead.
+            if canDrawWithNaturalEarth, !isBatchRun { pendingRefusal = refusal }
             return
         }
         // `refusal` has already answered for a missing area; this is the unwrap,
@@ -935,6 +973,7 @@ final class MapModel {
             return
         }
         pendingWarning = nil
+        pendingRefusal = nil
         fetch()
     }
 

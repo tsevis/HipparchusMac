@@ -110,6 +110,20 @@ struct ContentView: View {
         } message: {
             Text(model.pendingWarning ?? "")
         }
+        // The refusal, with the way out attached. The button does what the
+        // message used to tell the reader to go and do by hand.
+        .alert(
+            "Too large for OpenStreetMap",
+            isPresented: Binding(
+                get: { model.pendingRefusal != nil },
+                set: { if !$0 { model.pendingRefusal = nil } }
+            )
+        ) {
+            Button("Draw with Natural Earth") { model.useNaturalEarthInstead() }
+            Button("Cancel", role: .cancel) { model.pendingRefusal = nil }
+        } message: {
+            Text(model.pendingRefusal ?? "")
+        }
     }
 
     // MARK: - The map
