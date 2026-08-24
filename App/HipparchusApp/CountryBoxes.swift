@@ -82,10 +82,16 @@ enum CountryBoxes {
         // The island, not the Republic. Natural Earth files the north as its own
         // admin_0 entity, so the generated box stopped at 34.1°E / 35.19°N and
         // cut the Karpas peninsula off entirely — picking Cyprus from the menu
-        // framed two thirds of an island. This is the union of the two entries
-        // below and above the Green Line; "N. Cyprus" stays in the list for
+        // framed two thirds of an island. "N. Cyprus" stays in the list for
         // anyone who wants that frame on its own.
-        ("Cyprus", "Asia", BoundingBox(minLon: 32.27, minLat: 34.63, maxLon: 34.59, maxLat: 35.69)),
+        //
+        // Three sides are the union of those two entries. The south is not:
+        // Natural Earth files Akrotiri and Dhekelia as Sovereign Base Areas,
+        // which this table's generator drops along with every other
+        // non-sovereign entity, so no entry here reaches the island's real
+        // southern tip. 34.56° is Cape Gata, on the Akrotiri peninsula —
+        // without it the coast runs off the bottom of the frame.
+        ("Cyprus", "Asia", BoundingBox(minLon: 32.27, minLat: 34.56, maxLon: 34.59, maxLat: 35.69)),
         ("Georgia", "Asia", BoundingBox(minLon: 39.99, minLat: 41.04, maxLon: 46.69, maxLat: 43.58)),
         ("Hong Kong", "Asia", BoundingBox(minLon: 113.84, minLat: 22.18, maxLon: 114.4, maxLat: 22.56)),
         ("India", "Asia", BoundingBox(minLon: 68.14, minLat: 6.75, maxLon: 97.36, maxLat: 35.5)),
