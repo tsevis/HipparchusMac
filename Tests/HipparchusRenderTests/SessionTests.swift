@@ -81,6 +81,21 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(restored.projectionKey, "", "no projection written means the frame still chooses")
     }
 
+    /// A sheet fitted to the map is a standing preference too.
+    func testEdgeToEdgeSurvivesTheRoundTrip() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+
+        XCTAssertFalse(Session().edgeToEdge, "a sheet is a sheet unless asked otherwise")
+        var session = Session()
+        session.edgeToEdge = true
+        try session.write(to: url)
+        XCTAssertTrue(Session.read(from: url).edgeToEdge)
+    }
+
     /// A rectangle asked for once should still be a rectangle next launch:
     /// the projection is a standing preference, not a property of one render.
     func testAForcedProjectionSurvivesTheRoundTrip() throws {

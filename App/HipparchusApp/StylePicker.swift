@@ -121,6 +121,16 @@ struct StylePicker: View {
             stretching the high latitudes. Takes effect on the next Render map.
             """)
 
+            Toggle("Edge to edge", isOn: $model.edgeToEdge)
+                .toggleStyle(.checkbox)
+                .help("""
+                Give the exported sheet the map's own proportions and let the \
+                map run right to its edges. Off, the map is centred on a fixed \
+                sheet — which is what you want for paper, and what leaves a \
+                black bar above and below a wide map like a rectangular world. \
+                Affects the exported file, not the window.
+                """)
+
             ValueSlider(
                 title: "Line weight",
                 value: $model.lineWeight,

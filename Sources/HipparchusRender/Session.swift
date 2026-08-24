@@ -80,6 +80,9 @@ public struct Session: Codable, Sendable, Equatable {
     /// honest choice the frame makes on its own. Remembered because someone who
     /// wants the world as a rectangle wants it that way next launch too.
     public var projectionKey: String
+    /// Whether an exported sheet takes the map's own proportions and lets the
+    /// map bleed to its edges, rather than centring it on a fixed one.
+    public var edgeToEdge: Bool
     public var hiddenLayers: [String]
 
     /// Decoded field by field with a default for anything absent, so a file from
@@ -107,6 +110,8 @@ public struct Session: Codable, Sendable, Equatable {
         self.qualityKey = try container.decodeIfPresent(String.self, forKey: .qualityKey) ?? defaults.qualityKey
         self.projectionKey = try container
             .decodeIfPresent(String.self, forKey: .projectionKey) ?? defaults.projectionKey
+        self.edgeToEdge = try container
+            .decodeIfPresent(Bool.self, forKey: .edgeToEdge) ?? defaults.edgeToEdge
         self.hiddenLayers = try container.decodeIfPresent([String].self, forKey: .hiddenLayers) ?? []
     }
 
@@ -130,6 +135,7 @@ public struct Session: Codable, Sendable, Equatable {
         reliefOverBuildings: Bool = false,
         qualityKey: String = Quality.default.key,
         projectionKey: String = "",
+        edgeToEdge: Bool = false,
         hiddenLayers: [String] = [],
     ) {
         self.area = area
@@ -145,6 +151,7 @@ public struct Session: Codable, Sendable, Equatable {
         self.reliefOverBuildings = reliefOverBuildings
         self.qualityKey = qualityKey
         self.projectionKey = projectionKey
+        self.edgeToEdge = edgeToEdge
         self.hiddenLayers = hiddenLayers
     }
 
@@ -158,6 +165,7 @@ public struct Session: Codable, Sendable, Equatable {
         reliefOverBuildings: Bool = false,
         quality: String,
         projection: String = "",
+        edgeToEdge: Bool = false,
         hiddenLayers: [String]
     ) {
         var paths: [String: String] = [:]
@@ -198,6 +206,7 @@ public struct Session: Codable, Sendable, Equatable {
             reliefOverBuildings: reliefOverBuildings,
             qualityKey: quality,
             projectionKey: projection,
+            edgeToEdge: edgeToEdge,
             hiddenLayers: hiddenLayers,
         )
     }

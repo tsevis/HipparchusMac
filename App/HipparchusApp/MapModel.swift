@@ -568,6 +568,7 @@ final class MapModel {
             reliefOverBuildings: reliefOverBuildings,
             quality: quality.key,
             projection: projection?.rawValue ?? "",
+            edgeToEdge: edgeToEdge,
             hiddenLayers: hiddenLayers.sorted()
         )
     }
@@ -654,6 +655,7 @@ final class MapModel {
         // been renamed — reads as the automatic choice rather than throwing the
         // session away.
         projection = ProjectionMode(rawValue: session.projectionKey)
+        edgeToEdge = session.edgeToEdge
         hiddenLayers = Set(session.hiddenLayers)
         placeName = session.placeName
         west = String(session.area.west)
@@ -697,6 +699,7 @@ final class MapModel {
         // been renamed — reads as the automatic choice rather than throwing the
         // session away.
         projection = ProjectionMode(rawValue: session.projectionKey)
+        edgeToEdge = session.edgeToEdge
         hiddenLayers = Set(session.hiddenLayers)
         placeName = session.placeName
         west = String(session.area.west)
@@ -2159,8 +2162,34 @@ final class MapModel {
     /// PNG export was hardcoded to before there were page controls at all.
     static let canvasExportPixels = (width: 2400, height: 1800)
 
-    func exportPNG() {
+    /// Whether an exported sheet takes the map's own proportions and lets the
+    /// map bleed to its edges.
+    ///
+    /// **The bars are not margin, they are sheet the map never reaches.** A
+    /// rectangular whole earth is 2:1 and the export canvas is 4:3, so it was
+    /// centred with black above and below that no margin setting could remove.
+    /// Off by default: a sheet is usually a sheet, and someone printing to A3
+    /// wants A3.
+    var edgeToEdge = false {
+        didSet {
+            guard oldValue != edgeToEdge else { return }
+            record()
+        }
+    }
+
+    /// The export canvas, given the map's shape when it is asked to fill it.
+    private func exportCanvas() -> (width: Int, height: Int) {
         let canvas = Self.canvasExportPixels
+        guard edgeToEdge, let scene = visibleScene else { return canvas }
+        let fitted = CanvasTransform.sheet(
+            fitting: scene.contentBounds,
+            into: CGSize(width: canvas.width, height: canvas.height)
+        )
+        return (width: Int(fitted.width.rounded()), height: Int(fitted.height.rounded()))
+    }
+
+    func exportPNG() {
+        let canvas = exportCanvas()
         let size = page.pixelSize(canvasWidth: canvas.width, canvasHeight: canvas.height)
         let cost = page.bitmapCost(canvasWidth: canvas.width, canvasHeight: canvas.height)
         guard !page.exceedsBitmapLimit(canvasWidth: canvas.width, canvasHeight: canvas.height) else {
@@ -2174,7 +2203,8 @@ final class MapModel {
         }
         export(type: .png, extension: "png") { scene, url in
             guard let image = CoreGraphicsRenderer().image(
-                of: scene, size: CGSize(width: size.width, height: size.height)
+                of: scene, size: CGSize(width: size.width, height: size.height),
+                margin: self.edgeToEdge ? 0 : nil
             ) else {
                 // Reached when the allocation fails under the limit rather than
                 // over it, so it says what was asked for instead of "could not

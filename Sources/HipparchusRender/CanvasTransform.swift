@@ -33,12 +33,47 @@ public struct CanvasTransform: Sendable, Equatable {
         max(16.0, min(width, height) * 0.06)
     }
 
-    public init?(contentBounds: Bounds?, size: CGSize, viewport: ViewportState = ViewportState()) {
+    /// A sheet with the map's own proportions, keeping the long edge.
+    ///
+    /// **Letterboxing is a sheet that disagrees with its map.** A whole earth
+    /// drawn as a rectangle is 2:1, and putting it on the fixed 4:3 canvas left
+    /// a black bar above and below that no margin setting could remove — the
+    /// space is not padding, it is the part of the sheet the map does not
+    /// reach. Sizing the sheet from the content is the only thing that removes
+    /// it; the margin then decides whether the map bleeds or breathes.
+    ///
+    /// Returns the size unchanged when the content has no usable extent, so a
+    /// caller can apply this without checking first.
+    public static func sheet(fitting contentBounds: Bounds?, into size: CGSize) -> CGSize {
+        guard let bounds = contentBounds else { return size }
+        let spanX = max(bounds.width, 1e-9)
+        let spanY = max(bounds.height, 1e-9)
+        let aspect = spanX / spanY
+        guard aspect.isFinite, aspect > 0 else { return size }
+
+        // Keep the longer edge of the sheet asked for, so a request for "about
+        // this big" stays about that big whichever way the map is turned.
+        let longest = max(size.width, size.height)
+        return aspect >= 1
+            ? CGSize(width: longest, height: (longest / aspect).rounded())
+            : CGSize(width: (longest * aspect).rounded(), height: longest)
+    }
+
+    /// - Parameter margin: points of breathing room, or nil for the usual 6%.
+    ///   Pass `0` to bleed the map to the edges of the sheet, which is only
+    ///   worth asking for when the sheet already has the map's own shape —
+    ///   otherwise the space reappears as letterboxing on the long side.
+    public init?(
+        contentBounds: Bounds?,
+        size: CGSize,
+        viewport: ViewportState = ViewportState(),
+        margin explicitMargin: Double? = nil
+    ) {
         guard let bounds = contentBounds, size.width > 0, size.height > 0 else { return nil }
 
         let spanX = max(bounds.width, 1e-9)
         let spanY = max(bounds.height, 1e-9)
-        let margin = Self.margin(width: size.width, height: size.height)
+        let margin = explicitMargin ?? Self.margin(width: size.width, height: size.height)
         let availableWidth = max(1.0, size.width - 2.0 * margin)
         let availableHeight = max(1.0, size.height - 2.0 * margin)
 

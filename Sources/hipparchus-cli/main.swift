@@ -102,6 +102,9 @@ func usage() -> Never {
       --paper <name>     sheet for every export: \(PaperSize.names.joined(separator: ", "))
       --dpi <n>          resolution for the raster and the SVG viewport
       --line-weight <x>  multiply every stroke (default: 1)
+      --edge-to-edge     give the sheet the map's own proportions and let the
+                         map bleed to its edges, instead of centring it on a
+                         fixed 4:3 canvas with bars above and below
       --palette <name>   recolour the preset without restyling it
       --list-palettes    print the palette names and exit
       --portrait         turn the sheet (default: landscape)
@@ -139,6 +142,7 @@ struct Options {
     var shadeBands = TerrainTileSettings().hillshadeBandCount
     var naturalEarth: URL?
     var projection: ProjectionMode?
+    var edgeToEdge = false
 }
 
 /// Style packs, loaded before anything else is parsed.
@@ -221,6 +225,8 @@ while argumentIndex < arguments.count {
             exit(2)
         }
         options.palette = found
+    case "--edge-to-edge", "--bleed":
+        options.edgeToEdge = true
     case "--projection":
         argumentIndex += 1
         guard argumentIndex < arguments.count else { usage() }
@@ -520,15 +526,26 @@ func run(_ place: Place, options: Options) async throws {
 
     // Canvas keeps the 1600 × 1200 these runs have always written; a named sheet
     // is inches × dpi, and is the same sheet in all three formats below.
-    let raster = options.page.pixelSize(canvasWidth: 1600, canvasHeight: 1200)
-    let cost = options.page.bitmapCost(canvasWidth: 1600, canvasHeight: 1200)
-    if options.page.exceedsBitmapLimit(canvasWidth: 1600, canvasHeight: 1200) {
+    //
+    // Unless the map is asked to fill the sheet, in which case the sheet takes
+    // the map's own proportions: a 2:1 world on a 4:3 canvas is letterboxed, and
+    // that black bar is sheet the map never reaches rather than margin.
+    let defaultCanvas = CGSize(width: 1600, height: 1200)
+    let canvas = options.edgeToEdge
+        ? CanvasTransform.sheet(fitting: scene.contentBounds, into: defaultCanvas)
+        : defaultCanvas
+    let bleed: Double? = options.edgeToEdge ? 0 : nil
+    let canvasWidth = Int(canvas.width.rounded()), canvasHeight = Int(canvas.height.rounded())
+
+    let raster = options.page.pixelSize(canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    let cost = options.page.bitmapCost(canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    if options.page.exceedsBitmapLimit(canvasWidth: canvasWidth, canvasHeight: canvasHeight) {
         print(String(format: "  skipping PNG: %d x %d is %.0f MP (%.1f GB)",
                      raster.width, raster.height, cost.megapixels, cost.megabytes / 1000.0))
     } else {
         let started = ContinuousClock.now
         if let image = CoreGraphicsRenderer().image(
-            of: scene, size: CGSize(width: raster.width, height: raster.height)
+            of: scene, size: CGSize(width: raster.width, height: raster.height), margin: bleed
         ) {
             try writePNG(image, to: base.appendingPathExtension("png"))
             if cost.megapixels > 8 {
@@ -543,6 +560,14 @@ func run(_ place: Place, options: Options) async throws {
     }
     var svgOptions = SVGExporter.Options()
     svgOptions.precision = options.quality.svgPrecision
+    if options.edgeToEdge {
+        let fitted = CanvasTransform.sheet(
+            fitting: scene.contentBounds,
+            into: CGSize(width: svgOptions.width, height: svgOptions.height)
+        )
+        svgOptions.width = Int(fitted.width)
+        svgOptions.height = Int(fitted.height)
+    }
     let svgSize = options.page.pixelSize(canvasWidth: svgOptions.width, canvasHeight: svgOptions.height)
     svgOptions.width = svgSize.width
     svgOptions.height = svgSize.height
@@ -567,7 +592,7 @@ func run(_ place: Place, options: Options) async throws {
     }
     let diagnostics = try SVGExporter(options: svgOptions).write(scene, to: base.appendingPathExtension("svg"))
     var pdfOptions = PDFExporter.Options()
-    let points = options.page.pointSize(canvasWidth: 1600, canvasHeight: 1200)
+    let points = options.page.pointSize(canvasWidth: canvasWidth, canvasHeight: canvasHeight)
     pdfOptions.width = points.width
     pdfOptions.height = points.height
     try PDFExporter(options: pdfOptions).write(scene, to: base.appendingPathExtension("pdf"))

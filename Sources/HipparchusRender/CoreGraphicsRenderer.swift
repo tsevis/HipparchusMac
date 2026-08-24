@@ -40,14 +40,17 @@ public struct CoreGraphicsRenderer: Sendable {
         _ scene: RenderScene,
         in context: CGContext,
         size: CGSize,
-        viewport: ViewportState = ViewportState()
+        viewport: ViewportState = ViewportState(),
+        margin: Double? = nil
     ) -> CanvasTransform? {
         if options.drawBackground {
             context.setFillColor(scene.background.cgColor)
             context.fill(CGRect(origin: .zero, size: size))
         }
 
-        guard let transform = CanvasTransform(contentBounds: scene.contentBounds, size: size, viewport: viewport) else {
+        guard let transform = CanvasTransform(
+            contentBounds: scene.contentBounds, size: size, viewport: viewport, margin: margin
+        ) else {
             return nil
         }
 
@@ -137,7 +140,12 @@ public struct CoreGraphicsRenderer: Sendable {
     /// against a 4× downsample as though it were ground truth — but that
     /// reference *is* the smear, so it rewarded the blur it should have caught.
     /// The visual check settled it. See "What is not here" in the README.
-    public func image(of scene: RenderScene, size: CGSize, viewport: ViewportState = ViewportState()) -> CGImage? {
+    public func image(
+        of scene: RenderScene,
+        size: CGSize,
+        viewport: ViewportState = ViewportState(),
+        margin: Double? = nil
+    ) -> CGImage? {
         let width = Int(size.width.rounded())
         let height = Int(size.height.rounded())
         guard width > 0, height > 0,
@@ -155,7 +163,7 @@ public struct CoreGraphicsRenderer: Sendable {
         context.translateBy(x: 0, y: size.height)
         context.scaleBy(x: 1, y: -1)
         context.setAllowsAntialiasing(true)
-        draw(scene, in: context, size: size, viewport: viewport)
+        draw(scene, in: context, size: size, viewport: viewport, margin: margin)
         return context.makeImage()
     }
 

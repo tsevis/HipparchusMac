@@ -356,6 +356,54 @@ final class SceneBuilderTests: XCTestCase {
     }
 }
 
+final class SheetFittingTests: XCTestCase {
+
+    /// The letterbox is a sheet that disagrees with its map: a 2:1 world on a
+    /// 4:3 canvas leaves a black bar that no margin setting can reach, because
+    /// the space is sheet the map never covers.
+    func testAWideMapGetsAWideSheet() {
+        let world = Bounds(minX: -180, minY: -90, maxX: 180, maxY: 90)
+        let fitted = CanvasTransform.sheet(
+            fitting: world, into: CGSize(width: 1600, height: 1200)
+        )
+        XCTAssertEqual(fitted.width, 1600, "the long edge asked for is kept")
+        XCTAssertEqual(fitted.height, 800, accuracy: 1, "2:1 map, 2:1 sheet")
+    }
+
+    /// The other way round, so a tall map is not silently widened.
+    func testATallMapGetsATallSheet() {
+        let tall = Bounds(minX: 0, minY: 0, maxX: 50, maxY: 200)
+        let fitted = CanvasTransform.sheet(
+            fitting: tall, into: CGSize(width: 1600, height: 1200)
+        )
+        XCTAssertEqual(fitted.height, 1600)
+        XCTAssertEqual(fitted.width, 400, accuracy: 1)
+    }
+
+    /// Applied without checking first, so nothing to draw must not mean nothing
+    /// to draw *on*.
+    func testNoContentLeavesTheSheetAlone() {
+        let asked = CGSize(width: 1600, height: 1200)
+        XCTAssertEqual(CanvasTransform.sheet(fitting: nil, into: asked), asked)
+    }
+
+    /// Zero margin is a real request, not "unset".
+    func testAZeroMarginBleedsToTheEdges() throws {
+        let world = Bounds(minX: -180, minY: -90, maxX: 180, maxY: 90)
+        let size = CGSize(width: 1600, height: 800)
+        let bled = try XCTUnwrap(
+            CanvasTransform(contentBounds: world, size: size, margin: 0)
+        )
+        let breathing = try XCTUnwrap(CanvasTransform(contentBounds: world, size: size))
+        XCTAssertGreaterThan(
+            bled.fitScale, breathing.fitScale,
+            "bleeding must fill more of the sheet than the default margin does"
+        )
+        XCTAssertEqual(bled.offsetX, 0, accuracy: 0.5, "no bar on the left")
+        XCTAssertEqual(bled.offsetY, 0, accuracy: 0.5, "no bar on the top")
+    }
+}
+
 final class CanvasTransformTests: XCTestCase {
 
     private func transform(viewport: ViewportState = ViewportState()) throws -> CanvasTransform {
