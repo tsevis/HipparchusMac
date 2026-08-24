@@ -136,9 +136,9 @@ private struct PlaceMenu: View {
                     model.choose(name: place.name, bbox: place.bbox)
                 } label: {
                     if place.name == model.placeName {
-                        Label(place.name, systemImage: "checkmark")
+                        Label(title(for: place), systemImage: "checkmark")
                     } else {
-                        Text(place.name)
+                        Text(title(for: place))
                     }
                 }
             }
@@ -146,5 +146,23 @@ private struct PlaceMenu: View {
                 AnyView(PlaceMenu(model: model, group: subgroup))
             }
         }
+    }
+
+    /// The place and how wide it is. A menu item is one run of text — there is
+    /// no second column to hang the width off, the way the flat list had — so
+    /// the two are joined and the width carries its own degree sign to say what
+    /// it is. Which one is current is the checkmark's job, not the title's.
+    private func title(for place: MapModel.Place) -> String {
+        "\(place.name) — \(Self.width(place.bbox.lonSpan))"
+    }
+
+    /// Places run from the Vatican's 0.04° to the whole world's 360°, and a fixed
+    /// two decimals across that range spends its precision where there is none
+    /// to report: "360.00°" is three characters of noise. Narrow it as the
+    /// number grows.
+    private static func width(_ lonSpan: Double) -> String {
+        let degrees = abs(lonSpan)
+        let decimals = degrees >= 100 ? 0 : (degrees >= 10 ? 1 : 2)
+        return String(format: "%.\(decimals)f°", degrees)
     }
 }
