@@ -1016,3 +1016,39 @@ final class RoadHierarchyTests: XCTestCase {
         XCTAssertEqual(SceneBuilder.classifyRoads(empty).keys.sorted(), ["water"])
     }
 }
+
+/// The profile has to govern how much ground is sampled, not only how the
+/// samples are drawn.
+final class QualitySamplingTests: XCTestCase {
+
+    /// Print Export traced contours at full fidelity from a mosaic sampled at
+    /// the preview's 1200 across — print-grade geometry over preview-grade
+    /// ground. Fidelity downstream cannot restore detail never sampled.
+    func testExportSamplesTheGroundMoreFinelyThanPreview() {
+        let preview = Quality.profile("preview_fast")
+        let print = Quality.profile("export_print")
+        XCTAssertGreaterThan(
+            print.samplingPixels, preview.samplingPixels,
+            "an export profile that samples like a preview cannot be an export"
+        )
+    }
+
+    /// Monotonic in menu order, so choosing a heavier profile never samples
+    /// less than a lighter one.
+    func testSamplingRisesWithTheProfile() {
+        let widths = Quality.profiles.map(\.samplingPixels)
+        XCTAssertEqual(widths, widths.sorted(), "menu order must not go backwards")
+    }
+
+    /// The mosaic caps at 256 tiles, which is 4096 px across. A profile asking
+    /// past that would be silently clipped — the exact trap `maxTiles`
+    /// documents.
+    func testNoProfileAsksForMoreThanTheMosaicCanGive() {
+        for profile in Quality.profiles {
+            XCTAssertLessThanOrEqual(
+                profile.samplingPixels, 4096,
+                "\(profile.key) would be clipped by the tile budget without saying so"
+            )
+        }
+    }
+}

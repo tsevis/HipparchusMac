@@ -23,6 +23,19 @@ public struct QualityProfile: Sendable, Equatable, Identifiable {
     public let simplifyScale: Double
     /// Multiplies the preset's per-layer feature cap.
     public let geometryCapScale: Double
+    /// How wide to sample the elevation mosaic, in pixels across the area.
+    ///
+    /// **The profile governed how the data was drawn and not how much of it
+    /// there was.** Print Export traced its contours at `simplifyScale 0` from
+    /// a mosaic sampled 1200 across — print-grade geometry over preview-grade
+    /// ground, and no amount of fidelity downstream can put back detail that
+    /// was never sampled. It is the ceiling on a country map in particular: a
+    /// frame that size at 1200 samples is about a kilometre per cell, which is
+    /// a coastline with its bays rounded off before any drawing begins.
+    ///
+    /// A floor, not an override: someone who sets "Samples across" by hand in
+    /// the Sources panel has said what they want and gets it.
+    public let samplingPixels: Int
     /// Decimal places in exported SVG coordinates.
     public let svgPrecision: Int
     /// Export profiles refuse to write a file whose diagnostics look wrong.
@@ -43,6 +56,7 @@ public enum Quality {
             smoothingScale: 0.0,
             simplifyScale: 1.0,
             geometryCapScale: 0.55,
+            samplingPixels: 1200,
             svgPrecision: 3,
             strictDiagnostics: false
         ),
@@ -53,6 +67,7 @@ public enum Quality {
             smoothingScale: 1.0,
             simplifyScale: 0.5,
             geometryCapScale: 1.0,
+            samplingPixels: 1600,
             svgPrecision: 3,
             strictDiagnostics: false
         ),
@@ -63,6 +78,7 @@ public enum Quality {
             smoothingScale: 2.0,
             simplifyScale: 0.35,
             geometryCapScale: 1.0,
+            samplingPixels: 2400,
             svgPrecision: 4,
             strictDiagnostics: false
         ),
@@ -73,6 +89,7 @@ public enum Quality {
             smoothingScale: 2.0,
             simplifyScale: 0.0,
             geometryCapScale: 1.0,
+            samplingPixels: 3200,
             svgPrecision: 6,
             strictDiagnostics: true
         ),

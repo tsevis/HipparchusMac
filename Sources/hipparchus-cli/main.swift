@@ -71,7 +71,8 @@ func usage() -> Never {
 
     Options:
       --out <dir>        where to write files (default: ./out)
-      --pixels <n>       sampling width to aim for (default: 1200)
+      --pixels <n>       sampling width to aim for. Default comes from the
+                         quality profile: 1200 fast preview, 3200 print export
       --streets          stack OpenStreetMap onto the elevation: roads,
                          buildings, water and land cover. Slow, and it is the
                          area that decides — a city block answers, a county does
@@ -129,7 +130,8 @@ guard !arguments.isEmpty else { usage() }
 /// variables in a `main.swift` are main-actor isolated, and `run` is not.
 struct Options {
     var outputDirectory = URL(fileURLWithPath: "out")
-    var targetPixels = 1200
+    /// nil until `--pixels` says otherwise, so the quality profile decides.
+    var targetPixels: Int?
     var writeFiles = true
     var preset = SceneBuilder.Options().preset
     var quality = Quality.default
@@ -420,7 +422,8 @@ enum CLIError: Error, CustomStringConvertible {
 
 func run(_ place: Place, options: Options) async throws {
     var settings = TerrainTileSettings()
-    settings.targetPixels = options.targetPixels
+    // The profile's sampling unless --pixels overrode it by name.
+    settings.targetPixels = options.targetPixels ?? options.quality.samplingPixels
     settings.emitHillshade = options.hillshade
     settings.sun = options.sun
     settings.hillshadeExaggeration = options.exaggeration

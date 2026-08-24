@@ -1207,6 +1207,10 @@ final class MapModel {
                 if let bands = overrides["elevationBandCount"]?.intValue {
                     settings.elevationBandCount = bands
                 }
+                // The profile decides how finely the ground is sampled, unless
+                // "Samples across" was set by hand — a number typed in the
+                // Sources panel is an instruction, not a suggestion.
+                settings.targetPixels = quality.samplingPixels
                 if let samples = overrides["targetPixels"]?.intValue, samples > 0 {
                     settings.targetPixels = samples
                 }
