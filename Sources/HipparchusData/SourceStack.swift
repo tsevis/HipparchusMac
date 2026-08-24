@@ -567,8 +567,17 @@ public struct SourceStack: Sendable, Equatable {
     /// app is built around its layers. Otherwise the first ticked source supplies the
     /// base and everything else rides along. Nothing ticked means there is nothing to
     /// fetch, which the caller should treat as a prompt rather than an error.
-    public var plan: FetchPlan? {
-        let enabled = enabledIDs
+    public var plan: FetchPlan? { plan(excluding: []) }
+
+    /// The plan with some sources left out.
+    ///
+    /// **One source that cannot answer must not cost the others their map.**
+    /// OpenStreetMap is the base whenever it is ticked, so an area too large for
+    /// Overpass used to refuse the whole render — and the reader who had
+    /// Elevation and Natural Earth ticked as well, both of which draw a world
+    /// happily, got a blank canvas and a sentence about Overpass.
+    public func plan(excluding excluded: Set<String>) -> FetchPlan? {
+        let enabled = enabledIDs.filter { !excluded.contains($0) }
         guard !enabled.isEmpty else { return nil }
         let base = enabled.contains(SourceID.overpass) ? SourceID.overpass : enabled[0]
         return FetchPlan(base: base, extras: enabled.filter { $0 != base })

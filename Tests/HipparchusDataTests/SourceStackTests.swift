@@ -54,6 +54,32 @@ final class SourceStackTests: XCTestCase {
         XCTAssertEqual(plan.sourceIDs, [SourceID.overpass, SourceID.terrainTiles])
     }
 
+    /// A world map with Elevation ticked must still draw when OpenStreetMap is
+    /// dropped for being too large. Overpass is the base whenever it is on, so
+    /// excluding it has to hand the base to something else rather than
+    /// returning no plan at all — which is what left the canvas blank.
+    func testDroppingTheStreetsStillLeavesAMapToDraw() throws {
+        var stack = SourceStack()
+        stack.setEnabled(SourceID.terrainTiles, true)
+        XCTAssertTrue(stack.isEnabled(SourceID.overpass), "the streets start on")
+
+        let plan = try XCTUnwrap(stack.plan(excluding: [SourceID.overpass]))
+        XCTAssertEqual(plan.base, SourceID.terrainTiles, "elevation takes the base")
+        XCTAssertFalse(
+            plan.sourceIDs.contains(SourceID.overpass),
+            "the source that cannot answer must not be asked"
+        )
+    }
+
+    /// With nothing else ticked there is genuinely nothing to draw, and the
+    /// caller has to be able to tell that apart from a usable plan.
+    func testDroppingTheOnlySourceLeavesNoPlan() throws {
+        var stack = SourceStack()
+        stack.setEnabled(SourceID.terrainTiles, false)
+        XCTAssertEqual(stack.enabledIDs, [SourceID.overpass], "only the streets are on")
+        XCTAssertNil(stack.plan(excluding: [SourceID.overpass]))
+    }
+
     func testManySourcesStackOntoOneBase() throws {
         var stack = SourceStack()
         for id in [SourceID.terrainTiles, SourceID.usgsEarthquakes, SourceID.satelliteTracks] {

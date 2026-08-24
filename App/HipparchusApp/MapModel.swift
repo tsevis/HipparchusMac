@@ -942,10 +942,26 @@ final class MapModel {
         guard let bbox else {
             return "Those coordinates do not make an area. West must be less than east, south less than north."
         }
-        guard stack.isEnabled(SourceID.overpass), FetchCost.isTooLargeToFetch(bbox: bbox) else {
+        // Only when OpenStreetMap is the *only* thing ticked is there nothing to
+        // draw. With anything else in the stack the area is drawable — see
+        // `sourcesTooLargeForThisArea`, which drops Overpass and lets the rest
+        // render rather than refusing on its behalf.
+        guard isTooLargeForOpenStreetMap, stack.enabledIDs == [SourceID.overpass] else {
             return nil
         }
         return FetchCost.refusalMessage(bbox: bbox)
+    }
+
+    /// Whether Overpass would refuse this area.
+    var isTooLargeForOpenStreetMap: Bool {
+        guard let bbox else { return false }
+        return stack.isEnabled(SourceID.overpass) && FetchCost.isTooLargeToFetch(bbox: bbox)
+    }
+
+    /// The sources to leave out of this render, because they cannot answer for
+    /// an area this size. Empty for every area small enough to ask.
+    var sourcesTooLargeForThisArea: Set<String> {
+        isTooLargeForOpenStreetMap ? [SourceID.overpass] : []
     }
 
     /// Whether the size refusal has a source that *can* draw this area.
@@ -1022,7 +1038,11 @@ final class MapModel {
         // `refusal` has already answered for a missing area; this is the unwrap,
         // not a second opinion.
         guard let bbox else { return }
+        // The size warning is about waiting for Overpass. If Overpass is being
+        // left out of this render anyway, there is nothing to wait for and
+        // nothing to ask about.
         if stack.isEnabled(SourceID.overpass),
+           !isTooLargeForOpenStreetMap,
            FetchCost.shouldWarn(bbox: bbox, layers: []),
            pendingWarning == nil {
             pendingWarning = FetchCost.warning(bbox: bbox)
@@ -1035,7 +1055,8 @@ final class MapModel {
 
     func fetch() {
         guard let bbox else { return }
-        guard let plan = stack.plan else {
+        let skipped = sourcesTooLargeForThisArea
+        guard let plan = stack.plan(excluding: skipped) else {
             isError = true
             status = "No sources selected. Tick at least one to build a map from."
             return
@@ -1045,7 +1066,11 @@ final class MapModel {
         isFetching = true
         isError = false
         progress = FetchProgress()
-        status = "Fetching…"
+        // Said rather than done silently: a map missing its streets should say
+        // why, and this is a note about what is being drawn, not an error.
+        status = skipped.isEmpty
+            ? "Fetching…"
+            : "Fetching without OpenStreetMap — too large for it at this size…"
 
         let manager = self.manager()
         let reporter = FetchReporter()
