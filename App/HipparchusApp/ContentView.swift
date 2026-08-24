@@ -98,37 +98,37 @@ struct ContentView: View {
         }
         .onAppear { model.undoManager = undoManager }
         .onDisappear { model.save() }
+        // **One alert, not two.** SwiftUI presents a single alert per view, so a
+        // second `.alert` chained here is silently never shown — which is
+        // exactly what happened to the refusal: the warning below won the slot
+        // and the way out of the size refusal could not appear at all. Both
+        // questions share the one presentation and differ by which is pending.
         .alert(
-            "This will take a while",
+            model.pendingRefusal != nil ? "Too large for OpenStreetMap" : "This will take a while",
             isPresented: Binding(
-                get: { model.pendingWarning != nil },
-                set: { if !$0 { model.pendingWarning = nil } }
+                get: { model.pendingRefusal != nil || model.pendingWarning != nil },
+                set: { presented in
+                    guard !presented else { return }
+                    model.pendingRefusal = nil
+                    model.pendingWarning = nil
+                }
             )
         ) {
-            Button("Fetch anyway") { model.fetch() }
-            Button("Cancel", role: .cancel) { model.pendingWarning = nil }
-        } message: {
-            Text(model.pendingWarning ?? "")
-        }
-        // The refusal, with the way out attached. The button does what the
-        // message used to tell the reader to go and do by hand.
-        .alert(
-            "Too large for OpenStreetMap",
-            isPresented: Binding(
-                get: { model.pendingRefusal != nil },
-                set: { if !$0 { model.pendingRefusal = nil } }
-            )
-        ) {
-            if model.hasNaturalEarthData {
-                Button("Draw with Natural Earth") { model.useNaturalEarthInstead() }
+            if model.pendingRefusal != nil {
+                if model.hasNaturalEarthData {
+                    Button("Draw with Natural Earth") { model.useNaturalEarthInstead() }
+                } else {
+                    // Never chosen a file: the offer is to choose it, not to
+                    // tick a source with nothing behind it.
+                    Button("Choose Natural Earth data…") { model.chooseNaturalEarthData() }
+                }
+                Button("Cancel", role: .cancel) { model.pendingRefusal = nil }
             } else {
-                // Never chosen a file: the offer is to choose it, not to tick a
-                // source that has nothing behind it.
-                Button("Choose Natural Earth data…") { model.chooseNaturalEarthData() }
+                Button("Fetch anyway") { model.fetch() }
+                Button("Cancel", role: .cancel) { model.pendingWarning = nil }
             }
-            Button("Cancel", role: .cancel) { model.pendingRefusal = nil }
         } message: {
-            Text(model.pendingRefusal ?? "")
+            Text(model.pendingRefusal ?? model.pendingWarning ?? "")
         }
     }
 
