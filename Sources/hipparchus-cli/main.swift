@@ -105,6 +105,9 @@ func usage() -> Never {
       --size <w>x<h>     a sheet of exactly these inches, so any aspect can be
                          asked for: 20x12 is 5:3, 24x12 is 2:1. Combines with
                          --dpi-style paper resolution to set the pixel size
+      --size <WxH>       exact output size in pixels, e.g. 3000x1800. Replaces
+                         the 1600 x 1200 canvas; the map fills it as far as its
+                         own shape allows, so pick an area of the same shape
       --edge-to-edge     give the sheet the map's own proportions and let the
                          map bleed to its edges, instead of centring it on a
                          fixed 4:3 canvas with bars above and below
@@ -146,6 +149,8 @@ struct Options {
     var naturalEarth: URL?
     var projection: ProjectionMode?
     var edgeToEdge = false
+    /// An exact output size in pixels, replacing the 1600 × 1200 canvas.
+    var outputSize: (width: Int, height: Int)?
 }
 
 /// Style packs, loaded before anything else is parsed.
@@ -230,6 +235,18 @@ while argumentIndex < arguments.count {
         options.palette = found
     case "--edge-to-edge", "--bleed":
         options.edgeToEdge = true
+    case "--size":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        let parts = arguments[argumentIndex].lowercased().split(separator: "x")
+        guard parts.count == 2,
+              let width = Int(parts[0]), let height = Int(parts[1]),
+              width > 0, height > 0
+        else {
+            print("error: --size wants WIDTHxHEIGHT in pixels, like 3000x1800")
+            exit(2)
+        }
+        options.outputSize = (width: width, height: height)
     case "--size":
         argumentIndex += 1
         guard argumentIndex < arguments.count else { usage() }
@@ -548,8 +565,14 @@ func run(_ place: Place, options: Options) async throws {
     // Unless the map is asked to fill the sheet, in which case the sheet takes
     // the map's own proportions: a 2:1 world on a 4:3 canvas is letterboxed, and
     // that black bar is sheet the map never reaches rather than margin.
-    let defaultCanvas = CGSize(width: 1600, height: 1200)
-    let canvas = options.edgeToEdge
+    let defaultCanvas = options.outputSize.map {
+        CGSize(width: $0.width, height: $0.height)
+    } ?? CGSize(width: 1600, height: 1200)
+    // An explicit --size is exact: it is the one thing the caller said in
+    // pixels, so fitting the sheet to the content would be overruling them.
+    // --edge-to-edge then means only "no margin", and the map fills the size
+    // given to the extent its own shape allows.
+    let canvas = (options.edgeToEdge && options.outputSize == nil)
         ? CanvasTransform.sheet(fitting: scene.contentBounds, into: defaultCanvas)
         : defaultCanvas
     let bleed: Double? = options.edgeToEdge ? 0 : nil
