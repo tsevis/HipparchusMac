@@ -3,6 +3,12 @@
 // Generated from Natural Earth 1:10m admin_0 countries (public domain),
 // the same source and boxes as the Python app's country_boxes.py. Do not
 // edit by hand; regenerate from the Natural Earth data.
+//
+// **One deliberate divergence, which a regeneration would undo.** Cyprus is
+// widened to the whole island — the union of Natural Earth's "Cyprus" and
+// "N. Cyprus" — because a box that frames two thirds of an island is wrong as
+// a map even where it is right as a boundary. Reapply it after regenerating,
+// or teach the generator to union the pair.
 
 import HipparchusGeometry
 
@@ -73,7 +79,13 @@ enum CountryBoxes {
         ("Brunei", "Asia", BoundingBox(minLon: 114.0, minLat: 4.02, maxLon: 115.36, maxLat: 5.06)),
         ("Cambodia", "Asia", BoundingBox(minLon: 102.31, minLat: 10.42, maxLon: 107.61, maxLat: 14.7)),
         ("China", "Asia", BoundingBox(minLon: 73.6, minLat: 15.78, maxLon: 134.77, maxLat: 53.57)),
-        ("Cyprus", "Asia", BoundingBox(minLon: 32.27, minLat: 34.63, maxLon: 34.1, maxLat: 35.19)),
+        // The island, not the Republic. Natural Earth files the north as its own
+        // admin_0 entity, so the generated box stopped at 34.1°E / 35.19°N and
+        // cut the Karpas peninsula off entirely — picking Cyprus from the menu
+        // framed two thirds of an island. This is the union of the two entries
+        // below and above the Green Line; "N. Cyprus" stays in the list for
+        // anyone who wants that frame on its own.
+        ("Cyprus", "Asia", BoundingBox(minLon: 32.27, minLat: 34.63, maxLon: 34.59, maxLat: 35.69)),
         ("Georgia", "Asia", BoundingBox(minLon: 39.99, minLat: 41.04, maxLon: 46.69, maxLat: 43.58)),
         ("Hong Kong", "Asia", BoundingBox(minLon: 113.84, minLat: 22.18, maxLon: 114.4, maxLat: 22.56)),
         ("India", "Asia", BoundingBox(minLon: 68.14, minLat: 6.75, maxLon: 97.36, maxLat: 35.5)),
