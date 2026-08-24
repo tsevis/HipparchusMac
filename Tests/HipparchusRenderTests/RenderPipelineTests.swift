@@ -78,8 +78,17 @@ enum Sample {
         )
     }
 
+    /// **Pinned to a named profile rather than to whatever the default is.**
+    /// Half a dozen tests read this fixture's projection back as `EPSG:3857`,
+    /// which was true only because the default happened to be the fast preview;
+    /// when the default moved to Print Export they all failed at once, on a
+    /// change that had nothing to do with what any of them was testing. A
+    /// shared fixture that follows a default is a fixture that changes under
+    /// tests which never asked it to.
+    static let quality = Quality.profile("preview_fast")
+
     static func scene() throws -> RenderScene {
-        try SceneBuilder().build(from: collection())
+        try SceneBuilder(options: .init(quality: quality)).build(from: collection())
     }
 
     /// The preset the terrain slice is drawn with, and the one the tests measure

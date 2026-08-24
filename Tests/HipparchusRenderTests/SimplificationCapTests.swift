@@ -82,7 +82,13 @@ final class SimplificationCapTests: XCTestCase {
             name: "Coarse", geometryProfile: profile,
             styleProfile: Presets.preset("Hypsometric Relief").styleProfile
         )
-        let scene = try SceneBuilder(options: SceneBuilder.Options(preset: preset))
+        // Named rather than left to the default: the tolerance under test is
+        // `simplifyTolerancePreview`, and Print Export — now the default —
+        // simplifies nothing at all, so the default would test the opposite of
+        // what this is about.
+        let scene = try SceneBuilder(options: SceneBuilder.Options(
+            preset: preset, quality: Quality.profile("preview_fast")
+        ))
             .build(from: FeatureCollection(
                 featuresByLayer: ["buildings": [house], "roads": [road]],
                 metadata: [:], bbox: bbox, provenance: .measured

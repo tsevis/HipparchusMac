@@ -66,7 +66,10 @@ final class SessionEditTests: XCTestCase {
 
     func testChangingThePresetAndTheQuality() {
         XCTAssertEqual(describe { $0.presetName = "Night" }?.action, "Change Preset")
-        XCTAssertEqual(describe { $0.qualityKey = "export_print" }?.action, "Change Quality")
+        // Away from the default, whatever it is — setting a session field to
+        // the value it already holds is not an edit, and this is a test about
+        // naming edits rather than about which profile is default.
+        XCTAssertEqual(describe { $0.qualityKey = "preview_fast" }?.action, "Change Quality")
     }
 
     // MARK: - Derived layers

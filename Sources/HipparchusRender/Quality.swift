@@ -78,14 +78,27 @@ public enum Quality {
         ),
     ]
 
-    public static let `default` = profiles[0]
+    /// **Print Export, not the fast preview.**
+    ///
+    /// This was `profiles[0]` — the fastest and coarsest — so every map anyone
+    /// made without touching the control was drawn at `simplifyScale 1.0` and
+    /// a geometry cap of 55%. On a world frame that is the difference between
+    /// a longest contour of 16,538 vertices and one of 264,608: the same data,
+    /// with 94% of it simplified away, and nothing on screen saying so.
+    ///
+    /// A preview profile earns its place when someone is iterating and chooses
+    /// it. It does not earn being the answer for someone who never looked.
+    ///
+    /// By key rather than by index, so reordering the menu cannot silently
+    /// change what everyone gets.
+    public static let `default` = profiles.first { $0.key == "export_print" } ?? profiles[0]
 
     public static var keys: [String] { profiles.map(\.key) }
     public static var labels: [String] { profiles.map(\.label) }
 
     /// Resolve a key, a user-facing label, or one of the two legacy names.
     ///
-    /// Anything unrecognised gives the fast preview rather than failing: this is fed
+    /// Anything unrecognised gives the default rather than failing: this is fed
     /// from a saved setting and from an environment variable, and a stale value
     /// should not stop the app opening.
     public static func profile(_ value: String?) -> QualityProfile {
