@@ -15,6 +15,24 @@ import SwiftUI
 struct CompositionPanel: View {
     @Bindable var model: MapModel
 
+    /// One edge of the custom sheet. Clamped on the way in rather than trusted:
+    /// a sheet of zero is not a sheet, and one of a thousand inches is a bitmap
+    /// nobody can allocate.
+    private func inchField(_ label: String, _ value: Binding<Double>) -> some View {
+        TextField(label, value: Binding(
+            get: { value.wrappedValue },
+            set: { typed in
+                guard typed.isFinite else { return }
+                let range = PageSpec.customInchRange
+                value.wrappedValue = min(max(typed, range.lowerBound), range.upperBound)
+            }
+        ), format: .number.precision(.fractionLength(0...2)))
+            .textFieldStyle(.roundedBorder)
+            .frame(width: 54)
+            .labelsHidden()
+            .multilineTextAlignment(.trailing)
+    }
+
     /// What the current page comes to, so the cost of a 24 × 36 at 600 dpi is
     /// visible before the export refuses it rather than after.
     private var pageSummary: String {
@@ -37,11 +55,38 @@ struct CompositionPanel: View {
                     }
                 }
             }
+            // Only when Custom is chosen: two numbers say the sheet outright,
+            // and with them any aspect at all — 5:3 for a world, say, which no
+            // named sheet offers.
+            if model.page.paper.isCustom {
+                HStack(spacing: 6) {
+                    Text("Size")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    inchField("Width", $model.page.customWidthInches)
+                    Text("×")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                    inchField("Height", $model.page.customHeightInches)
+                    Text("in")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Spacer()
+                    Text("\(model.page.customAspectDescription) · orientation follows these numbers")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
             Picker("Orientation", selection: $model.page.orientation) {
                 ForEach(PageSpec.orientations, id: \.self) { orientation in
                     Text(orientation).tag(orientation)
                 }
             }
+            .disabled(model.page.paper.isCustom)
             Picker("Resolution", selection: $model.page.dpi) {
                 ForEach(Resolution.all, id: \.self) { dpi in
                     Text(Resolution.label(dpi)).tag(dpi)

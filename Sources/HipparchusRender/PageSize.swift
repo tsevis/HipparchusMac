@@ -30,11 +30,31 @@ public struct PaperSize: Sendable, Equatable {
     public static let canvas = PaperSize(name: "Canvas", widthInches: 0, heightInches: 0)
     public var isCanvas: Bool { widthInches <= 0 || heightInches <= 0 }
 
+    /// The sheet whose size the reader states outright.
+    ///
+    /// **The named sheets are all document and poster proportions**, and a map
+    /// is not always either: a whole earth wants 2:1, and someone framing one
+    /// may want 5:3. Rather than guess at more names, this one carries whatever
+    /// two numbers `PageSpec` is holding — so an aspect is expressible exactly,
+    /// and the same two numbers decide the pixels once the resolution is
+    /// applied.
+    public static let customName = "Custom"
+    /// A placeholder so the name resolves and appears in the picker; the real
+    /// dimensions come from `PageSpec.customWidthInches`/`customHeightInches`.
+    ///
+    /// Declared portrait like every other sheet here, even though nothing reads
+    /// these numbers — the invariant is what lets `orientation` turn a sheet
+    /// without asking which way it was written down, and an exception to it
+    /// would be a trap for the next sheet added rather than a saving here.
+    public static let customPlaceholder = PaperSize(name: customName, widthInches: 12, heightInches: 20)
+    public var isCustom: Bool { name == Self.customName }
+
     /// The offered sheets. ISO and US paper for documents, then the three sizes
     /// people actually frame — the last is the 24 × 36 that a print shop treats
     /// as a standard poster.
     public static let all: [PaperSize] = [
         canvas,
+        customPlaceholder,
         PaperSize(name: "Square", widthInches: 20, heightInches: 20),
         PaperSize(name: "A4", widthInches: 8.268, heightInches: 11.693),
         PaperSize(name: "A3", widthInches: 11.693, heightInches: 16.535),
@@ -80,20 +100,51 @@ public struct PageSpec: Sendable, Equatable {
     public var paperName: String
     public var orientation: String
     public var dpi: Double
+    /// The Custom sheet's two numbers, in inches. Read only when `paperName` is
+    /// `PaperSize.customName`, and kept while another sheet is selected so
+    /// coming back to Custom finds what was last typed.
+    public var customWidthInches: Double
+    public var customHeightInches: Double
 
     public static let orientations = ["Landscape", "Portrait"]
+
+    /// The smallest and largest a custom edge may be. A sheet of zero is not a
+    /// sheet, and one of a thousand inches is a bitmap nobody can allocate —
+    /// the resolution picker is deliberately not a free number for the same
+    /// reason, and this is the other half of that.
+    public static let customInchRange = 1.0...200.0
 
     public init(
         paperName: String = PaperSize.canvas.name,
         orientation: String = "Landscape",
-        dpi: Double = Resolution.default
+        dpi: Double = Resolution.default,
+        customWidthInches: Double = 20,
+        customHeightInches: Double = 12
     ) {
         self.paperName = paperName
         self.orientation = orientation
         self.dpi = dpi
+        self.customWidthInches = customWidthInches
+        self.customHeightInches = customHeightInches
     }
 
-    public var paper: PaperSize { PaperSize.named(paperName) }
+    public var paper: PaperSize {
+        let named = PaperSize.named(paperName)
+        guard named.isCustom else { return named }
+        let range = Self.customInchRange
+        return PaperSize(
+            name: PaperSize.customName,
+            widthInches: Swift.min(Swift.max(customWidthInches, range.lowerBound), range.upperBound),
+            heightInches: Swift.min(Swift.max(customHeightInches, range.lowerBound), range.upperBound)
+        )
+    }
+
+    /// The custom sheet's proportions, said the way someone asks for them.
+    public var customAspectDescription: String {
+        let width = customWidthInches, height = customHeightInches
+        guard width > 0, height > 0 else { return "—" }
+        return String(format: "%.3g:1", width / height)
+    }
 
     /// The sheet in inches, turned to the chosen orientation.
     ///
@@ -105,6 +156,9 @@ public struct PageSpec: Sendable, Equatable {
         guard !paper.isCanvas else { return nil }
         var width = paper.widthInches
         var height = paper.heightInches
+        // A custom sheet states its own orientation: the two numbers *are* the
+        // request, and turning them would quietly refuse what was typed.
+        guard !paper.isCustom else { return (width, height) }
         if orientation == "Landscape", height > width {
             swap(&width, &height)
         } else if orientation == "Portrait", width > height {

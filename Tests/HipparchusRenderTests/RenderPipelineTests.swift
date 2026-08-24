@@ -356,6 +356,51 @@ final class SceneBuilderTests: XCTestCase {
     }
 }
 
+final class CustomPaperTests: XCTestCase {
+
+    /// The named sheets are document and poster proportions; a map is often
+    /// neither. Two numbers must give exactly the aspect asked for.
+    func testACustomSheetIsExactlyTheInchesAskedFor() throws {
+        var page = PageSpec(paperName: PaperSize.customName, dpi: 300)
+        page.customWidthInches = 20
+        page.customHeightInches = 12
+
+        let inches = try XCTUnwrap(page.inches(canvasAspect: 1))
+        XCTAssertEqual(inches.width / inches.height, 5.0 / 3.0, accuracy: 1e-9)
+
+        let pixels = page.pixelSize(canvasWidth: 1600, canvasHeight: 1200)
+        XCTAssertEqual(pixels.width, 6000)
+        XCTAssertEqual(pixels.height, 3600)
+    }
+
+    /// Orientation turns a named sheet. It must not turn a custom one: those
+    /// two numbers are the request, and swapping them refuses what was typed.
+    func testOrientationLeavesACustomSheetAlone() throws {
+        var page = PageSpec(paperName: PaperSize.customName, orientation: "Landscape")
+        page.customWidthInches = 12
+        page.customHeightInches = 20
+
+        let inches = try XCTUnwrap(page.inches(canvasAspect: 1))
+        XCTAssertEqual(inches.width, 12, accuracy: 1e-9, "a tall custom sheet stays tall")
+        XCTAssertEqual(inches.height, 20, accuracy: 1e-9)
+    }
+
+    /// A sheet of zero is not a sheet, and one of a thousand inches is a bitmap
+    /// nobody can allocate.
+    func testACustomSheetIsClampedToSomethingDrawable() throws {
+        var page = PageSpec(paperName: PaperSize.customName)
+        page.customWidthInches = 0
+        page.customHeightInches = 10_000
+        let paper = page.paper
+        XCTAssertEqual(paper.widthInches, PageSpec.customInchRange.lowerBound)
+        XCTAssertEqual(paper.heightInches, PageSpec.customInchRange.upperBound)
+    }
+
+    func testCustomIsOfferedInThePicker() {
+        XCTAssertTrue(PaperSize.names.contains(PaperSize.customName))
+    }
+}
+
 final class SheetFittingTests: XCTestCase {
 
     /// The letterbox is a sheet that disagrees with its map: a 2:1 world on a

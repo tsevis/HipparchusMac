@@ -102,6 +102,9 @@ func usage() -> Never {
       --paper <name>     sheet for every export: \(PaperSize.names.joined(separator: ", "))
       --dpi <n>          resolution for the raster and the SVG viewport
       --line-weight <x>  multiply every stroke (default: 1)
+      --size <w>x<h>     a sheet of exactly these inches, so any aspect can be
+                         asked for: 20x12 is 5:3, 24x12 is 2:1. Combines with
+                         --dpi-style paper resolution to set the pixel size
       --edge-to-edge     give the sheet the map's own proportions and let the
                          map bleed to its edges, instead of centring it on a
                          fixed 4:3 canvas with bars above and below
@@ -227,6 +230,21 @@ while argumentIndex < arguments.count {
         options.palette = found
     case "--edge-to-edge", "--bleed":
         options.edgeToEdge = true
+    case "--size":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        let parts = arguments[argumentIndex].lowercased()
+            .split(whereSeparator: { $0 == "x" || $0 == ":" || $0 == "," })
+        guard parts.count == 2,
+              let width = Double(parts[0]), let height = Double(parts[1]),
+              width > 0, height > 0
+        else {
+            print("error: --size wants width x height in inches, like 20x12 or 5:3")
+            exit(2)
+        }
+        options.page.paperName = PaperSize.customName
+        options.page.customWidthInches = width
+        options.page.customHeightInches = height
     case "--projection":
         argumentIndex += 1
         guard argumentIndex < arguments.count else { usage() }
