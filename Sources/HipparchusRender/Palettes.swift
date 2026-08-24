@@ -50,6 +50,12 @@ public struct Palette: Sendable, Equatable, Identifiable {
     public let depthShallow: RGBAColor?
     public let depthDeep: RGBAColor?
 
+    /// The sub-sea depth contours' own colour, so a black sea can still carry
+    /// its oceanography as bright linework — the ocean's twin of the land's
+    /// glowing terrain contours. Nil keeps the derived, dim bathymetry every
+    /// other palette draws.
+    public let seaContour: RGBAColor?
+
     public var id: String { name }
 
     public init(
@@ -68,7 +74,8 @@ public struct Palette: Sendable, Equatable, Identifiable {
         elevationLow: RGBAColor? = nil,
         elevationHigh: RGBAColor? = nil,
         depthShallow: RGBAColor? = nil,
-        depthDeep: RGBAColor? = nil
+        depthDeep: RGBAColor? = nil,
+        seaContour: RGBAColor? = nil
     ) {
         self.name = name
         self.ground = ground
@@ -86,6 +93,7 @@ public struct Palette: Sendable, Equatable, Identifiable {
         self.elevationHigh = elevationHigh
         self.depthShallow = depthShallow
         self.depthDeep = depthDeep
+        self.seaContour = seaContour
     }
 }
 
@@ -336,73 +344,75 @@ extension Palette {
             roadScale: 1.8
         ),
 
-        // Limassol Towel — a dark topographic HUD. The land and the sea are
-        // near-black; the drama is all in the lines. Glowing contours trace the
-        // relief, the index lines and summits burn brightest, and the coast is
-        // the sharpest edge on the sheet — dark inside, hard-lit at the border.
-        // From the ASE swatch set (yellow #FFC12E, greys, black), pulled deep so
-        // the accent reads as light against black rather than as a fill.
-        // Three variations, one idea, differing in the colour of the light.
+        // Limassol Towel — a dark bathymetric HUD. Land and sea are black; all
+        // the colour is in the lines. Warm contours trace the relief, cool ones
+        // trace the sea floor, and the two meet at a hard-lit coast. The sea is
+        // not an empty void but its own instrument: a black surface carrying its
+        // depth as bright sub-sea contours, the ocean's answer to the land's.
+        // Pure black grounds, for the most contrast the sheet can hold. Three
+        // variations, one idea, differing in the colour of the light.
 
-        // 1. Gold on black — the plotter warmed up. Yellow contours and roads,
-        // warm-dark land, cool-dark sea.
+        // 1. Gold land, cyan sea — a nautical plotter. Warm relief over land,
+        // cool depth over water, on black.
         Palette(
             name: "Limassol Towel",
-            ground: rgb(12, 13, 16),
+            ground: rgb(0, 0, 0),
             ink: rgb(255, 193, 46),
-            water: rgb(16, 18, 22),
-            land: rgb(42, 44, 49),
+            water: rgb(0, 0, 0),
+            land: rgb(255, 193, 46),
             road: rgb(255, 193, 46),
-            roadCasing: rgb(12, 13, 16),
-            vegetation: rgb(30, 32, 36),
+            roadCasing: rgb(0, 0, 0),
+            vegetation: rgb(26, 28, 32),
             contour: rgb(255, 193, 46),
             roadScale: 0.7,
-            contourWeight: 1.2,
-            elevationLow: rgb(46, 40, 20),   // plain: dark amber, not bright
-            elevationHigh: rgb(0, 0, 0),     // summit: black
-            depthShallow: rgb(24, 28, 34),   // coast: dark steel
-            depthDeep: rgb(0, 0, 0)         // abyss: black
+            contourWeight: 1.3,
+            elevationLow: rgb(30, 26, 12),   // land: near-black amber
+            elevationHigh: rgb(0, 0, 0),
+            depthShallow: rgb(7, 11, 15),    // sea: black, a whisper of depth
+            depthDeep: rgb(0, 0, 0),
+            seaContour: rgb(58, 200, 220)   // sea floor: bright cyan
         ),
 
-        // 2. Noir — a cold sonar screen. White contours and type on pure black,
+        // 2. Noir — a cold sonar screen. White relief, cooler steel bathymetry,
         // a single warm accent left in the roads.
         Palette(
             name: "Limassol Towel Noir",
             ground: rgb(0, 0, 0),
             ink: rgb(255, 255, 255),
-            water: rgb(10, 12, 15),
-            land: rgb(34, 36, 40),
+            water: rgb(0, 0, 0),
+            land: rgb(30, 32, 36),
             road: rgb(255, 193, 46),
             roadCasing: rgb(0, 0, 0),
-            vegetation: rgb(26, 28, 32),
-            contour: rgb(176, 182, 194),
+            vegetation: rgb(22, 24, 28),
+            contour: rgb(230, 234, 240),
             roadScale: 0.7,
-            contourWeight: 1.1,
-            elevationLow: rgb(26, 28, 32),
+            contourWeight: 1.2,
+            elevationLow: rgb(14, 15, 18),
             elevationHigh: rgb(0, 0, 0),
-            depthShallow: rgb(16, 20, 26),
-            depthDeep: rgb(0, 0, 0)
+            depthShallow: rgb(8, 10, 15),
+            depthDeep: rgb(0, 0, 0),
+            seaContour: rgb(140, 175, 205)
         ),
 
-        // 3. Neon — the most wired of the three. Yellow contours under white
-        // index lines and summits, thickest linework, deepest black. Two
-        // brightnesses stacked so the edges read twice.
+        // 3. Neon — the most wired. Gold relief under white index lines, bright
+        // cyan sea floor, thickest linework, deepest black.
         Palette(
             name: "Limassol Towel Neon",
-            ground: rgb(8, 9, 12),
+            ground: rgb(0, 0, 0),
             ink: rgb(255, 255, 255),
-            water: rgb(12, 14, 18),
-            land: rgb(38, 34, 22),
+            water: rgb(0, 0, 0),
+            land: rgb(38, 32, 16),
             road: rgb(255, 193, 46),
-            roadCasing: rgb(8, 9, 12),
-            vegetation: rgb(28, 26, 18),
+            roadCasing: rgb(0, 0, 0),
+            vegetation: rgb(26, 24, 14),
             contour: rgb(255, 193, 46),
             roadScale: 0.65,
-            contourWeight: 1.4,
-            elevationLow: rgb(44, 38, 18),
+            contourWeight: 1.5,
+            elevationLow: rgb(34, 28, 12),
             elevationHigh: rgb(0, 0, 0),
-            depthShallow: rgb(20, 26, 34),
-            depthDeep: rgb(0, 0, 0)
+            depthShallow: rgb(7, 11, 16),
+            depthDeep: rgb(0, 0, 0),
+            seaContour: rgb(90, 220, 235)
         ),
     ]
 

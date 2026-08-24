@@ -38,6 +38,19 @@ final class LimassolTowelTests: XCTestCase {
         }
     }
 
+    func testTheSeaIsBlackButCarriesBrightOceanography() throws {
+        // The sea's fill is black, but it is not an empty void: its depth
+        // contours glow, the ocean's own instrument on a black surface.
+        for name in names {
+            let styles = try XCTUnwrap(Palette.named(name)).styleProfile().layerStyles
+            let sea = try XCTUnwrap(styles["depth_bands"], "\(name): no depth bands")
+            let bathymetry = try XCTUnwrap(styles["bathymetry"], "\(name): no bathymetry")
+            XCTAssertLessThan(Palette.luma(sea.fillColor), 20.0, "\(name): the sea is not black")
+            XCTAssertGreaterThan(Palette.luma(bathymetry.strokeColor), 120.0,
+                                 "\(name): the sea's depth contours do not glow")
+        }
+    }
+
     func testTheContoursAreTheBrightEdge() throws {
         // The techie part: bright lines on a dark ground, and the contrast lives
         // where the line crosses the fill — at the edges of the relief.

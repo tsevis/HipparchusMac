@@ -40,9 +40,12 @@ extension Palette {
             fill: fillsSea ? water : nil
         )
         styles["coastline"] = style(stroke: 1.6, strokeColor: Self.mix(water, ink, 0.45))
+        // The sub-sea contours. A palette that states a sea-contour colour draws
+        // them bright — the ocean's own linework on a black sea — and a little
+        // heavier for it; any other palette keeps the derived, dim line.
         styles["bathymetry"] = style(
-            stroke: 0.5 * contourWeight,
-            strokeColor: Self.mix(water, ground, 0.4), opacity: 0.9
+            stroke: (seaContour != nil ? 0.6 : 0.5) * contourWeight,
+            strokeColor: seaContour ?? Self.mix(water, ground, 0.4), opacity: 0.9
         )
         // Depth as mass, on a ramp of its own. Index 0 is the deepest band, so
         // this runs dark water up to the shallows — the opposite direction from
