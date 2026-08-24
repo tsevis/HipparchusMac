@@ -2,11 +2,12 @@ import XCTest
 import HipparchusData
 @testable import HipparchusRender
 
-/// Limassol Towel — a beach towel read as a hypsometric ramp. The land runs
-/// yellow in the plain to black at the summit; the sea runs light at the coast
-/// to black in the abyss. Three variations of the one idea.
+/// Limassol Towel — a dark topographic HUD. Land and sea are near-black; the
+/// colour is in the lines, not the fills. Bright contours glow against the dark,
+/// and the coast is the sharpest edge on the sheet. Three variations of the one
+/// idea, differing in the colour of the light.
 final class LimassolTowelTests: XCTestCase {
-    private let names = ["Limassol Towel", "Limassol Towel Noir", "Limassol Towel Sand"]
+    private let names = ["Limassol Towel", "Limassol Towel Noir", "Limassol Towel Neon"]
 
     func testAllThreeVariationsAreOffered() throws {
         for name in names {
@@ -14,33 +15,41 @@ final class LimassolTowelTests: XCTestCase {
         }
     }
 
-    func testTheLandRunsYellowPlainToBlackSummit() throws {
+    func testTheGroundIsDark() throws {
+        // A HUD, not a page: the paper is near-black.
         for name in names {
-            let styles = try XCTUnwrap(Palette.named(name)).styleProfile().layerStyles
-            let bands = try XCTUnwrap(styles["elevation_bands"], "\(name): no elevation bands")
-            XCTAssertTrue(bands.fillEnabled, "\(name): the land is not filled")
-            let plain = bands.fillColor
-            let summit = try XCTUnwrap(bands.fillColorHigh, "\(name): the land has one stop, not two")
-            // The plain is yellow — red and green high, blue low.
-            XCTAssertGreaterThan(Int(plain.r), 200, "\(name): the plain is not yellow")
-            XCTAssertGreaterThan(Int(plain.g), 150, "\(name): the plain is not yellow")
-            XCTAssertLessThan(Int(plain.b), 120, "\(name): the plain is not yellow")
-            // The summit is darker than the plain.
-            XCTAssertLessThan(Palette.luma(summit), Palette.luma(plain),
-                              "\(name): the summit is not darker than the plain")
+            let palette = try XCTUnwrap(Palette.named(name))
+            XCTAssertLessThan(Palette.luma(palette.ground), 40.0, "\(name): the ground is not dark")
         }
     }
 
-    func testTheSeaRunsLightCoastToBlackAbyss() throws {
+    func testTheLandAndSeaAreDarkNotYellow() throws {
         for name in names {
             let styles = try XCTUnwrap(Palette.named(name)).styleProfile().layerStyles
-            let depth = try XCTUnwrap(styles["depth_bands"], "\(name): no depth bands")
-            let abyss = depth.fillColor
-            let coast = try XCTUnwrap(depth.fillColorHigh, "\(name): the sea has one stop, not two")
-            // The deepest is near-black; the coast far lighter.
-            XCTAssertLessThan(Palette.luma(abyss), 20.0, "\(name): the abyss is not near-black")
-            XCTAssertGreaterThan(Palette.luma(coast), Palette.luma(abyss) + 100.0,
-                                 "\(name): the coast is not much lighter than the abyss")
+            let land = try XCTUnwrap(styles["elevation_bands"], "\(name): no elevation bands")
+            let sea = try XCTUnwrap(styles["depth_bands"], "\(name): no depth bands")
+            // Every fill stop is dark — the accent is the linework, never the fill.
+            XCTAssertLessThan(Palette.luma(land.fillColor), 80.0, "\(name): the plain is not dark")
+            XCTAssertLessThan(Palette.luma(try XCTUnwrap(land.fillColorHigh)), 80.0,
+                              "\(name): the summit is not dark")
+            XCTAssertLessThan(Palette.luma(sea.fillColor), 20.0, "\(name): the abyss is not near-black")
+            XCTAssertLessThan(Palette.luma(try XCTUnwrap(sea.fillColorHigh)), 80.0,
+                              "\(name): the shallows are not dark")
+        }
+    }
+
+    func testTheContoursAreTheBrightEdge() throws {
+        // The techie part: bright lines on a dark ground, and the contrast lives
+        // where the line crosses the fill — at the edges of the relief.
+        for name in names {
+            let styles = try XCTUnwrap(Palette.named(name)).styleProfile().layerStyles
+            let contour = try XCTUnwrap(styles["terrain_contours"], "\(name): no contours")
+            let land = try XCTUnwrap(styles["elevation_bands"])
+            XCTAssertGreaterThan(Palette.luma(contour.strokeColor), 130.0,
+                                 "\(name): the contours do not glow against the dark")
+            XCTAssertGreaterThan(Palette.luma(contour.strokeColor),
+                                 Palette.luma(land.fillColor) + 80.0,
+                                 "\(name): too little contrast between the line and the ground")
         }
     }
 }

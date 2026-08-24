@@ -336,67 +336,72 @@ extension Palette {
             roadScale: 1.8
         ),
 
-        // Limassol Towel — a beach towel read as a hypsometric ramp. The
-        // waterline glows: the plain and the shallows are the same yellow, and
-        // the ground falls away to black in both directions — down to the abyss
-        // and up to the summit. From the ASE palette (yellow #FFC12E, white,
-        // four greys, black), colour by height and depth rather than by kind.
-        // Three variations, one idea, differing in the ground they sit on.
+        // Limassol Towel — a dark topographic HUD. The land and the sea are
+        // near-black; the drama is all in the lines. Glowing contours trace the
+        // relief, the index lines and summits burn brightest, and the coast is
+        // the sharpest edge on the sheet — dark inside, hard-lit at the border.
+        // From the ASE swatch set (yellow #FFC12E, greys, black), pulled deep so
+        // the accent reads as light against black rather than as a fill.
+        // Three variations, one idea, differing in the colour of the light.
 
-        // 1. On dark slate, at dusk. White linework, a yellow shoreline.
+        // 1. Gold on black — the plotter warmed up. Yellow contours and roads,
+        // warm-dark land, cool-dark sea.
         Palette(
             name: "Limassol Towel",
-            ground: rgb(42, 44, 49),
-            ink: rgb(255, 255, 255),
-            water: rgb(91, 91, 94),
-            land: rgb(255, 193, 46),
-            road: rgb(255, 255, 255),
-            roadCasing: rgb(42, 44, 49),
-            vegetation: rgb(137, 137, 137),
-            contour: rgb(137, 137, 137),
-            elevationLow: rgb(255, 193, 46),   // the plain, yellow
-            elevationHigh: rgb(0, 0, 0),       // the summit, black
-            depthShallow: rgb(255, 193, 46),   // the coast, yellow — the towel's stripe
-            depthDeep: rgb(0, 0, 0)            // the abyss, black
+            ground: rgb(12, 13, 16),
+            ink: rgb(255, 193, 46),
+            water: rgb(16, 18, 22),
+            land: rgb(42, 44, 49),
+            road: rgb(255, 193, 46),
+            roadCasing: rgb(12, 13, 16),
+            vegetation: rgb(30, 32, 36),
+            contour: rgb(255, 193, 46),
+            roadScale: 0.7,
+            contourWeight: 1.2,
+            elevationLow: rgb(46, 40, 20),   // plain: dark amber, not bright
+            elevationHigh: rgb(0, 0, 0),     // summit: black
+            depthShallow: rgb(24, 28, 34),   // coast: dark steel
+            depthDeep: rgb(0, 0, 0)         // abyss: black
         ),
 
-        // 2. Noir — a HUD on pure black. Yellow roads and type, the sea's edge a
-        // white glow, the peaks pulled to near-black so they still read against
-        // the void behind them.
+        // 2. Noir — a cold sonar screen. White contours and type on pure black,
+        // a single warm accent left in the roads.
         Palette(
             name: "Limassol Towel Noir",
             ground: rgb(0, 0, 0),
-            ink: rgb(255, 193, 46),
-            water: rgb(42, 44, 49),
-            land: rgb(255, 193, 46),
+            ink: rgb(255, 255, 255),
+            water: rgb(10, 12, 15),
+            land: rgb(34, 36, 40),
             road: rgb(255, 193, 46),
             roadCasing: rgb(0, 0, 0),
-            vegetation: rgb(91, 91, 94),
-            contour: rgb(66, 64, 68),
-            roadScale: 0.9,
+            vegetation: rgb(26, 28, 32),
+            contour: rgb(176, 182, 194),
+            roadScale: 0.7,
             contourWeight: 1.1,
-            elevationLow: rgb(255, 193, 46),
-            elevationHigh: rgb(42, 44, 49),
-            depthShallow: rgb(255, 255, 255),
+            elevationLow: rgb(26, 28, 32),
+            elevationHigh: rgb(0, 0, 0),
+            depthShallow: rgb(16, 20, 26),
             depthDeep: rgb(0, 0, 0)
         ),
 
-        // 3. Sand — the same towel at noon, on white paper. Dark roads, a yellow
-        // shoreline, black in the deeps and the heights.
+        // 3. Neon — the most wired of the three. Yellow contours under white
+        // index lines and summits, thickest linework, deepest black. Two
+        // brightnesses stacked so the edges read twice.
         Palette(
-            name: "Limassol Towel Sand",
-            ground: rgb(255, 255, 255),
-            ink: rgb(0, 0, 0),
-            water: rgb(137, 137, 137),
-            land: rgb(255, 193, 46),
-            road: rgb(66, 64, 68),
-            roadCasing: rgb(255, 255, 255),
-            vegetation: rgb(137, 137, 137),
-            contour: rgb(91, 91, 94),
-            contourWeight: 0.9,
-            elevationLow: rgb(255, 193, 46),
+            name: "Limassol Towel Neon",
+            ground: rgb(8, 9, 12),
+            ink: rgb(255, 255, 255),
+            water: rgb(12, 14, 18),
+            land: rgb(38, 34, 22),
+            road: rgb(255, 193, 46),
+            roadCasing: rgb(8, 9, 12),
+            vegetation: rgb(28, 26, 18),
+            contour: rgb(255, 193, 46),
+            roadScale: 0.65,
+            contourWeight: 1.4,
+            elevationLow: rgb(44, 38, 18),
             elevationHigh: rgb(0, 0, 0),
-            depthShallow: rgb(255, 193, 46),
+            depthShallow: rgb(20, 26, 34),
             depthDeep: rgb(0, 0, 0)
         ),
     ]
