@@ -78,6 +78,28 @@ final class SessionTests: XCTestCase {
         XCTAssertEqual(restored.paletteName, Palette.presetOwnName)
         XCTAssertEqual(restored.lineWeight, 1.0, accuracy: 1e-12)
         XCTAssertFalse(restored.reliefOverBuildings)
+        XCTAssertEqual(restored.projectionKey, "", "no projection written means the frame still chooses")
+    }
+
+    /// A rectangle asked for once should still be a rectangle next launch:
+    /// the projection is a standing preference, not a property of one render.
+    func testAForcedProjectionSurvivesTheRoundTrip() throws {
+        let url = temporaryURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+
+        var session = Session()
+        session.projectionKey = ProjectionMode.wgs84Raw.rawValue
+        try session.write(to: url)
+
+        let restored = Session.read(from: url)
+        XCTAssertEqual(restored.projectionKey, ProjectionMode.wgs84Raw.rawValue)
+        XCTAssertEqual(
+            ProjectionMode(rawValue: restored.projectionKey), .wgs84Raw,
+            "the stored key has to be readable back as the mode itself"
+        )
     }
 
     func testTheSourceStackComesBackAsItWasLeft() throws {

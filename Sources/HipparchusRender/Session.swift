@@ -76,6 +76,10 @@ public struct Session: Codable, Sendable, Equatable {
     /// Whether relief shading is drawn over the built environment or under it.
     public var reliefOverBuildings: Bool
     public var qualityKey: String
+    /// A forced projection, by `ProjectionMode` raw value, or empty for the
+    /// honest choice the frame makes on its own. Remembered because someone who
+    /// wants the world as a rectangle wants it that way next launch too.
+    public var projectionKey: String
     public var hiddenLayers: [String]
 
     /// Decoded field by field with a default for anything absent, so a file from
@@ -101,6 +105,8 @@ public struct Session: Codable, Sendable, Equatable {
         self.reliefOverBuildings = try container
             .decodeIfPresent(Bool.self, forKey: .reliefOverBuildings) ?? defaults.reliefOverBuildings
         self.qualityKey = try container.decodeIfPresent(String.self, forKey: .qualityKey) ?? defaults.qualityKey
+        self.projectionKey = try container
+            .decodeIfPresent(String.self, forKey: .projectionKey) ?? defaults.projectionKey
         self.hiddenLayers = try container.decodeIfPresent([String].self, forKey: .hiddenLayers) ?? []
     }
 
@@ -123,6 +129,7 @@ public struct Session: Codable, Sendable, Equatable {
         lineWeight: Double = 1.0,
         reliefOverBuildings: Bool = false,
         qualityKey: String = Quality.default.key,
+        projectionKey: String = "",
         hiddenLayers: [String] = [],
     ) {
         self.area = area
@@ -137,6 +144,7 @@ public struct Session: Codable, Sendable, Equatable {
         self.lineWeight = lineWeight
         self.reliefOverBuildings = reliefOverBuildings
         self.qualityKey = qualityKey
+        self.projectionKey = projectionKey
         self.hiddenLayers = hiddenLayers
     }
 
@@ -148,7 +156,9 @@ public struct Session: Codable, Sendable, Equatable {
         palette: String = Palette.presetOwnName,
         lineWeight: Double = 1.0,
         reliefOverBuildings: Bool = false,
-        quality: String, hiddenLayers: [String]
+        quality: String,
+        projection: String = "",
+        hiddenLayers: [String]
     ) {
         var paths: [String: String] = [:]
         var bookmarks: [String: String] = [:]
@@ -187,6 +197,7 @@ public struct Session: Codable, Sendable, Equatable {
             lineWeight: lineWeight,
             reliefOverBuildings: reliefOverBuildings,
             qualityKey: quality,
+            projectionKey: projection,
             hiddenLayers: hiddenLayers,
         )
     }

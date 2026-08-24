@@ -105,6 +105,21 @@ final class MapModel {
         }
     }
 
+    /// A forced projection, or nil for the honest choice.
+    ///
+    /// **Nil is not "no projection", it is "let the frame decide"** — the
+    /// quality profile's own, promoted to Equal Earth once the frame outgrows
+    /// it. That promotion is why a whole earth arrives as an oval, which is
+    /// right for area and wrong for anyone who wanted a rectangle. The override
+    /// existed in `SceneBuilder` and on the command line from the day it landed;
+    /// the window simply never offered it.
+    var projection: ProjectionMode? {
+        didSet {
+            guard oldValue != projection else { return }
+            record()
+        }
+    }
+
     /// Colour, as an axis separate from the preset.
     ///
     /// A preset is a whole sheet — geometry, weights and colour together — so
@@ -552,6 +567,7 @@ final class MapModel {
             lineWeight: lineWeight,
             reliefOverBuildings: reliefOverBuildings,
             quality: quality.key,
+            projection: projection?.rawValue ?? "",
             hiddenLayers: hiddenLayers.sorted()
         )
     }
@@ -634,6 +650,10 @@ final class MapModel {
         lineWeight = min(max(session.lineWeight, 0.25), 4.0)
         reliefOverBuildings = session.reliefOverBuildings
         quality = Quality.profile(session.qualityKey)
+        // An unknown raw value — a hand-edited file, or a mode that has since
+        // been renamed — reads as the automatic choice rather than throwing the
+        // session away.
+        projection = ProjectionMode(rawValue: session.projectionKey)
         hiddenLayers = Set(session.hiddenLayers)
         placeName = session.placeName
         west = String(session.area.west)
@@ -673,6 +693,10 @@ final class MapModel {
         lineWeight = min(max(session.lineWeight, 0.25), 4.0)
         reliefOverBuildings = session.reliefOverBuildings
         quality = Quality.profile(session.qualityKey)
+        // An unknown raw value — a hand-edited file, or a mode that has since
+        // been renamed — reads as the automatic choice rather than throwing the
+        // session away.
+        projection = ProjectionMode(rawValue: session.projectionKey)
         hiddenLayers = Set(session.hiddenLayers)
         placeName = session.placeName
         west = String(session.area.west)
@@ -1029,6 +1053,7 @@ final class MapModel {
         // now, and the scene is styled where it is built.
         let preset = self.effectivePreset
         let quality = self.quality
+        let projection = self.projection
 
         task = Task { [weak self] in
             // Watch the reporter so the status bar fills in as each source answers,
@@ -1043,7 +1068,7 @@ final class MapModel {
             do {
                 let collection = try await manager.fetch(BBoxQuery(bbox: bbox), plan: plan, reporter: reporter)
                 let built = try SceneBuilder(options: SceneBuilder.Options(
-                    preset: preset, quality: quality
+                    preset: preset, quality: quality, projectionOverride: projection
                 )).build(from: collection)
 
                 await MainActor.run {

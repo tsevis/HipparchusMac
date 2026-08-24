@@ -1,3 +1,4 @@
+import HipparchusGeometry
 import HipparchusRender
 import SwiftUI
 
@@ -100,6 +101,25 @@ struct StylePicker: View {
             }
             .controlSize(.small)
             .help("A preset says what the map should look like; quality says how much work to spend getting there.")
+
+            Picker("Projection", selection: Binding(
+                get: { model.projection?.rawValue ?? "" },
+                set: { model.projection = ProjectionMode(rawValue: $0) }
+            )) {
+                Text("Automatic").tag("")
+                Text("Rectangular").tag(ProjectionMode.wgs84Raw.rawValue)
+                Text("Equal Earth").tag(ProjectionMode.equalEarth.rawValue)
+                Text("Web Mercator").tag(ProjectionMode.webMercator.rawValue)
+            }
+            .controlSize(.small)
+            .help("""
+            How the round earth is flattened. Automatic lets the frame choose — \
+            which promotes a continent or a whole world to Equal Earth, an oval \
+            with curved edges, because that is the honest shape for area. \
+            Rectangular draws it as a plain rectangle, plate carrée, with the \
+            poles as lines: the whole earth edge to edge, at the cost of \
+            stretching the high latitudes. Takes effect on the next Render map.
+            """)
 
             ValueSlider(
                 title: "Line weight",
