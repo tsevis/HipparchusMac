@@ -63,10 +63,20 @@ extension Palette {
         // assigned by name. Found by a test written for the Python port, run
         // against this one on the suspicion the formula had been copied — it
         // had.
-        let towardInk = Self.mix(water, ink, 0.5)
-        let towardGround = Self.mix(water, ground, 0.55)
-        let deep = Self.luma(towardInk) <= Self.luma(towardGround) ? towardInk : towardGround
-        let shallow = deep == towardInk ? towardGround : towardInk
+        // An explicit ramp wins: a hypsometric palette states its own sea, deep
+        // to shallow, rather than accepting the muted mix a chart palette earns.
+        // Left unstated, the derivation below is exactly what it always was.
+        let deep: RGBAColor
+        let shallow: RGBAColor
+        if let depthDeep, let depthShallow {
+            deep = depthDeep
+            shallow = depthShallow
+        } else {
+            let towardInk = Self.mix(water, ink, 0.5)
+            let towardGround = Self.mix(water, ground, 0.55)
+            deep = Self.luma(towardInk) <= Self.luma(towardGround) ? towardInk : towardGround
+            shallow = deep == towardInk ? towardGround : towardInk
+        }
         styles["depth_bands"] = style(
             stroke: 0, fill: deep, fillHigh: shallow, opacity: 0.9
         )
@@ -92,9 +102,17 @@ extension Palette {
         styles["power"] = style(
             stroke: 0.4, strokeColor: Self.mix(ground, ink, 0.30), opacity: 0.6
         )
-        styles["elevation_bands"] = style(
-            fill: Self.mix(ground, contour, 0.18), opacity: 0.6
-        )
+        // A hypsometric palette colours the land plain-to-summit as a two-stop
+        // ramp; every other palette keeps the single faint fill it always had.
+        if let elevationLow, let elevationHigh {
+            styles["elevation_bands"] = style(
+                fill: elevationLow, fillHigh: elevationHigh, opacity: 0.9
+            )
+        } else {
+            styles["elevation_bands"] = style(
+                fill: Self.mix(ground, contour, 0.18), opacity: 0.6
+            )
+        }
         styles[TerrainLayer.hillshade] = hillshadeStyle()
         styles["terrain_contours"] = style(
             stroke: 0.3 * contourWeight, strokeColor: contour, opacity: 0.7

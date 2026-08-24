@@ -39,6 +39,17 @@ public struct Palette: Sendable, Equatable, Identifiable {
     /// A chart fills its sea; a land map often leaves it as paper.
     public let fillsSea: Bool
 
+    /// Explicit hypsometric ramps, for a palette that colours the ground by
+    /// height and depth rather than leaving it a flat fill. Both stops of a ramp
+    /// must be set for it to apply; left nil the layer keeps its *derived*
+    /// colour, so every palette written before these existed is untouched.
+    /// `elevationLow` is the plain and `elevationHigh` the summit; `depthShallow`
+    /// the coast and `depthDeep` the abyss.
+    public let elevationLow: RGBAColor?
+    public let elevationHigh: RGBAColor?
+    public let depthShallow: RGBAColor?
+    public let depthDeep: RGBAColor?
+
     public var id: String { name }
 
     public init(
@@ -53,7 +64,11 @@ public struct Palette: Sendable, Equatable, Identifiable {
         contour: RGBAColor,
         roadScale: Double = 1.0,
         contourWeight: Double = 1.0,
-        fillsSea: Bool = true
+        fillsSea: Bool = true,
+        elevationLow: RGBAColor? = nil,
+        elevationHigh: RGBAColor? = nil,
+        depthShallow: RGBAColor? = nil,
+        depthDeep: RGBAColor? = nil
     ) {
         self.name = name
         self.ground = ground
@@ -67,6 +82,10 @@ public struct Palette: Sendable, Equatable, Identifiable {
         self.roadScale = roadScale
         self.contourWeight = contourWeight
         self.fillsSea = fillsSea
+        self.elevationLow = elevationLow
+        self.elevationHigh = elevationHigh
+        self.depthShallow = depthShallow
+        self.depthDeep = depthDeep
     }
 }
 
@@ -315,6 +334,70 @@ extension Palette {
             land: rgb(0, 0, 0), road: white, roadCasing: rgb(0, 0, 0), vegetation: rgb(0, 0, 0),
             contour:mix(rgb(0, 0, 0), white, 0.35),
             roadScale: 1.8
+        ),
+
+        // Limassol Towel — a beach towel read as a hypsometric ramp. The
+        // waterline glows: the plain and the shallows are the same yellow, and
+        // the ground falls away to black in both directions — down to the abyss
+        // and up to the summit. From the ASE palette (yellow #FFC12E, white,
+        // four greys, black), colour by height and depth rather than by kind.
+        // Three variations, one idea, differing in the ground they sit on.
+
+        // 1. On dark slate, at dusk. White linework, a yellow shoreline.
+        Palette(
+            name: "Limassol Towel",
+            ground: rgb(42, 44, 49),
+            ink: rgb(255, 255, 255),
+            water: rgb(91, 91, 94),
+            land: rgb(255, 193, 46),
+            road: rgb(255, 255, 255),
+            roadCasing: rgb(42, 44, 49),
+            vegetation: rgb(137, 137, 137),
+            contour: rgb(137, 137, 137),
+            elevationLow: rgb(255, 193, 46),   // the plain, yellow
+            elevationHigh: rgb(0, 0, 0),       // the summit, black
+            depthShallow: rgb(255, 193, 46),   // the coast, yellow — the towel's stripe
+            depthDeep: rgb(0, 0, 0)            // the abyss, black
+        ),
+
+        // 2. Noir — a HUD on pure black. Yellow roads and type, the sea's edge a
+        // white glow, the peaks pulled to near-black so they still read against
+        // the void behind them.
+        Palette(
+            name: "Limassol Towel Noir",
+            ground: rgb(0, 0, 0),
+            ink: rgb(255, 193, 46),
+            water: rgb(42, 44, 49),
+            land: rgb(255, 193, 46),
+            road: rgb(255, 193, 46),
+            roadCasing: rgb(0, 0, 0),
+            vegetation: rgb(91, 91, 94),
+            contour: rgb(66, 64, 68),
+            roadScale: 0.9,
+            contourWeight: 1.1,
+            elevationLow: rgb(255, 193, 46),
+            elevationHigh: rgb(42, 44, 49),
+            depthShallow: rgb(255, 255, 255),
+            depthDeep: rgb(0, 0, 0)
+        ),
+
+        // 3. Sand — the same towel at noon, on white paper. Dark roads, a yellow
+        // shoreline, black in the deeps and the heights.
+        Palette(
+            name: "Limassol Towel Sand",
+            ground: rgb(255, 255, 255),
+            ink: rgb(0, 0, 0),
+            water: rgb(137, 137, 137),
+            land: rgb(255, 193, 46),
+            road: rgb(66, 64, 68),
+            roadCasing: rgb(255, 255, 255),
+            vegetation: rgb(137, 137, 137),
+            contour: rgb(91, 91, 94),
+            contourWeight: 0.9,
+            elevationLow: rgb(255, 193, 46),
+            elevationHigh: rgb(0, 0, 0),
+            depthShallow: rgb(255, 193, 46),
+            depthDeep: rgb(0, 0, 0)
         ),
     ]
 
