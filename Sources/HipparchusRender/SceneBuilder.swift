@@ -29,15 +29,23 @@ public struct SceneBuilder: Sendable {
         /// runs past the frame, because the mosaic does.
         public var clipToArea: Bool
 
+        /// Force a projection rather than letting the frame choose one. Nil keeps
+        /// the honest choice — the profile's projection, promoted to Equal Earth
+        /// when the frame has outgrown it. Set to `.wgs84Raw` to draw a whole
+        /// earth as a rectangle, plate carrée, where it would otherwise become
+        /// the Equal Earth oval.
+        public var projectionOverride: ProjectionMode?
 
         public init(
             preset: ArtisticPreset = Presets.preset("Hypsometric Relief"),
             quality: QualityProfile = Quality.default,
             clipToArea: Bool = true,
+            projectionOverride: ProjectionMode? = nil,
         ) {
             self.preset = preset
             self.quality = quality
             self.clipToArea = clipToArea
+            self.projectionOverride = projectionOverride
         }
     }
 
@@ -132,7 +140,7 @@ public struct SceneBuilder: Sendable {
         // See `ProjectionMode.honest(for:)`.
         let projection = ProjectionProfile(
             bbox: collection.bbox,
-            mode: quality.projectionMode.honest(for: collection.bbox)
+            mode: options.projectionOverride ?? quality.projectionMode.honest(for: collection.bbox)
         )
         let geos = GEOSContext()
 

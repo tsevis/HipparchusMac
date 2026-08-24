@@ -138,6 +138,7 @@ struct Options {
     var exaggeration = 1.0
     var shadeBands = TerrainTileSettings().hillshadeBandCount
     var naturalEarth: URL?
+    var projection: ProjectionMode?
 }
 
 /// Style packs, loaded before anything else is parsed.
@@ -220,6 +221,23 @@ while argumentIndex < arguments.count {
             exit(2)
         }
         options.palette = found
+    case "--projection":
+        argumentIndex += 1
+        guard argumentIndex < arguments.count else { usage() }
+        switch arguments[argumentIndex].lowercased() {
+        case "rectangular", "equirectangular", "plate-carree", "wgs84", "wgs84_raw":
+            options.projection = .wgs84Raw
+        case "equal-earth", "equalearth", "equal_earth":
+            options.projection = .equalEarth
+        case "mercator", "web-mercator", "web_mercator":
+            options.projection = .webMercator
+        case "azimuthal", "local-azimuthal", "local_azimuthal":
+            options.projection = .localAzimuthal
+        default:
+            print("error: no projection '\(arguments[argumentIndex])'. One of: "
+                + "rectangular, equal-earth, mercator, azimuthal")
+            exit(2)
+        }
     case "--line-weight":
         argumentIndex += 1
         guard argumentIndex < arguments.count,
@@ -461,7 +479,8 @@ func run(_ place: Place, options: Options) async throws {
     ))
 
     let built = try SceneBuilder(options: SceneBuilder.Options(
-        preset: options.preset.recoloured(with: options.palette), quality: options.quality
+        preset: options.preset.recoloured(with: options.palette), quality: options.quality,
+        projectionOverride: options.projection
     )).build(from: collection).scalingLineWeights(by: options.lineWeight)
     let scene = options.reliefOnTop ? built.raisingReliefOverTheBuiltEnvironment() : built
     print("  \(scene.summary)   fetched in \(fetched.formattedSeconds)")
