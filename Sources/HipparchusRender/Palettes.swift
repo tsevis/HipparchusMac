@@ -352,8 +352,13 @@ extension Palette {
         // Pure black grounds, for the most contrast the sheet can hold. Three
         // variations, one idea, differing in the colour of the light.
 
-        // 1. Gold land, cyan sea — a nautical plotter. Warm relief over land,
-        // cool depth over water, on black.
+        // The sea is greyscale — depth read as many greys, light on the shelves
+        // to black in the trenches, the way a bathymetric chart states it — with
+        // its sub-sea contours a shade brighter again. Warm relief over the land,
+        // neutral depth over the water, and the coast where near-black land meets
+        // light-grey shelf is the hardest edge on the sheet.
+
+        // 1. Gold land, grey sea — a nautical plotter.
         Palette(
             name: "Limassol Towel",
             ground: rgb(0, 0, 0),
@@ -368,13 +373,13 @@ extension Palette {
             contourWeight: 1.3,
             elevationLow: rgb(30, 26, 12),   // land: near-black amber
             elevationHigh: rgb(0, 0, 0),
-            depthShallow: rgb(7, 11, 15),    // sea: black, a whisper of depth
-            depthDeep: rgb(0, 0, 0),
-            seaContour: rgb(58, 200, 220)   // sea floor: bright cyan
+            depthShallow: rgb(137, 137, 137),  // shelf: light grey
+            depthDeep: rgb(0, 0, 0),          // trench: black
+            seaContour: rgb(205, 205, 205)   // sub-sea contours: brighter grey
         ),
 
-        // 2. Noir — a cold sonar screen. White relief, cooler steel bathymetry,
-        // a single warm accent left in the roads.
+        // 2. Noir — a cold monochrome screen. White relief, grey sea, one warm
+        // accent left in the roads.
         Palette(
             name: "Limassol Towel Noir",
             ground: rgb(0, 0, 0),
@@ -389,13 +394,13 @@ extension Palette {
             contourWeight: 1.2,
             elevationLow: rgb(14, 15, 18),
             elevationHigh: rgb(0, 0, 0),
-            depthShallow: rgb(8, 10, 15),
+            depthShallow: rgb(137, 137, 137),
             depthDeep: rgb(0, 0, 0),
-            seaContour: rgb(140, 175, 205)
+            seaContour: rgb(215, 215, 215)
         ),
 
-        // 3. Neon — the most wired. Gold relief under white index lines, bright
-        // cyan sea floor, thickest linework, deepest black.
+        // 3. Neon — the most wired. Gold relief under white index lines, grey
+        // sea, thickest linework, deepest black.
         Palette(
             name: "Limassol Towel Neon",
             ground: rgb(0, 0, 0),
@@ -410,9 +415,9 @@ extension Palette {
             contourWeight: 1.5,
             elevationLow: rgb(34, 28, 12),
             elevationHigh: rgb(0, 0, 0),
-            depthShallow: rgb(7, 11, 16),
+            depthShallow: rgb(150, 150, 150),
             depthDeep: rgb(0, 0, 0),
-            seaContour: rgb(90, 220, 235)
+            seaContour: rgb(220, 220, 220)
         ),
     ]
 
