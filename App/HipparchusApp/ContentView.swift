@@ -119,7 +119,13 @@ struct ContentView: View {
                 set: { if !$0 { model.pendingRefusal = nil } }
             )
         ) {
-            Button("Draw with Natural Earth") { model.useNaturalEarthInstead() }
+            if model.hasNaturalEarthData {
+                Button("Draw with Natural Earth") { model.useNaturalEarthInstead() }
+            } else {
+                // Never chosen a file: the offer is to choose it, not to tick a
+                // source that has nothing behind it.
+                Button("Choose Natural Earth data…") { model.chooseNaturalEarthData() }
+            }
             Button("Cancel", role: .cancel) { model.pendingRefusal = nil }
         } message: {
             Text(model.pendingRefusal ?? "")

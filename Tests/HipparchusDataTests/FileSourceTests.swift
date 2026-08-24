@@ -243,6 +243,34 @@ final class FileSourceTests: XCTestCase {
         XCTAssertEqual(collection.metadata["format"]?.stringValue, "shapefile")
     }
 
+    /// Natural Earth unzips one folder per dataset, so the folder a reader
+    /// actually points at holds no `.shp` of its own — only `ne_10m_coastline/`
+    /// and its siblings. That folder used to report "Unrecognised format",
+    /// which made the size refusal's advice to use Natural Earth impossible to
+    /// follow with the files as the site ships them.
+    func testAFolderOfDatasetFoldersIsReadAsNaturalEarthDoesShipIt() async throws {
+        let download = directory.appendingPathComponent("natural_earth_10m")
+        for dataset in ["ne_10m_populated_places", "ne_10m_admin_0_countries"] {
+            let folder = download.appendingPathComponent(dataset)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            _ = try ShapefileWriter.write(
+                to: folder.appendingPathComponent("\(dataset).shp"),
+                points: [(Coordinate(lon: 23.73, lat: 37.98), dataset)]
+            )
+        }
+
+        XCTAssertEqual(
+            FileFormat.of(download), .shapefile,
+            "a folder of dataset folders is still Natural Earth"
+        )
+
+        let collection = try await FileSourceProvider.naturalEarth(path: download).fetch(athens)
+        XCTAssertEqual(
+            collection.features(in: "places").count, 2,
+            "both dataset folders should have been read, not just the first"
+        )
+    }
+
     func testANonShapefileIsRejectedRatherThanMisread() throws {
         let path = try write("not a shapefile at all", to: "fake.shp")
         XCTAssertThrowsError(

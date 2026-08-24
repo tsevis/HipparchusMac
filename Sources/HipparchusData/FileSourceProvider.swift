@@ -193,7 +193,20 @@ public enum FileFormat: String, Sendable, Equatable {
             if children.contains(where: { ($0 as NSString).pathExtension.lowercased() == "shp" }) {
                 return .shapefile
             }
-            return .unknown
+            // A folder of folders, one per dataset — how Natural Earth's own
+            // downloads unzip. `ShapefileReader.sources(at:)` reads these; this
+            // has to agree, or the source is called unrecognised and never
+            // reaches the reader that would have understood it.
+            let nested = children.contains { child in
+                let folder = path.appendingPathComponent(child)
+                var isFolder: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder),
+                      isFolder.boolValue
+                else { return false }
+                let inner = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+                return inner.contains { ($0 as NSString).pathExtension.lowercased() == "shp" }
+            }
+            return nested ? .shapefile : .unknown
         }
 
         let name = path.lastPathComponent.lowercased()

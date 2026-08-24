@@ -933,14 +933,21 @@ final class MapModel {
     /// app already knows that, and `useNaturalEarthInstead()` is that sentence
     /// with the work done.
     ///
-    /// False when Natural Earth is not installed: offering a button that cannot
-    /// work would be worse than the instruction it replaced.
-    var canDrawWithNaturalEarth: Bool {
+    /// Whether this refusal is the size one, which is the refusal that has a
+    /// way out. Bad coordinates are still just wrong.
+    var isRefusedForSize: Bool {
         guard let bbox else { return false }
-        return stack.isEnabled(SourceID.overpass)
-            && FetchCost.isTooLargeToFetch(bbox: bbox)
-            && stack.isAvailable(SourceID.naturalEarth)
+        return stack.isEnabled(SourceID.overpass) && FetchCost.isTooLargeToFetch(bbox: bbox)
     }
+
+    /// Whether Natural Earth has been pointed at any data yet.
+    ///
+    /// **Not a reason to withhold the way out.** Gating the offer on this was
+    /// the first fix's mistake: someone who has never chosen a Natural Earth
+    /// file is exactly the person being told to use Natural Earth, and they got
+    /// the bare refusal with no button at all. Without data the offer becomes
+    /// "choose it" rather than "use it"; either way the dialog appears.
+    var hasNaturalEarthData: Bool { stack.isAvailable(SourceID.naturalEarth) }
 
     /// Turn OpenStreetMap off, tick Natural Earth, and draw the thing that was
     /// asked for.
@@ -952,6 +959,31 @@ final class MapModel {
         update()
     }
 
+    /// Point Natural Earth at its data and then draw, for the reader who has
+    /// never chosen a file — the one the refusal is least use to.
+    ///
+    /// The panel is opened here rather than in `SourcesPanel` because this is
+    /// reached from the refusal dialog, which is raised over the map. The
+    /// bookmark is minted while the panel's grant is still held; that is the
+    /// only moment a token for this folder can be made.
+    func chooseNaturalEarthData() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose the Natural Earth file or folder — a .shp, a folder of them, "
+            + "or the folder the downloads unzipped into."
+        panel.prompt = "Use"
+        guard panel.runModal() == .OK, let url = panel.url else {
+            pendingRefusal = nil
+            return
+        }
+        stack.setPath(
+            SourceID.naturalEarth, url.path, bookmark: SecurityScopedAccess.bookmark(for: url)
+        )
+        useNaturalEarthInstead()
+    }
+
     func update() {
         if let refusal {
             isError = true
@@ -960,7 +992,7 @@ final class MapModel {
             // asking rather than printing into the status bar. Not in a batch
             // run: there is nobody there to answer it, which is the whole
             // reason `fetchAsLaunched` writes the refusal to stderr instead.
-            if canDrawWithNaturalEarth, !isBatchRun { pendingRefusal = refusal }
+            if isRefusedForSize, !isBatchRun { pendingRefusal = refusal }
             return
         }
         // `refusal` has already answered for a missing area; this is the unwrap,

@@ -54,16 +54,40 @@ public enum ShapefileReader {
         return features
     }
 
-    /// Natural Earth arrives either as one `.shp` or as a folder of them.
+    /// Natural Earth arrives as one `.shp`, as a folder of them, or — which is
+    /// how the site actually hands it over — as a folder of *folders*, one per
+    /// dataset, because each download unzips into a directory of its own.
+    ///
+    /// **The third shape is the one a reader is most likely to point at**, and
+    /// it used to find nothing: `ne_10m/` holds no `.shp`, only
+    /// `ne_10m_coastline/` and its siblings. The source then reported
+    /// "Unrecognised format" for a folder of perfectly good Natural Earth, and
+    /// the size refusal's advice to use Natural Earth could not be followed.
+    /// One level down is enough for every layout the site produces.
     static func sources(at path: URL) throws -> [URL] {
         var isDirectory: ObjCBool = false
         FileManager.default.fileExists(atPath: path.path, isDirectory: &isDirectory)
         guard isDirectory.boolValue else { return [path] }
 
-        return try FileManager.default
-            .contentsOfDirectory(at: path, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension.lowercased() == "shp" }
-            .sorted { $0.lastPathComponent < $1.lastPathComponent }
+        let manager = FileManager.default
+        let children = try manager.contentsOfDirectory(
+            at: path, includingPropertiesForKeys: [.isDirectoryKey]
+        )
+        func shapefiles(in urls: [URL]) -> [URL] {
+            urls.filter { $0.pathExtension.lowercased() == "shp" }
+        }
+
+        let here = shapefiles(in: children)
+        if !here.isEmpty { return here.sorted { $0.lastPathComponent < $1.lastPathComponent } }
+
+        let nested = children
+            .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+            .flatMap { folder in
+                shapefiles(in: (try? manager.contentsOfDirectory(
+                    at: folder, includingPropertiesForKeys: nil
+                )) ?? [])
+            }
+        return nested.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
     static func read(
