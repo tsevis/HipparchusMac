@@ -745,14 +745,23 @@ final class MapModel {
 
     // MARK: - Actions
 
-    func select(_ name: String) {
-        guard let place = availablePlaces.first(where: { $0.name == name }) else { return }
+    /// Set the area from a saved place given outright. The saved places are a
+    /// tree now — the regions and every country as well as the featured cities
+    /// — and only the cities are in `availablePlaces`, so the menu hands the
+    /// place over rather than naming one to look up.
+    func choose(name: String, bbox: BoundingBox) {
         pendingAction = ("Choose Place", "area")
         placeName = name
-        west = String(place.bbox.minLon)
-        south = String(place.bbox.minLat)
-        east = String(place.bbox.maxLon)
-        north = String(place.bbox.maxLat)
+        west = String(bbox.minLon)
+        south = String(bbox.minLat)
+        east = String(bbox.maxLon)
+        north = String(bbox.maxLat)
+    }
+
+    /// Set the area from one of the featured places, by name.
+    func select(_ name: String) {
+        guard let place = availablePlaces.first(where: { $0.name == name }) else { return }
+        choose(name: place.name, bbox: place.bbox)
     }
 
     /// Set the area from a rectangle drawn on the canvas.

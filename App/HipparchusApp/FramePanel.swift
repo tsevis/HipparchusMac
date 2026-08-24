@@ -93,27 +93,8 @@ struct FramePanel: View {
             }
 
             Section("Saved places") {
-                ForEach(model.availablePlaces) { place in
-                    Button {
-                        model.select(place.name)
-                    } label: {
-                        HStack {
-                            Text(place.name)
-                            Spacer()
-                            if model.placeName == place.name {
-                                Text("current")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            } else {
-                                Text(String(format: "%.2f°", abs(place.bbox.lonSpan)))
-                                    .font(.caption)
-                                    .monospacedDigit()
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
+                ForEach(SavedPlaces.groups(featured: model.availablePlaces)) { group in
+                    PlaceMenu(model: model, group: group)
                 }
             }
         }
@@ -132,6 +113,38 @@ struct FramePanel: View {
                 .multilineTextAlignment(.trailing)
                 .frame(width: 82)
                 .labelsHidden()
+        }
+    }
+}
+
+/// One saved-places group as a menu, its subgroups as nested menus — which is
+/// how AppKit draws a cascade. Two hundred countries are a wall as a list and
+/// unremarkable as six continents, so the depth is the whole point.
+///
+/// A view rather than a `@ViewBuilder` method because the recursion has to go
+/// through a type the compiler already knows: an opaque `some View` returned by
+/// a function that calls itself would be defined in terms of itself, which is
+/// an error. `AnyView` at the recursion point is what breaks that circle.
+private struct PlaceMenu: View {
+    let model: MapModel
+    let group: PlaceGroup
+
+    var body: some View {
+        Menu(group.name) {
+            ForEach(group.places) { place in
+                Button {
+                    model.choose(name: place.name, bbox: place.bbox)
+                } label: {
+                    if place.name == model.placeName {
+                        Label(place.name, systemImage: "checkmark")
+                    } else {
+                        Text(place.name)
+                    }
+                }
+            }
+            ForEach(group.subgroups) { subgroup in
+                AnyView(PlaceMenu(model: model, group: subgroup))
+            }
         }
     }
 }
