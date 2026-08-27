@@ -25,7 +25,7 @@ fixture rather than by narrowing to one direction of truth.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->992<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->1038<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -306,6 +306,7 @@ choices above were checked without a window to look at:
 | `--natural-earth <path>` | stack Natural Earth on top: coastlines, borders, rivers, place names |
 | `--pixels <n>` | how finely to sample the ground; the knob that matters on a large frame |
 | `--simulated` | a generated field, needing no network at all |
+| `--geojson` `--geojson-layers` | also write the ground as data rather than as ink |
 
 ```sh
 swift run -c release hipparchus-cli everest --hillshade \
@@ -1596,6 +1597,69 @@ duckdb -c "COPY (SELECT * FROM 'in.parquet') TO 'out.geojson' WITH (FORMAT GDAL,
 ```
 
 The app says exactly that when handed one, rather than returning an empty map.
+
+## The way back out: the scene as data
+
+Every export this application had until now — SVG, PDF, PNG — is a **picture**.
+The coordinates in them are page coordinates, and the ground they came from is
+gone by the time the file is written. That is right for the product and wrong as
+the only door out: a coastline assembled from EMODnet's 115 m grid, a depth band,
+a summit placed from OSM could leave here only as a drawing, and a drawing cannot
+be measured, queried or joined to anything.
+
+`GeoJSONExporter` writes the same scene as RFC 7946 GeoJSON. It is the inverse of
+the step the SVG exporter takes, not new geometry: every vertex goes back through
+`ProjectionProfile.unproject` into longitude and latitude.
+
+```bash
+hipparchus-cli --bbox 32.95,34.60,33.15,34.75 --geojson         # one collection
+hipparchus-cli --bbox 32.95,34.60,33.15,34.75 --geojson-layers  # one file per layer
+```
+
+One file is what a viewer wants dropped on it; a folder is what a GIS wants as
+layers, and it is also what `GeoJSONReader` reads — so **an export folder is a
+file source**, and a scene that leaves here can come back. That round trip is a
+test rather than a claim.
+
+What a feature carries:
+
+| Written | Why |
+|---|---|
+| `hipparchus_layer` | A file that forgets which layer a line came from is a heap of lines. The reader checks this key first, which is what closes the round trip. |
+| `fill`, `fill-opacity`, `stroke`, `stroke-width`, `stroke-opacity` | simplestyle-spec — the one styling convention a GeoJSON file can carry that other tools already read. |
+| `name`, `place_type`, `rotation` | Labels, as point features. A name that sits exactly on a mark lands **on that mark** rather than beside it as a second, anonymous point: Cyprus exported six cities as twelve points until this, half of them nameless. A label nudged clear of the dot it names, or set along a line, stays its own feature. |
+| `visible: false` | Only when the layer is unticked, as the SVG writes `display="none"`. An unticked layer is still part of the map. |
+
+Fills are read **per feature**, not off the layer style. Elevation bands take
+their colours from a ramp, band by band; an export that reads the style instead
+flattens a hypsometric map to one colour.
+
+The collection itself carries the requested `bbox` and, in the one place RFC 7946
+leaves for it, the same provenance the SVG carries as `data-hipparchus-*`
+attributes: the render CRS, the elevation model, the contour interval, the
+attribution, and `not_for_navigation` where the sheet stands on soundings. A new
+export format is a new way for [Attribution](#attribution-which-is-data-rather-than-prose)
+to quietly stop being true.
+
+Two details are silent when wrong, so both are tested:
+
+- **Ring winding.** RFC 7946 §3.1.6 wants exterior rings counter-clockwise and
+  holes clockwise. Plenty of readers ignore it; MapLibre — which is what viewers
+  like GeoLibre and Mapbox-derived tools draw with — does not, and a wrongly wound
+  exterior there fills the world and knocks a hole where the island should be.
+  Winding is measured on the ring **as written**, in degrees, because a projected
+  ring and its unprojected self are not always the same hand.
+- **A vertex that will not unproject.** Equal Earth has a domain, and outside it
+  the inverse is not a number. The part holding such a vertex is dropped whole
+  rather than repaired by leaving the vertex out: a missing shape is visible, and
+  a shape silently short-cut across the gap is not. The count is printed.
+
+**What it cannot carry is attributes.** A `RenderScene` is the drawing: by the
+time a feature reaches a layer, its OSM tags have been read, classified and
+discarded, and nothing downstream of `SceneBuilder` has them to give back. What
+comes out is shape, layer and style — enough to draw, measure and filter, not
+enough to ask what a way was tagged. That means going back to the source, which
+is what the source is for.
 
 ## The one source that needs nothing
 

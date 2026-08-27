@@ -2148,6 +2148,31 @@ final class MapModel {
     /// Appended to the export message when the sidecar could not be written.
     private var sidecarNote = ""
 
+    /// The scene as data rather than as ink.
+    ///
+    /// The other three exports are pictures: the coordinates in them are page
+    /// coordinates, and the ground is gone by the time the file is written. This
+    /// one writes the ground — RFC 7946 GeoJSON, every vertex unprojected back
+    /// into longitude and latitude — for anything that measures, queries or joins
+    /// rather than draws. See `GeoJSONExporter`.
+    ///
+    /// **No sidecar.** What the SVG puts in a diagnostics file beside it travels
+    /// inside this one, on the collection itself, so there is nothing here for a
+    /// refused sibling write to lose.
+    ///
+    /// Precision stays at the exporter's own default. It counts in degrees, where
+    /// six places is about 11 cm; the quality profile's places count projected
+    /// metres, and the same number would mean a different thing here.
+    ///
+    /// One file, not the per-layer folder the command line will write: a save
+    /// panel names a file, and asking it to name a directory that does not exist
+    /// yet is a worse conversation than it looks.
+    func exportGeoJSON() {
+        export(type: .geoJSON, extension: "geojson") { scene, url in
+            try GeoJSONExporter().write(scene, to: url)
+        }
+    }
+
     func exportPDF() {
         // A PDF carries physical size rather than a resolution: 72 points to the
         // inch, by definition, so a 24 × 36 sheet prints at 24 × 36 on any device

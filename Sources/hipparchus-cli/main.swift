@@ -116,9 +116,13 @@ func usage() -> Never {
       --list-palettes    print the palette names and exit
       --portrait         turn the sheet (default: landscape)
       --furniture        title, scale bar, north arrow and legend on the SVG, A4
+      --geojson          also write the ground as GeoJSON in lon/lat, which is
+                         the drawing as data: what a GIS reads, not a picture
+      --geojson-layers   the same, one file per layer in a <name>.geojson folder
       --no-files         measure only, write nothing
 
-    Writes <name>.png, <name>.svg, <name>.pdf and <name>.diagnostics.json.
+    Writes <name>.png, <name>.svg, <name>.pdf and <name>.diagnostics.json,
+    and <name>.geojson with --geojson.
     """)
     exit(2)
 }
@@ -151,6 +155,12 @@ struct Options {
     var naturalEarth: URL?
     var projection: ProjectionMode?
     var edgeToEdge = false
+    /// Also write the ground rather than the drawing: RFC 7946 GeoJSON, in
+    /// longitude and latitude, which is what every other GIS reads.
+    var geoJSON = false
+    /// One file per layer in a directory, rather than one collection. Which of
+    /// the two is wanted depends on what opens it — see `GeoJSONExporter`.
+    var geoJSONPerLayer = false
     /// An exact output size in pixels, replacing the 1600 × 1200 canvas.
     var outputSize: (width: Int, height: Int)?
 }
@@ -205,6 +215,11 @@ while argumentIndex < arguments.count {
         options.targetPixels = value
     case "--no-files":
         options.writeFiles = false
+    case "--geojson":
+        options.geoJSON = true
+    case "--geojson-layers":
+        options.geoJSON = true
+        options.geoJSONPerLayer = true
     case "--paper":
         argumentIndex += 1
         guard argumentIndex < arguments.count else { usage() }
@@ -642,7 +657,29 @@ func run(_ place: Place, options: Options) async throws {
     try PDFExporter(options: pdfOptions).write(scene, to: base.appendingPathExtension("pdf"))
     try diagnostics.jsonData().write(to: base.appendingPathExtension("diagnostics.json"))
 
-    print("  wrote \(slug(place.name)).{png,svg,pdf,diagnostics.json} into \(options.outputDirectory.path)")
+    // The drawing has been written; this writes the ground it was drawn from.
+    // Off unless asked for: it is a different kind of artefact, and most runs
+    // here want a sheet rather than a dataset.
+    var written = "png,svg,pdf,diagnostics.json"
+    if options.geoJSON {
+        let exporter = GeoJSONExporter()
+        let destination = base.appendingPathExtension("geojson")
+        let summary = options.geoJSONPerLayer
+            ? try exporter.writeLayers(of: scene, into: destination)
+            : try exporter.write(scene, to: destination)
+        written += ",geojson"
+        var line = "  GeoJSON \(spacedThousands(summary.features)) features"
+        line += " over \(summary.layers) layer\(summary.layers == 1 ? "" : "s")"
+        if options.geoJSONPerLayer { line += " in \(summary.files.count) files" }
+        print(line)
+        // A part that would not unproject is a hole in the data rather than a
+        // rounding difference, so it is said out loud instead of counted quietly.
+        if summary.dropped > 0 {
+            print("  GeoJSON \(summary.dropped) parts dropped: a vertex would not unproject")
+        }
+    }
+
+    print("  wrote \(slug(place.name)).{\(written)} into \(options.outputDirectory.path)")
 }
 
 extension String {

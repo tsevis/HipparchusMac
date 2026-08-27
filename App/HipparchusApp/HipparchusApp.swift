@@ -85,6 +85,10 @@ struct HipparchusApp: App {
             Button("Export PNG…") { model.exportPNG() }
                 .keyboardShortcut("e", modifiers: [.command, .option])
                 .disabled(model.scene == nil)
+            // No shortcut: the three obvious ⌘E combinations are taken, and a
+            // fourth would be a chord nobody guesses.
+            Button("Export GeoJSON…") { model.exportGeoJSON() }
+                .disabled(model.scene == nil)
         }
     }
 

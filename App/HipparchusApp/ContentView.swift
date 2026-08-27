@@ -398,6 +398,7 @@ struct ContentView: View {
                 Button("SVG…") { model.exportSVG() }
                 Button("PDF…") { model.exportPDF() }
                 Button("PNG…") { model.exportPNG() }
+                Button("GeoJSON…") { model.exportGeoJSON() }
                 Divider()
                 Button("Clear cache") { model.clearCache() }
             }
