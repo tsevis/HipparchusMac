@@ -1628,7 +1628,7 @@ What a feature carries:
 | Written | Why |
 |---|---|
 | `hipparchus_layer` | A file that forgets which layer a line came from is a heap of lines. The reader checks this key first, which is what closes the round trip. |
-| `fill`, `fill-opacity`, `stroke`, `stroke-width`, `stroke-opacity` | simplestyle-spec — the one styling convention a GeoJSON file can carry that other tools already read. |
+| `fill`, `fill-opacity`, `stroke`, `stroke-width`, `stroke-opacity` | simplestyle-spec, the nearest thing GeoJSON has to a styling convention. Some tools draw it — geojson.io, a GitHub gist. Others carry it as data and let you style *by* it: GeoLibre draws its own default blue and puts the colour in the feature popup. Either way it leaves here as fact rather than as ink. |
 | `name`, `place_type`, `rotation` | Labels, as point features. A name that sits exactly on a mark lands **on that mark** rather than beside it as a second, anonymous point: Cyprus exported six cities as twelve points until this, half of them nameless. A label nudged clear of the dot it names, or set along a line, stays its own feature. |
 | `visible: false` | Only when the layer is unticked, as the SVG writes `display="none"`. An unticked layer is still part of the map. |
 
@@ -1655,6 +1655,23 @@ Two details are silent when wrong, so both are tested:
   the inverse is not a number. The part holding such a vertex is dropped whole
   rather than repaired by leaving the vertex out: a missing shape is visible, and
   a shape silently short-cut across the gap is not. The count is printed.
+
+**Opened in GeoLibre, not only reasoned about.** One elevation band — a polygon
+with three holes — loaded into `web.geolibre.app` through Add Data ▸ Vector
+Layer, with no account and nothing published. It framed itself over Troodos,
+the basemap underneath reading Τρόοδος, Pano Amiantos and the B9; **the holes
+came out as holes**, which is the winding rule paying for itself, because a
+wrongly wound exterior there fills the viewport instead; `hipparchus_layer`,
+`fill` and `fill-opacity` all appear in the feature popup; and the `hipparchus`
+member was ignored in silence, which is what RFC 7946 asks of a reader that
+does not know it. The places layer loaded as six features, not twelve — the
+name-on-mark merge, seen from the other side.
+
+Size is the practical limit, and it is measured rather than guessed: a
+full-detail Cyprus frame writes 38 MB of bathymetry and 27 MB of contours, which
+QGIS takes calmly and a browser tab does not. Export per layer and load what you
+need; if that ever stops being enough, converting once to PMTiles is the answer,
+not a different exporter.
 
 **What it cannot carry is attributes.** A `RenderScene` is the drawing: by the
 time a feature reaches a layer, its OSM tags have been read, classified and

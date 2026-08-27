@@ -159,8 +159,9 @@ final class GeoJSONExportTests: XCTestCase {
         }
     }
 
-    /// simplestyle-spec, because it is the one styling convention a GeoJSON file
-    /// can carry that other tools already read.
+    /// simplestyle-spec, the nearest thing GeoJSON has to a styling convention.
+    /// Whether a viewer draws it or merely carries it varies — what is tested
+    /// here is that the file says it, which is the only half this end controls.
     func testStrokesAreWrittenInTheConventionOtherToolsRead() throws {
         let payload = try parsed()
         let contours = try features(in: payload)
