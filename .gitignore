@@ -31,6 +31,7 @@ xcuserdata/
 /HANDOFF_NEXT.md
 /NEXT_SESSION.md
 /Hipparchus_Land_and_Sea.md
+/documents/
 
 # Bytecode from importing a build script as a module, which is how the palette
 # parity fixture is generated from the one that ships the style packs.
