@@ -216,3 +216,30 @@ public struct PageSpec: Sendable, Equatable {
         bitmapCost(canvasWidth: canvasWidth, canvasHeight: canvasHeight).megapixels > Self.maximumMegapixels
     }
 }
+
+extension PageSpec {
+    /// Two inch numbers, said the way someone types them: `20x12`, `5:3`,
+    /// `20,12`. Nil if that is not what the text is.
+    ///
+    /// Lives here rather than in the command line tool because the tool cannot
+    /// be imported by a test — and the rule for reading a sheet is worth
+    /// testing on its own, separately from whatever asked for one.
+    public static func customInches(parsing text: String) -> (width: Double, height: Double)? {
+        let parts = text.lowercased().split(whereSeparator: { $0 == "x" || $0 == ":" || $0 == "," })
+        guard parts.count == 2,
+              let width = Double(parts[0]), let height = Double(parts[1]),
+              width > 0, height > 0
+        else { return nil }
+        return (width: width, height: height)
+    }
+
+    /// The same page, on a sheet of exactly these inches. A copy rather than a
+    /// mutation, so the caller's page is still the page they had.
+    public func settingCustomSize(widthInches: Double, heightInches: Double) -> PageSpec {
+        var page = self
+        page.paperName = PaperSize.customName
+        page.customWidthInches = widthInches
+        page.customHeightInches = heightInches
+        return page
+    }
+}

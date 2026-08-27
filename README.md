@@ -301,6 +301,8 @@ choices above were checked without a window to look at:
 | `--palette <name>` | recolour a preset; `--list-palettes` |
 | `--line-weight <x>` | multiply every stroke |
 | `--paper <name>` `--dpi <n>` `--portrait` | the sheet, for all three formats |
+| `--inches <w>x<h>` | a sheet of exactly these inches, for an aspect no named sheet has |
+| `--size <WxH>` | exact output size in pixels, instead of a sheet |
 | `--plugins <dir>` | load a style pack, so its presets and places can be named |
 | `--streets` | stack OpenStreetMap onto the elevation |
 | `--natural-earth <path>` | stack Natural Earth on top: coastlines, borders, rivers, place names |

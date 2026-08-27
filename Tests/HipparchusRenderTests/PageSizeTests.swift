@@ -154,3 +154,58 @@ final class PageSizeTests: XCTestCase {
         }
     }
 }
+
+/// What `--inches` does to a page.
+///
+/// The tool had two `--size` branches: the first read pixels, the second
+/// inches, and the second was unreachable — so `--size 20x12` asking for a
+/// 5:3 poster silently produced a 20 × 12 *pixel* canvas. The inch form now
+/// has its own flag, and the rule it parses by lives here where a test can
+/// reach it: the command line tool is an executable and cannot be imported.
+final class SheetArgumentTests: XCTestCase {
+
+    /// The form the flag advertises, reaching the page as a Custom sheet.
+    func testInchesReachThePageAsACustomSheet() throws {
+        let inches = try XCTUnwrap(PageSpec.customInches(parsing: "20x12"))
+        let page = PageSpec(dpi: 300).settingCustomSize(
+            widthInches: inches.width, heightInches: inches.height)
+
+        XCTAssertEqual(page.paperName, PaperSize.customName)
+        XCTAssertEqual(page.customWidthInches, 20, accuracy: 1e-9)
+        XCTAssertEqual(page.customHeightInches, 12, accuracy: 1e-9)
+
+        // Inches, not pixels: 20 × 12 at 300 dpi is a 6000 × 3600 bitmap, not
+        // a 20 × 12 one. This is the assertion the dead branch cost.
+        let pixels = page.pixelSize(canvasWidth: 1600, canvasHeight: 1200)
+        XCTAssertEqual(pixels.width, 6000)
+        XCTAssertEqual(pixels.height, 3600)
+    }
+
+    /// The separators someone actually types, and the aspect each gives.
+    func testTheSeparatorsAreTheOnesPeopleType() throws {
+        for text in ["20x12", "20X12", "5:3", "20,12"] {
+            let inches = try XCTUnwrap(PageSpec.customInches(parsing: text), text)
+            XCTAssertEqual(inches.width / inches.height, 5.0 / 3.0, accuracy: 1e-9, text)
+        }
+    }
+
+    /// Nothing that is not two positive numbers is a sheet.
+    func testWhatIsNotASheetIsRefused() {
+        for text in ["", "20", "20x", "x12", "20x12x8", "0x12", "-20x12", "wide x tall"] {
+            XCTAssertNil(PageSpec.customInches(parsing: text), text)
+        }
+    }
+
+    /// A page that was on a named sheet moves to Custom, and keeps everything
+    /// else it was carrying — the resolution above all, since inches only
+    /// become pixels once a dpi is applied.
+    func testTheRestOfThePageSurvivesTheChange() {
+        let before = PageSpec(paperName: "A4", orientation: "Portrait", dpi: 150)
+        let after = before.settingCustomSize(widthInches: 24, heightInches: 36)
+
+        XCTAssertEqual(after.paperName, PaperSize.customName)
+        XCTAssertEqual(after.orientation, "Portrait")
+        XCTAssertEqual(after.dpi, 150)
+        XCTAssertEqual(before.paperName, "A4", "the page asked from is not the page changed")
+    }
+}

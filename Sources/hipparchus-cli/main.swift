@@ -103,9 +103,9 @@ func usage() -> Never {
       --paper <name>     sheet for every export: \(PaperSize.names.joined(separator: ", "))
       --dpi <n>          resolution for the raster and the SVG viewport
       --line-weight <x>  multiply every stroke (default: 1)
-      --size <w>x<h>     a sheet of exactly these inches, so any aspect can be
+      --inches <w>x<h>   a sheet of exactly these inches, so any aspect can be
                          asked for: 20x12 is 5:3, 24x12 is 2:1. Combines with
-                         --dpi-style paper resolution to set the pixel size
+                         --dpi to set the pixel size, the way --paper does
       --size <WxH>       exact output size in pixels, e.g. 3000x1800. Replaces
                          the 1600 x 1200 canvas; the map fills it as far as its
                          own shape allows, so pick an area of the same shape
@@ -264,21 +264,18 @@ while argumentIndex < arguments.count {
             exit(2)
         }
         options.outputSize = (width: width, height: height)
-    case "--size":
+    // Inches, not pixels: a sheet rather than a canvas. Its own flag because a
+    // bare 20x12 says nothing about which was meant, and reading it as the
+    // wrong one is silent — a 20-pixel poster, or a 3000-inch sheet.
+    case "--inches":
         argumentIndex += 1
         guard argumentIndex < arguments.count else { usage() }
-        let parts = arguments[argumentIndex].lowercased()
-            .split(whereSeparator: { $0 == "x" || $0 == ":" || $0 == "," })
-        guard parts.count == 2,
-              let width = Double(parts[0]), let height = Double(parts[1]),
-              width > 0, height > 0
-        else {
-            print("error: --size wants width x height in inches, like 20x12 or 5:3")
+        guard let inches = PageSpec.customInches(parsing: arguments[argumentIndex]) else {
+            print("error: --inches wants width x height in inches, like 20x12 or 5:3")
             exit(2)
         }
-        options.page.paperName = PaperSize.customName
-        options.page.customWidthInches = width
-        options.page.customHeightInches = height
+        options.page = options.page.settingCustomSize(
+            widthInches: inches.width, heightInches: inches.height)
     case "--projection":
         argumentIndex += 1
         guard argumentIndex < arguments.count else { usage() }
