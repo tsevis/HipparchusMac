@@ -41,3 +41,36 @@ jobs:
 
       - name: Run tests
         run: swift test
+
+      # Two facts about every commit that nothing used to check, and both went
+      # stale. The count in the README is derived from `swift test --list-tests`
+      # rather than typed, and drifted three times in one day before it was; the
+      # preset tables are generated from the Python, and had been emitting three
+      # geometry fields this package's model does not have, so the next person to
+      # regenerate them would have got Swift that does not compile.
+      #
+      # Neither check writes anything. Both fail loudly instead.
+      - name: Test count in the README is current
+        run: Scripts/update-test-count.sh --check
+
+      - name: Check out the Python
+        uses: actions/checkout@v4
+        with:
+          repository: tsevis/Hipparchus
+          path: .python-twin
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Preset tables match the Python
+        env:
+          HIPPARCHUS_PYTHON_REPO: ${{ github.workspace }}/.python-twin
+        run: |
+          python -m pip install --upgrade pip
+          # Shapely only, which brings numpy with it. The generator reads the
+          # registry through the Python's own `rendering.models`, and that module
+          # imports `shapely.geometry.base` for its geometry types — but nothing
+          # here draws, so skia and scipy are not needed.
+          python -m pip install shapely
+          python3 Scripts/generate-presets.py --check
