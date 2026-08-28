@@ -194,6 +194,66 @@ final class PaletteTests: XCTestCase {
         }
     }
 
+    /// The seven layers that drifted from the Python, pinned as literals.
+    ///
+    /// Sea marks, the restricted areas and the surface currents were written
+    /// here and ported to the Python, and every one of them arrived slightly
+    /// wrong over there: one shared `mark_ink` where this chooses a colour per
+    /// mark, filled discs where this draws outlines with haloes, and a
+    /// streamline base of 1.1 against this 0.75 — which, since both apps
+    /// multiply it by the identical 0.45–2.2 `stroke_scale`, simply drew every
+    /// current half again as heavy.
+    ///
+    /// **Neither repository's parity fixture could see it.** `palette-parity.json`
+    /// is generated from `build-style-packs.py` sitting beside this engine, and
+    /// the Python's is generated from the module it checks. Two snapshots, each
+    /// faithful, neither looking at the other. So these are literals, stated the
+    /// same way in the Python's `MarineParityWithTheMacOSAppTests`, and changing
+    /// one side without the other fails on both.
+    func testTheMarineLayerMatchesThePythonApplication() {
+        for palette in Palette.all {
+            let styles = palette.styleProfile().layerStyles
+            let ink = palette.ink, water = palette.water, land = palette.land
+
+            func style(_ layer: String) throws -> LayerStyle {
+                try XCTUnwrap(styles[layer], "\(palette.name): no \(layer)")
+            }
+
+            XCTContext.runActivity(named: palette.name) { _ in
+                let widths: [(String, Double)] = [
+                    ("seamark_beacons", 1.0), ("seamark_buoys", 0.9),
+                    ("seamark_hazards", 1.05), ("seamark_lights", 0.9),
+                    ("seamark_harbours", 0.8), ("seamark_areas", 0.7),
+                    ("current_streamlines", 0.75),
+                ]
+                for (layer, width) in widths {
+                    XCTAssertEqual(styles[layer]?.strokeWidth, width, "\(palette.name)/\(layer): width")
+                }
+
+                // A colour each, rather than one shared mark ink.
+                XCTAssertEqual(styles["seamark_beacons"]?.strokeColor, Palette.mix(land, ink, 0.6))
+                XCTAssertEqual(styles["seamark_buoys"]?.strokeColor, Palette.mix(water, ink, 0.65))
+                XCTAssertEqual(styles["seamark_hazards"]?.strokeColor, ink)
+                XCTAssertEqual(styles["seamark_lights"]?.strokeColor, ink)
+                XCTAssertEqual(styles["seamark_harbours"]?.strokeColor, Palette.mix(land, ink, 0.45))
+                XCTAssertEqual(styles["seamark_areas"]?.strokeColor, Palette.mix(water, ink, 0.55))
+                XCTAssertEqual(
+                    styles["current_streamlines"]?.strokeColor,
+                    Palette.mix(water, ink, 0.7)
+                )
+
+                // The point marks are outlines with haloes; only the light is
+                // filled, because its weight comes from its area.
+                for layer in ["seamark_beacons", "seamark_buoys", "seamark_hazards"] {
+                    XCTAssertEqual(styles[layer]?.fillEnabled, false, "\(palette.name)/\(layer) is filled")
+                    XCTAssertEqual(styles[layer]?.labelHaloColor.a, 225, "\(palette.name)/\(layer): halo")
+                }
+                XCTAssertEqual(styles["seamark_lights"]?.fillEnabled, true)
+                XCTAssertEqual(styles["seamark_lights"]?.fillColor.a, 210)
+            }
+        }
+    }
+
     func testTheOfferedNamesLeadWithLeavingThePresetAlone() {
         XCTAssertEqual(Palette.names.first, Palette.presetOwnName)
         XCTAssertNil(Palette.named(Palette.presetOwnName), "the no-op must not be a palette")
