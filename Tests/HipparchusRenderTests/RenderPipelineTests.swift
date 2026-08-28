@@ -350,6 +350,37 @@ final class SceneBuilderTests: XCTestCase {
         )
     }
 
+    /// The rule, rather than the two instances of it that were found by eye.
+    ///
+    /// `testEveryProducibleLayerHasAPlaceInTheDrawOrder` names `night_lights`
+    /// and `admin_boundaries` because those are the ones somebody noticed. This
+    /// holds the order to the layer inventory instead, so a source added
+    /// tomorrow is ranked when it is added rather than when a sheet comes back
+    /// with a fill painted over it. The Python had thirteen unranked layers,
+    /// three of them fills, found only by rendering Cyprus and looking.
+    func testTheDrawOrderCoversEveryLayerTheInventoryKnows() {
+        let ranked = Set(SceneBuilder.preferredLayerOrder)
+        let known = Set(LayerInventory.labels.keys).union(LayerInventory.groups.keys)
+        let missing = known.subtracting(ranked).sorted()
+        XCTAssertEqual(missing, [], "drawn last, over everything: \(missing)")
+    }
+
+    /// The other direction: a rank for a layer that does not exist is a typo.
+    func testTheDrawOrderRanksNothingTheInventoryHasNeverHeardOf() {
+        let known = Set(LayerInventory.labels.keys).union(LayerInventory.groups.keys)
+        let unknown = SceneBuilder.preferredLayerOrder
+            .filter { !known.contains($0) && $0 != "roads" && !$0.hasPrefix("roads_") }
+            .sorted()
+        XCTAssertEqual(unknown, [], "ranked but unknown to the inventory: \(unknown)")
+    }
+
+    func testNoLayerIsRankedTwice() {
+        XCTAssertEqual(
+            SceneBuilder.preferredLayerOrder.count,
+            Set(SceneBuilder.preferredLayerOrder).count
+        )
+    }
+
     func testAnUnknownLayerIsDrawnAfterEverythingItCouldSitUnder() {
         let ordered = SceneBuilder.ordered([
             "terrain_contours", "zebra_crossings", "elevation_bands", "aardvarks",

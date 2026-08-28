@@ -17,6 +17,7 @@ final class PresetsTests: XCTestCase {
     }
 
     private let night = "Night"
+    private let cleanAtlas = "Clean Atlas"
 
     // MARK: - Every preset
 
@@ -112,6 +113,71 @@ final class PresetsTests: XCTestCase {
         let night = Set(Presets.preset(self.night).styleProfile.layerStyles.keys)
         let standard = Set(Presets.preset(Presets.defaultName).styleProfile.layerStyles.keys)
         XCTAssertEqual(standard.subtracting(night), [], "Night is missing layers the default styles")
+    }
+
+    // MARK: - Clean Atlas contours
+
+    /// Clean Atlas must name its contours rather than inherit a fallback.
+    ///
+    /// It tints elevation bands, so a terrain source gives it 800-odd contour
+    /// lines over those fills — its most numerous layer by an order of
+    /// magnitude. Naming nothing left them to `style(for:)`'s last resort, and
+    /// the two apps' last resorts were never the same one: a grey hairline
+    /// here, a near-black 1.0-wide line in the Python. The same preset drew a
+    /// visibly different sheet in each, and the palettes were not the reason.
+    func testCleanAtlasNamesItsContours() {
+        let styles = Presets.preset(cleanAtlas).styleProfile.layerStyles
+        for layer in ["terrain_contours", "terrain_index_contours"] {
+            XCTAssertNotNil(styles[layer], "Clean Atlas leaves \(layer) to the fallback")
+        }
+    }
+
+    /// Both presets fill the same bands, so both take the same ink over them.
+    func testCleanAtlasContoursMatchTerrainStudy() {
+        let clean = Presets.preset(cleanAtlas).styleProfile.layerStyles
+        let study = Presets.preset("Terrain Study").styleProfile.layerStyles
+        XCTAssertEqual(clean["elevation_bands"], study["elevation_bands"])
+        for layer in ["terrain_contours", "terrain_index_contours"] {
+            XCTAssertEqual(clean[layer], study[layer], "\(layer) diverges from Terrain Study")
+        }
+    }
+
+    /// The Python fallback's near-black is what greyed the hypsometric tint down.
+    func testCleanAtlasContoursAreBrownNotBlack() {
+        let contours = Presets.preset(cleanAtlas).styleProfile.style(for: "terrain_contours")
+        XCTAssertGreaterThan(contours.strokeColor.r, contours.strokeColor.b)
+        XCTAssertGreaterThan(luminance(contours.strokeColor), 60.0)
+        XCTAssertLessThan(contours.opacity, 1.0)
+    }
+
+    /// Every fifth line reads as the one carrying the number.
+    func testCleanAtlasIndexContoursCarryMoreWeight() {
+        let styles = Presets.preset(cleanAtlas).styleProfile
+        let minor = styles.style(for: "terrain_contours")
+        let index = styles.style(for: "terrain_index_contours")
+        XCTAssertGreaterThan(index.strokeWidth, minor.strokeWidth)
+        XCTAssertGreaterThan(index.opacity, minor.opacity)
+        XCTAssertLessThan(luminance(index.strokeColor), luminance(minor.strokeColor))
+    }
+
+    /// `LayerStyle` fills by default, and a filled contour is a blot.
+    func testCleanAtlasContoursAreDrawnAsLines() {
+        let styles = Presets.preset(cleanAtlas).styleProfile.layerStyles
+        for layer in ["terrain_contours", "terrain_index_contours"] {
+            XCTAssertEqual(styles[layer]?.fillEnabled, false, "\(layer) is filled")
+        }
+    }
+
+    /// Soft Urban is built from Clean Atlas's table in the Python and tints the
+    /// identical bands, so it inherits the same contours. Asserted rather than
+    /// left to chance: it is a second preset changed by a one-preset fix.
+    func testSoftUrbanInheritsTheSameContours() {
+        let clean = Presets.preset(cleanAtlas).styleProfile.layerStyles
+        let soft = Presets.preset("Soft Urban").styleProfile.layerStyles
+        XCTAssertEqual(soft["elevation_bands"], clean["elevation_bands"])
+        for layer in ["terrain_contours", "terrain_index_contours"] {
+            XCTAssertEqual(soft[layer], clean[layer], "Soft Urban's \(layer) drifted from Clean Atlas")
+        }
     }
 
     // MARK: - Resolving a name
