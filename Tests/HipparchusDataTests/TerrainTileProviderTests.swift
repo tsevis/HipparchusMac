@@ -287,8 +287,18 @@ final class TerrainFetchTests: XCTestCase {
     /// The tile *fetch* is what is being timed, not the whole pipeline: contouring
     /// dominates the wall clock in a debug build and would swamp the signal. So the
     /// mosaic builder is timed directly.
+    /// **The delay is long on purpose.** What this asserts is that the elapsed
+    /// time lands nearer one delay than `callCount` of them, so the margin it
+    /// has to see is a single delay wide. At 120 ms and two tiles that margin
+    /// was 120 ms, which is inside the jitter of a loaded CI runner: the first
+    /// real run of this suite measured 267 ms for work that is 240 ms serial and
+    /// ~120 ms pooled, and called it serial. Nothing was wrong with the code.
+    ///
+    /// Half a second makes the gap 500 ms, which scheduling noise does not
+    /// close, and costs half a second once. The assertion itself is unchanged —
+    /// still "faster than doing them one after another".
     func testTilesAreFetchedConcurrently() async throws {
-        let delay = Duration.milliseconds(120)
+        let delay = Duration.milliseconds(500)
         let stub = StubFetcher { _, _ in
             try? await Task.sleep(for: delay)
             return rampTileData()
