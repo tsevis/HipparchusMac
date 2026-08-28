@@ -214,43 +214,45 @@ final class PaletteTests: XCTestCase {
         for palette in Palette.all {
             let styles = palette.styleProfile().layerStyles
             let ink = palette.ink, water = palette.water, land = palette.land
+            let name = palette.name
 
-            func style(_ layer: String) throws -> LayerStyle {
-                try XCTUnwrap(styles[layer], "\(palette.name): no \(layer)")
+            // Every assertion names its palette rather than being wrapped in an
+            // `XCTContext.runActivity`, which is `@MainActor`-isolated: it
+            // compiles in a synchronous test on some toolchains and not on the
+            // one CI runs, which is a build failure for a grouping the failure
+            // messages already carry.
+            let widths: [(String, Double)] = [
+                ("seamark_beacons", 1.0), ("seamark_buoys", 0.9),
+                ("seamark_hazards", 1.05), ("seamark_lights", 0.9),
+                ("seamark_harbours", 0.8), ("seamark_areas", 0.7),
+                ("current_streamlines", 0.75),
+            ]
+            for (layer, width) in widths {
+                XCTAssertEqual(styles[layer]?.strokeWidth, width, "\(name)/\(layer): width")
             }
 
-            XCTContext.runActivity(named: palette.name) { _ in
-                let widths: [(String, Double)] = [
-                    ("seamark_beacons", 1.0), ("seamark_buoys", 0.9),
-                    ("seamark_hazards", 1.05), ("seamark_lights", 0.9),
-                    ("seamark_harbours", 0.8), ("seamark_areas", 0.7),
-                    ("current_streamlines", 0.75),
-                ]
-                for (layer, width) in widths {
-                    XCTAssertEqual(styles[layer]?.strokeWidth, width, "\(palette.name)/\(layer): width")
-                }
-
-                // A colour each, rather than one shared mark ink.
-                XCTAssertEqual(styles["seamark_beacons"]?.strokeColor, Palette.mix(land, ink, 0.6))
-                XCTAssertEqual(styles["seamark_buoys"]?.strokeColor, Palette.mix(water, ink, 0.65))
-                XCTAssertEqual(styles["seamark_hazards"]?.strokeColor, ink)
-                XCTAssertEqual(styles["seamark_lights"]?.strokeColor, ink)
-                XCTAssertEqual(styles["seamark_harbours"]?.strokeColor, Palette.mix(land, ink, 0.45))
-                XCTAssertEqual(styles["seamark_areas"]?.strokeColor, Palette.mix(water, ink, 0.55))
-                XCTAssertEqual(
-                    styles["current_streamlines"]?.strokeColor,
-                    Palette.mix(water, ink, 0.7)
-                )
-
-                // The point marks are outlines with haloes; only the light is
-                // filled, because its weight comes from its area.
-                for layer in ["seamark_beacons", "seamark_buoys", "seamark_hazards"] {
-                    XCTAssertEqual(styles[layer]?.fillEnabled, false, "\(palette.name)/\(layer) is filled")
-                    XCTAssertEqual(styles[layer]?.labelHaloColor.a, 225, "\(palette.name)/\(layer): halo")
-                }
-                XCTAssertEqual(styles["seamark_lights"]?.fillEnabled, true)
-                XCTAssertEqual(styles["seamark_lights"]?.fillColor.a, 210)
+            // A colour each, rather than one shared mark ink.
+            let inks: [(String, RGBAColor)] = [
+                ("seamark_beacons", Palette.mix(land, ink, 0.6)),
+                ("seamark_buoys", Palette.mix(water, ink, 0.65)),
+                ("seamark_hazards", ink),
+                ("seamark_lights", ink),
+                ("seamark_harbours", Palette.mix(land, ink, 0.45)),
+                ("seamark_areas", Palette.mix(water, ink, 0.55)),
+                ("current_streamlines", Palette.mix(water, ink, 0.7)),
+            ]
+            for (layer, colour) in inks {
+                XCTAssertEqual(styles[layer]?.strokeColor, colour, "\(name)/\(layer): colour")
             }
+
+            // The point marks are outlines with haloes; only the light is
+            // filled, because its weight comes from its area.
+            for layer in ["seamark_beacons", "seamark_buoys", "seamark_hazards"] {
+                XCTAssertEqual(styles[layer]?.fillEnabled, false, "\(name)/\(layer) is filled")
+                XCTAssertEqual(styles[layer]?.labelHaloColor.a, 225, "\(name)/\(layer): halo")
+            }
+            XCTAssertEqual(styles["seamark_lights"]?.fillEnabled, true, "\(name): the light is filled")
+            XCTAssertEqual(styles["seamark_lights"]?.fillColor.a, 210, "\(name): the flare's alpha")
         }
     }
 
