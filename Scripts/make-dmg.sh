@@ -146,7 +146,11 @@ mkdir -p "$OUTPUT_DIR"
 IMAGE="$OUTPUT_DIR/$NAME.dmg"
 rm -f "$IMAGE"
 
-echo "Creating $IMAGE…"
+# Braced deliberately. A bare `$IMAGE…` is fine in a UTF-8 locale and breaks in
+# any other: bash reads the first byte of the ellipsis as part of the variable
+# name, and `set -u` then kills the run at the last step, after the whole
+# release build has been paid for. The brace ends the name where it is meant to.
+echo "Creating ${IMAGE}…"
 hdiutil create \
     -volname "Hipparchus" \
     -srcfolder "$STAGING" \
