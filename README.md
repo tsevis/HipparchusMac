@@ -25,7 +25,7 @@ fixture rather than by narrowing to one direction of truth.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->1038<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->1070<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
@@ -47,25 +47,127 @@ a control that moves, greys out or stops responding will not fail anything. The
 model behind the window is verified continuously and the window is not, and
 "Verifying the app itself" below is as close as anything headless gets to it.
 
-## Download
+## What's new in 0.5.0
 
-[**Hipparchus 0.4.8**](https://github.com/tsevis/HipparchusMac/releases/latest)
-— a disk image, on the releases page. Drag the app to Applications.
+**This is the release where a preset stops leaving layers to chance.**
 
-The build is **signed ad-hoc: no Developer ID, no notarisation.** It opens on
-the machine that built it. On any other Mac, Gatekeeper refuses it, because a
-downloaded image carries a quarantine flag and macOS cannot verify an ad-hoc
-signature. Right-click the app and choose **Open**, or clear the flag:
+The sixteen style tables are generated from the Python's registry, and that
+registry is older than half the layers this app can draw. A preset said nothing
+about the sea floor, the sea marks, the isotherms, the borders or the ferry
+routes, and eleven of the sixteen said nothing about contours — so every one of
+those layers landed on whatever the fallback happened to be. A fallback is a
+*non-decision*: it was drawing the most numerous layer on a terrain sheet, 825
+contours over Cyprus, in a colour nobody had chosen.
 
+Worse, the two applications had each picked a *different* non-decision — a
+translucent grey hairline here, a near-black line at twice the width in the
+Python — so the same preset, on the same ground, at the same sheet size, drew a
+visibly different map in each, and the palettes were not the reason.
+
+- **Every layer is now styled, and derived rather than guessed.** The sea's
+  layers read the sheet's own water and its darkest line on the sea; a border
+  reads its land; the contours read the high end of its elevation ramp. `Night`
+  pairs near-black paper with a pale hypsometric sheet, so its contours go
+  *darker* — the ground under a contour is the band it sits on, not the paper
+  behind it. A constant could not have got that right. See
+  [A layer nobody styled](#a-layer-nobody-styled).
+- **`Clean Atlas` and `Soft Urban` gain an explicit contour pair**, in the brown
+  `Terrain Study` uses over the identical elevation bands.
+- **`OSM Standard` and `Editorial Print` gain fifteen layers apiece.** They were
+  the only presets transcribed from tables the Python wrote from scratch, so they
+  had never gained what its shared base grew — `elevation_bands` among them,
+  which is a fill and so drew as nothing at all.
+- **The two apps now agree**, checked on real ground: contour ink, border colour,
+  band and depth geometry counts and layer order all match on the same Cyprus
+  sheet.
+- **A test asserts the whole class.** Nothing the layer inventory knows about can
+  reach the fallback under any preset, so a new source fails the suite the day it
+  is added rather than the day somebody renders a sheet and squints at it.
+
+Two bugs fell out of having looked. `Scripts/generate-presets.py` had been
+emitting three geometry fields this app's model does not have, so regenerating
+the tables produced a file that **would not compile** — nobody had re-run it
+since the Python grew them; it now skips them and says so. And the layer order in
+the Python was missing thirteen layers, three of them fills, which are drawn last
+when unranked: a sea temperature sheet painted the whole map out at its final
+step.
+
+**The sea marks and the currents are now pinned against the Python**, which had
+drifted from them: one shared ink where this picks a colour per mark, filled
+discs where this draws outlines with haloes, and streamlines half again too
+heavy. The Python moved onto these values, since this is where they were written.
+Neither repository's parity fixture could see it — each is generated from the
+implementation it checks — so the seven layers are asserted as literals in both
+suites, each naming the other.
+
+That pinning turned up a rounding trap. `RGBAColor.mixed` used Swift's default
+half-away-from-zero where Python's `round()` is half-to-even, so a channel
+landing exactly on 40.5 came out a unit apart in every derived style. It now
+rounds to even, as `PaletteSheet.mix` already did — colours may shift by one unit
+in one channel, and only where they sat exactly on a half.
+
+CI gained the two checks that would have caught this release's stale artefacts:
+the derived test count, and whether the preset tables still match the Python.
+
+New documentation: [MANUAL.md](MANUAL.md), [FILE_STRUCTURE.md](FILE_STRUCTURE.md),
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and [CLAUDE.md](CLAUDE.md).
+
+## Installing
+
+### The quick way
+
+[**Hipparchus 0.5.0**](https://github.com/tsevis/HipparchusMac/releases/latest)
+— a disk image, on the releases page. Open it and drag the app to Applications.
+
+**It will not open on first double-click, and that is expected.** The build is
+signed ad-hoc — no Developer ID, no notarisation — so a downloaded image carries
+a quarantine flag macOS cannot clear on its own. One time only, either:
+
+- **right-click the app and choose Open**, then confirm; or
+- clear the flag yourself:
+
+  ```sh
+  xattr -dr com.apple.quarantine /Applications/Hipparchus.app
+  ```
+
+macOS remembers the decision either way.
+
+### From source
+
+Needs **macOS 15+** and **Xcode 26 / Swift 6.2**. GEOS is committed pre-built, so
+CMake is only needed if you want to rebuild it.
+
+```sh
+git clone https://github.com/tsevis/HipparchusMac.git
+cd HipparchusMac
+brew install xcodegen        # the Xcode project is generated, not committed
+Scripts/install-app.sh       # builds in release, installs to /Applications
 ```
-xattr -dr com.apple.quarantine /Applications/Hipparchus.app
+
+For the headless renderer alone, no xcodegen needed:
+
+```sh
+swift build -c release
+.build/release/hipparchus-cli santorini --out out
 ```
 
-That is a reasonable thing to ask of yourself and an unreasonable thing to ask
-of anyone else. Proper distribution needs an Apple Developer account, a
-Developer ID certificate and `notarytool`; this repository does none of that,
-and says so rather than shipping something that looks distributable and is not.
-Building from source, below, has none of these problems.
+To check it works — in **release**, which is fifty times faster for the contour
+loop and takes about two seconds:
+
+```sh
+swift test -c release
+```
+
+Full detail, including how to build a disk image, is in
+[MANUAL.md](MANUAL.md#1-installing).
+
+### Why the signature is the way it is
+
+Right-clicking to open is a reasonable thing to ask of yourself and an
+unreasonable thing to ask of anyone else. Proper distribution needs an Apple
+Developer account, a Developer ID certificate and `notarytool`; this repository
+does none of that, and says so rather than shipping something that looks
+distributable and is not. Building from source has none of these problems.
 
 What this port deliberately does not have is listed under "What is not here",
 which distinguishes decided-against from overlooked.
@@ -124,7 +226,7 @@ Scripts/install-app.sh
 And for a disk image, named for the version and the commit it came from:
 
 ```sh
-Scripts/make-dmg.sh          # → dist/Hipparchus-0.4.8-<sha>.dmg
+Scripts/make-dmg.sh          # → dist/Hipparchus-0.5.0-<sha>.dmg
 ```
 
 The signature is **ad-hoc**, and that matters more for the image than for the
@@ -1089,6 +1191,40 @@ hairlines a third of a millimetre wide. Applied to the built scene, so it is
 live: moving the slider redraws without re-simplifying a quarter of a million
 features.
 
+## A layer nobody styled
+
+The sixteen presets are generated from the Python's registry, and that registry
+is older than half the layers this app can draw. A preset says nothing about the
+sea floor, the sea marks, the isotherms, the borders or the ferry routes, and
+eleven of them said nothing about contours — so every one of those layers landed
+on whatever the fallback happened to be.
+
+That is not a small cosmetic gap, for two reasons. A fallback is a *non-decision*
+rather than a neutral one: it drew the most numerous layer on a terrain sheet,
+825 contours over Cyprus, in a colour nobody chose. And the two applications had
+picked different non-decisions — a translucent grey hairline here, a near-black
+line at twice the width in the Python — so the same preset, on the same ground,
+at the same sheet size, drew a visibly different map in each, and the palettes
+were not the reason.
+
+So a layer a preset has not named is now **derived from what that preset already
+chose** rather than given a constant. The sea's layers read the sheet's own water
+and its darkest line on the sea; a border reads its land; the contours read the
+high end of its elevation ramp, which is what makes them look like they belong to
+the relief rather than lying on top of it. Each derivation then asks which way to
+push: `Night` pairs near-black paper with a pale hypsometric sheet, so its
+contours go *darker*, not lighter, because the ground under a contour is the band
+it is drawn on and not the paper behind it. A constant could not have got that
+right, and a hand-picked brown would have been invisible.
+
+An explicit entry always wins. `Clean Atlas` names its contours and keeps them;
+the derivation is the floor, not the ceiling.
+
+Both applications assert this the same way, and the assertion is the point: every
+layer the layer inventory knows about must resolve to a real style under every
+preset, and a test fails on the day a new source arrives unstyled rather than on
+the day somebody renders a sheet and squints at it.
+
 ## The sea, which OSM does not give you
 
 OpenStreetMap describes a coast as open ways, not as a filled ocean, so a coastal
@@ -1815,5 +1951,26 @@ a sheet that fell back to the global grid does not claim EMODnet.
 
 ## Licence
 
-The application is MIT, as the Python is. GEOS is LGPL-2.1 and is statically
-linked; see `Vendor/geos/MANIFEST.txt` and `Docs/GEOS.md`.
+Hipparchus is released under the **[MIT License](LICENSE)** — copyright (c) 2026
+Charis Tsevis — as the Python application is. That covers the code in this
+repository and nothing else. Two other things arrive with it and carry terms of
+their own.
+
+**GEOS is LGPL-2.1, and it is not optional.** Every polygon operation here is
+GEOS: the band builder, the coastline noding, the sea inference, the smoothing.
+It is linked statically as a committed `libgeos.a`. Static linking of an LGPL
+library is permitted on the condition that anyone receiving the binary can
+relink it against their own GEOS — which this repository satisfies, because the
+upstream release is pinned by URL and sha256 in
+`Scripts/build-geos-xcframework.sh`, every CMake flag that affects the output is
+a literal in that script, and the application's own source is here under MIT.
+**If you redistribute a built copy, that obligation travels with it.**
+
+**The map data is not ours to license.** OpenStreetMap is ODbL and share-alike;
+EMODnet asks for a line explicitly; the NOAA and USGS material is public domain;
+Natural Earth waives attribution and deserves it anyway. Each exported sheet
+carries the sources that actually drew it, derived from the registry rather than
+typed.
+
+All of it is set out in **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)**,
+with `Vendor/geos/MANIFEST.txt` and `Docs/GEOS.md` for the GEOS build detail.

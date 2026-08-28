@@ -114,8 +114,26 @@ targets:
         # launch flag skipped the size refusal along with the size warning,
         # which is how a headless continental frame spent five minutes asking
         # Overpass for the one thing it exists to refuse.
-        MARKETING_VERSION: "0.4.8"
-        CURRENT_PROJECT_VERSION: "19"
+        # 0.5.0 is the release where a preset stops leaving layers to chance.
+        # The style tables are generated from the Python's registry and that
+        # registry predates half of what this app can draw, so the sea floor,
+        # the sea marks, the isotherms, the borders, the ferry routes and — on
+        # eleven of the sixteen presets — the contours all landed on a fallback
+        # rather than on a decision. Worse, the two applications had chosen
+        # *different* fallbacks, a grey hairline here against a near-black line
+        # at twice the width there, so one preset drew two visibly different
+        # maps of the same ground and the palettes were not the reason. Every
+        # such layer is now derived from what the preset already chose, and a
+        # test asserts that nothing the layer inventory knows about can reach
+        # the fallback under any preset. Two bugs fall out of having looked.
+        # `Scripts/generate-presets.py` had been emitting three geometry fields
+        # this app's model does not have, so regenerating the tables produced a
+        # file that would not compile — nobody had re-run it since the Python
+        # grew them. And the layer order in the Python was missing thirteen
+        # layers, three of them fills, which are drawn last when unranked: a
+        # sea temperature sheet painted the whole map out at the final step.
+        MARKETING_VERSION: "0.5.0"
+        CURRENT_PROJECT_VERSION: "20"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
