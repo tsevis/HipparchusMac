@@ -77,13 +77,223 @@ public struct StyleProfile: Sendable {
         // draws a mark that reads as nothing in particular.
         if layer == TerrainLayer.hillshade { return derivedHillshade }
         if layer == TerrainLayer.depthBands { return derivedDepthBands }
+        if layer == FileLayer.adminBoundaries { return derivedAdminBoundaries }
+        if let contour = derivedContourStyle(for: layer) { return contour }
         if let seamark = derivedSeamarkStyle(for: layer) { return seamark }
+        if let ocean = derivedOceanStyle(for: layer) { return ocean }
 
-        var fallback = LayerStyle()
-        fallback.fillEnabled = false
-        fallback.strokeWidth = 0.5
-        fallback.strokeColor = RGBAColor(120, 120, 120, 200)
-        return fallback
+        return Self.unstyledFallback
+    }
+
+    /// What a layer nobody has styled and nothing derives is drawn as.
+    ///
+    /// Named rather than built inline so a test can ask "did this layer fall
+    /// back?" instead of asserting a colour, and so the Python — whose
+    /// `resolve_style` returned a bare `LayerStyle()` until this was reconciled,
+    /// a near-black 1.0-wide *filled* line nobody chose — has something to match.
+    public static let unstyledFallback: LayerStyle = {
+        var style = LayerStyle()
+        style.fillEnabled = false
+        style.strokeWidth = 0.5
+        style.strokeColor = RGBAColor(120, 120, 120, 200)
+        return style
+    }()
+
+    /// Rec. 601 luma on 0–1, the cheap standard answer to "is this light or dark",
+    /// and it agrees with the eye on every preset here.
+    static func luma(_ colour: RGBAColor) -> Double {
+        (299.0 * Double(colour.r) + 587.0 * Double(colour.g)
+            + 114.0 * Double(colour.b)) / 255_000.0
+    }
+
+    /// The ground a relief layer actually lands on.
+    ///
+    /// Not the background: the hillshade and the contours are both drawn over
+    /// `elevation_bands`, so where those are filled *they* are the ground. Asking
+    /// the background instead is wrong on any preset pairing dark paper with a
+    /// pale sheet — `Night` is exactly that.
+    ///
+    /// A band fill that is not opaque is sitting on the background, so the two
+    /// are mixed rather than one chosen.
+    private var groundAsDrawn: RGBAColor {
+        guard let bands = layerStyles[TerrainLayer.elevationBands], bands.fillEnabled else {
+            return background
+        }
+        return background.mixed(towards: bands.fillColor, amount: Double(bands.fillColor.a) / 255.0)
+    }
+
+    /// The land's own darkest tone: the high end of the elevation ramp.
+    ///
+    /// A contour describes the ground, so it is drawn in the ground's colour
+    /// rather than the sea's. Every hand-picked contour in the tables already
+    /// follows that relationship — `Terrain Study` draws `120,105,81` under a
+    /// ramp topping out at `150,122,96` — which is what makes contours read as
+    /// belonging to the relief instead of lying on top of it.
+    private var reliefInk: RGBAColor {
+        guard let bands = layerStyles[TerrainLayer.elevationBands] else { return sheetsOwnLand }
+        if bands.fillEnabled, let high = bands.fillColorHigh { return high }
+        return bands.strokeColor
+    }
+
+    /// Contours for a preset that has never named them, or `nil` otherwise.
+    ///
+    /// Nine presets left the pair to the fallback after `Clean Atlas` was given
+    /// its ink by hand. A derivation serves them better than one chosen colour
+    /// could: the brown that reads on `Terrain Study` is invisible on `Night`,
+    /// whose ground is near-black, and the direction of the correction below is
+    /// decided by the ground rather than assumed.
+    ///
+    /// An explicit entry always wins, so a preset whose contours were chosen by
+    /// eye keeps them.
+    private func derivedContourStyle(for layer: String) -> LayerStyle? {
+        let isIndex: Bool
+        switch layer {
+        case TerrainLayer.minorContours: isIndex = false
+        case TerrainLayer.indexContours: isIndex = true
+        default: return nil
+        }
+
+        // Push the ink away from the ground it is drawn on, so the line reads on
+        // a dark sheet and a pale one alike. Index lines go further, being the
+        // ones that carry the number.
+        let away = Self.luma(groundAsDrawn) >= 0.5
+            ? RGBAColor(0, 0, 0)
+            : RGBAColor(255, 255, 255)
+
+        var style = LayerStyle()
+        style.fillEnabled = false
+        style.strokeColor = reliefInk.mixed(towards: away, amount: isIndex ? 0.45 : 0.25)
+        // The weights `Clean Atlas` was given by hand, which came from `Terrain
+        // Study` and pair a readable minor line with an index line that reads as
+        // the one carrying the number.
+        style.strokeWidth = isIndex ? 1.15 : 0.7
+        style.opacity = isIndex ? 0.8 : 0.55
+        return style
+    }
+
+    /// The preset's own land, however it stated `buildings`.
+    ///
+    /// A border is drawn against the ground it partitions rather than against
+    /// the sea, so it is the one derivation here that reaches for this.
+    private var sheetsOwnLand: RGBAColor {
+        layerStyles["buildings"].map { $0.fillEnabled ? $0.fillColor : $0.strokeColor }
+            ?? RGBAColor(200, 190, 175)
+    }
+
+    /// The sea's own colour, however the preset stated it.
+    private var sheetsOwnWater: RGBAColor {
+        layerStyles["water"].map { $0.fillEnabled ? $0.fillColor : $0.strokeColor }
+            ?? RGBAColor(150, 180, 200)
+    }
+
+    /// The darkest line the preset draws on the sea.
+    private var sheetsOwnInk: RGBAColor {
+        layerStyles[TerrainLayer.bathymetry]?.strokeColor
+            ?? layerStyles["coastline"]?.strokeColor
+            ?? RGBAColor(40, 60, 80)
+    }
+
+    /// One of the four ocean layers for a preset that has never heard of them,
+    /// or `nil` for any other layer.
+    ///
+    /// **The same gap `derivedDepthBands` closed, four layers on.** The mixes
+    /// are `PaletteSheet`'s own for these layers, read off what the preset
+    /// already chose, so a sheet with no `--palette` override gets them in its
+    /// own voice rather than in nobody's.
+    private func derivedOceanStyle(for layer: String) -> LayerStyle? {
+        let water = sheetsOwnWater
+        let ink = sheetsOwnInk
+
+        switch layer {
+        case "sst_bands":
+            return derivedSeaTemperatureBands(water: water, ink: ink)
+
+        // Isotherms: the sea's own ink at half strength, finer than the isobaths
+        // they cross. When both are on, the depth is the ground and the
+        // temperature is the reading taken over it. `PaletteSheet` scales this
+        // by its own contour weight; a preset has no equivalent knob, so the
+        // base weight stands on its own.
+        case "sst_contours":
+            var style = LayerStyle()
+            style.strokeWidth = 0.4
+            style.fillEnabled = false
+            style.strokeColor = water.mixed(towards: ink, amount: 0.5)
+            style.opacity = 0.65
+            return style
+
+        // Drawn in the sea's own ink rather than an accent: the streamlines
+        // cross the whole sheet, and a second accent colour on a chart is one
+        // competing claim too many. A streamline's width means something — each
+        // run carries its own scale — so this is the base that scale multiplies.
+        case CurrentsProvider.layer:
+            var style = LayerStyle()
+            style.strokeWidth = 0.75
+            style.fillEnabled = false
+            style.strokeColor = water.mixed(towards: ink, amount: 0.7)
+            style.opacity = 0.85
+            style.lineCap = .round
+            return style
+
+        // A line on the water and the faintest thing drawn on it: a ferry route
+        // is a service, not a measurement, and must not read as an isobath.
+        case "ferry_routes":
+            var style = LayerStyle()
+            style.strokeWidth = 0.6
+            style.fillEnabled = false
+            style.strokeColor = water.mixed(towards: ink, amount: 0.2)
+            style.opacity = 0.7
+            style.lineCap = .butt
+            return style
+
+        default:
+            return nil
+        }
+    }
+
+    /// Filled sea-temperature bands, cool through warm.
+    ///
+    /// **It follows the land rather than overruling it**, the rule
+    /// `derivedDepthBands` follows for the sea floor: a preset that leaves
+    /// `elevation_bands` unfilled has decided the sheet is linework, and forcing
+    /// a temperature wash onto it would be this derivation deciding what the
+    /// sheet is.
+    ///
+    /// Unlike the depth ramp, the stops are **not** sorted by luminance. *Deep
+    /// is darker* is a thing a reader assumes about water without being told;
+    /// *warm is darker* is not, and the ends here are cool and warm rather than
+    /// near and far. They stay where `PaletteSheet` puts them.
+    private func derivedSeaTemperatureBands(water: RGBAColor, ink: RGBAColor) -> LayerStyle {
+        var style = LayerStyle()
+        style.strokeWidth = 0.0
+
+        let bands = layerStyles[TerrainLayer.elevationBands]
+        style.fillEnabled = bands?.fillEnabled ?? false
+        guard style.fillEnabled else { return style }
+
+        style.fillColor = water.mixed(towards: ink, amount: 0.35)
+        style.fillColorHigh = sheetsOwnLand.mixed(towards: ink, amount: 0.15)
+        // Low, and deliberately: these sit over the sea floor they describe, and
+        // a temperature that hides the isobaths has replaced the chart it
+        // annotates.
+        style.opacity = 0.42
+        return style
+    }
+
+    /// A border for a preset that has never named one.
+    ///
+    /// Drawn in the sheet's own land darkened towards its ink, lightly: a border
+    /// follows a coast or a road network it must not outshout, and it is the one
+    /// line here that belongs to the ground rather than to the water.
+    ///
+    /// Never filled. A boundary is a partition, and filling it paints one side
+    /// out.
+    private var derivedAdminBoundaries: LayerStyle {
+        var style = LayerStyle()
+        style.strokeWidth = 0.8
+        style.fillEnabled = false
+        style.strokeColor = sheetsOwnLand.mixed(towards: sheetsOwnInk, amount: 0.15)
+        style.opacity = 0.55
+        return style
     }
 
     /// Depth bands for a preset that has never heard of them.
@@ -302,19 +512,7 @@ public struct StyleProfile: Sendable {
         style.strokeWidth = 0.0
         style.fillEnabled = true
 
-        // The ground as it actually ends up: a band fill that is not opaque is
-        // sitting on the background, so the two are mixed rather than one chosen.
-        var ground = background
-        if let bands = layerStyles[TerrainLayer.elevationBands], bands.fillEnabled {
-            ground = background.mixed(towards: bands.fillColor, amount: Double(bands.fillColor.a) / 255.0)
-        }
-
-        // Rec. 601 luma, the cheap standard answer to "is this light or dark",
-        // and it agrees with the eye on every preset here.
-        let luma = (299.0 * Double(ground.r) + 587.0 * Double(ground.g)
-            + 114.0 * Double(ground.b)) / 255_000.0
-
-        if luma >= 0.5 {
+        if Self.luma(groundAsDrawn) >= 0.5 {
             // Band 0 is the deepest shadow, the last band the brightest.
             style.fillColor = RGBAColor(0, 0, 0, 140)
             style.fillColorHigh = RGBAColor(0, 0, 0, 0)
