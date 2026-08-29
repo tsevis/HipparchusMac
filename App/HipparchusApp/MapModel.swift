@@ -1898,7 +1898,7 @@ final class MapModel {
             }
             let features = scene.layers.reduce(0) { $0 + $1.geometries.count }
             print("drawn: \(features) geometries over \(scene.layers.count) layers")
-            print("scene covers: \(scene.bbox)")
+            print("scene covers: \(scene.bbox.map { "\($0)" } ?? "none")")
             print(self.status)
             exit(0)
         }
@@ -1926,7 +1926,10 @@ final class MapModel {
 
             let size = CGSize(width: 1600, height: 1200)
 
-            func visibleArea(atZoom zoom: Double) -> BoundingBox? {
+            // Explicitly isolated, as `settle()` above is: this builds and
+            // draws a real NSView, all of it main-actor work, and a nested
+            // function does not inherit the enclosing closure's actor.
+            @MainActor func visibleArea(atZoom zoom: Double) -> BoundingBox? {
                 let view = MapCanvasView()
                 view.frame = CGRect(origin: .zero, size: size)
                 view.scene = scene
