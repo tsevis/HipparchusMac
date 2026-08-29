@@ -1,5 +1,7 @@
 # HipparchusMac
 
+[![Tests](https://github.com/tsevis/HipparchusMac/actions/workflows/tests.yml/badge.svg)](https://github.com/tsevis/HipparchusMac/actions/workflows/tests.yml)
+
 A native macOS rewrite of [Hipparchus](https://github.com/tsevis/Hipparchus):
 choose an area of the world, fetch map data from public sources, and export
 layered, Illustrator-editable SVG.

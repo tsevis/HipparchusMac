@@ -132,8 +132,23 @@ targets:
         # grew them. And the layer order in the Python was missing thirteen
         # layers, three of them fills, which are drawn last when unranked: a
         # sea temperature sheet painted the whole map out at the final step.
+        # Three more things landed after that was written, none of them visible
+        # in a drawn map, and the CI this release added caught two of them
+        # within a day of first working. `XCTContext.runActivity` is
+        # `@MainActor @preconcurrency`, so the marine parity test could not call
+        # it from a synchronous nonisolated method under strict concurrency: the
+        # runner failed `swift build --build-tests` before a test ran, on code
+        # that compiles here. A concurrency assertion had a margin one 120 ms
+        # delay wide, which is inside a loaded runner's jitter, and it read
+        # 267 ms of pooled work as serial. The third is the first one's shape
+        # again, found by building rather than by testing — the verification
+        # helpers that drive real AppKit and MapKit objects were nonisolated
+        # while every caller is `@MainActor`, so a clean build carried 28
+        # warnings that Swift 6 turns into errors. None of the 28 had been
+        # noticed, because an incremental build recompiles nothing and reports
+        # none of them.
         MARKETING_VERSION: "0.5.0"
-        CURRENT_PROJECT_VERSION: "20"
+        CURRENT_PROJECT_VERSION: "21"
         PRODUCT_NAME: Hipparchus
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
