@@ -47,6 +47,7 @@ private func laidOutMap(
 /// exercised; the one thing this does not test is whether `MapKit` calls the
 /// delegate after a real drag, which is core, ubiquitous framework behaviour
 /// that does not need re-proving here.
+@MainActor
 func verifyLocatorRegionConversion(
     centerLat: Double, centerLon: Double, latSpan: Double, lonSpan: Double
 ) -> String {
@@ -90,6 +91,7 @@ func verifyLocatorRegionConversion(
 /// that showed the wrong area on screen. Prints the map's own region and
 /// `onRegionChanged`'s reports at each step, so a wrong step is visible
 /// rather than only its final symptom.
+@MainActor
 func verifyLocatorLaunchSequence(defaultBBox: BoundingBox, restoredBBox: BoundingBox) -> String {
     final class Reports: @unchecked Sendable {
         var seen: [BoundingBox] = []
@@ -394,6 +396,7 @@ func verifyLocatorDrag() -> String {
 /// perfectly for a mouse. What cannot be checked here is the events
 /// themselves — AppKit does not deliver a synthesised tablet press to a
 /// recognizer — so this checks the decision the recognizer makes about them.
+@MainActor
 func verifyForgivingClick() -> String {
     var log = "click tolerance: \(ForgivingClickRecognizer.slop)pt\n"
     var failures: [String] = []
