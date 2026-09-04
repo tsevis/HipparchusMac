@@ -119,20 +119,12 @@ New documentation: [MANUAL.md](MANUAL.md), [FILE_STRUCTURE.md](FILE_STRUCTURE.md
 ### The quick way
 
 [**Hipparchus 0.5.0**](https://github.com/tsevis/HipparchusMac/releases/latest)
-— a disk image, on the releases page. Open it and drag the app to Applications.
+— a disk image, on the releases page. Open it, drag the app to Applications, and
+open it from there.
 
-**It will not open on first double-click, and that is expected.** The build is
-signed ad-hoc — no Developer ID, no notarisation — so a downloaded image carries
-a quarantine flag macOS cannot clear on its own. One time only, either:
-
-- **right-click the app and choose Open**, then confirm; or
-- clear the flag yourself:
-
-  ```sh
-  xattr -dr com.apple.quarantine /Applications/Hipparchus.app
-  ```
-
-macOS remembers the decision either way.
+The build is signed with a Developer ID certificate and notarized by Apple, so
+macOS opens it without a Gatekeeper prompt, including on a Mac that has never
+seen it before.
 
 ### From source
 
