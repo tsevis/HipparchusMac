@@ -5,7 +5,7 @@ import XCTest
 ///
 /// The ported unit tests say the tracer is *correct*. This says it is the *same*:
 /// the reference JSON was produced by running `contour_polylines` from
-/// `/Users/tsevis/AI/ClaudeCode/Hipparchus` over an awkward field — two ridges, a
+/// the Hipparchus Python repository over an awkward field — two ridges, a
 /// saddle, a NaN hole, and a sample sitting exactly on a level — and it pins line
 /// count, line order, vertex order and vertex values.
 ///

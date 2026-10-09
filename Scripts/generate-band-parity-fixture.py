@@ -19,10 +19,19 @@ Run from the repo root:
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import sys
 
-PYTHON_REPO = pathlib.Path("/Users/tsevis/AI/ClaudeCode/Hipparchus")
+# The Python implementation this is checked against: a checkout of the Hipparchus
+# repository, by default the directory next to this one. Override it with
+# HIPPARCHUS_PYTHON_REPO.
+PYTHON_REPO = pathlib.Path(
+    os.environ.get(
+        "HIPPARCHUS_PYTHON_REPO",
+        pathlib.Path(__file__).resolve().parent.parent.parent / "Hipparchus",
+    )
+)
 OUTPUT = pathlib.Path("Tests/HipparchusGEOSTests/Fixtures/band-parity.json")
 LEVELS: tuple[float, ...] = (10.0, 30.0, 50.0, 60.0, 80.0)
 BAND_COUNT = 8

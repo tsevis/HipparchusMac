@@ -28,11 +28,15 @@ import os
 import pathlib
 import sys
 
-# Where the Python lives. The default is this machine's checkout; CI clones the
-# repository and points here with the environment variable, which is what lets
-# the drift check below run anywhere rather than only on the author's Mac.
+# Where the Python lives. The default is a Hipparchus checkout next to this
+# repository; CI clones the repository and points here with the environment
+# variable, which is what lets the drift check below run anywhere rather than
+# only on the author's Mac.
 PYTHON_REPO = pathlib.Path(
-    os.environ.get("HIPPARCHUS_PYTHON_REPO", "/Users/tsevis/AI/ClaudeCode/Hipparchus")
+    os.environ.get(
+        "HIPPARCHUS_PYTHON_REPO",
+        pathlib.Path(__file__).resolve().parent.parent.parent / "Hipparchus",
+    )
 )
 OUTPUT = pathlib.Path("Sources/HipparchusRender/PresetTables.swift")
 
@@ -193,7 +197,7 @@ def render(skipped: dict[str, str] | None = None) -> str:
         "// GENERATED FILE — do not edit by hand.",
         "//",
         "// Produced by Scripts/generate-presets.py from the Python preset registry in",
-        "// /Users/tsevis/AI/ClaudeCode/Hipparchus. Five hundred lines of colour data",
+        "// the Hipparchus repository. Five hundred lines of colour data",
         "// transcribed by hand would be five hundred chances to mistype a channel, and",
         "// nothing downstream would notice. Re-run the script instead of editing this.",
         "//",
