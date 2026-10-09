@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import pathlib
 import sys
 import urllib.request
@@ -35,7 +36,15 @@ EXPECTED = FIXTURES / "athens-tile-expected.json"
 # transpose or an off-by-one row as well as a value shift.
 SAMPLE_POINTS = ((0, 0), (0, 255), (255, 0), (255, 255), (128, 128), (37, 91), (200, 17))
 
-PYTHON_REPO = pathlib.Path("/Users/tsevis/AI/ClaudeCode/Hipparchus")
+# The Python implementation this is checked against: a checkout of the Hipparchus
+# repository, by default the directory next to this one. Override it with
+# HIPPARCHUS_PYTHON_REPO.
+PYTHON_REPO = pathlib.Path(
+    os.environ.get(
+        "HIPPARCHUS_PYTHON_REPO",
+        pathlib.Path(__file__).resolve().parent.parent.parent / "Hipparchus",
+    )
+)
 sys.path.insert(0, str(PYTHON_REPO / "src"))
 
 import numpy as np  # noqa: E402

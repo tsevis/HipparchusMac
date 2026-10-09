@@ -16,10 +16,19 @@ means one of the two tracers changed; find out which before accepting it.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import sys
 
-PYTHON_REPO = pathlib.Path("/Users/tsevis/AI/ClaudeCode/Hipparchus")
+# The Python implementation this is checked against: a checkout of the Hipparchus
+# repository, by default the directory next to this one. Override it with
+# HIPPARCHUS_PYTHON_REPO.
+PYTHON_REPO = pathlib.Path(
+    os.environ.get(
+        "HIPPARCHUS_PYTHON_REPO",
+        pathlib.Path(__file__).resolve().parent.parent.parent / "Hipparchus",
+    )
+)
 OUTPUT = pathlib.Path("Tests/HipparchusGeometryTests/Fixtures/contour-parity.json")
 LEVELS: tuple[float, ...] = (-0.5, 0.0, 0.25, 0.5, 0.9)
 SIZE = 37

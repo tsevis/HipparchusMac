@@ -28,10 +28,19 @@ means one of the two generators changed; find out which before accepting it.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import sys
 
-PYTHON_REPO = pathlib.Path("/Users/tsevis/AI/ClaudeCode/Hipparchus")
+# The Python implementation this is checked against: a checkout of the Hipparchus
+# repository, by default the directory next to this one. Override it with
+# HIPPARCHUS_PYTHON_REPO.
+PYTHON_REPO = pathlib.Path(
+    os.environ.get(
+        "HIPPARCHUS_PYTHON_REPO",
+        pathlib.Path(__file__).resolve().parent.parent.parent / "Hipparchus",
+    )
+)
 OUTPUT = pathlib.Path("Tests/HipparchusGeometryTests/Fixtures/simulated-field-parity.json")
 
 sys.path.insert(0, str(PYTHON_REPO / "src"))

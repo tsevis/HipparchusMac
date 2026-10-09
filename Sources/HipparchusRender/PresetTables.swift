@@ -1,7 +1,7 @@
 // GENERATED FILE — do not edit by hand.
 //
 // Produced by Scripts/generate-presets.py from the Python preset registry in
-// /Users/tsevis/AI/ClaudeCode/Hipparchus. Five hundred lines of colour data
+// the Hipparchus repository. Five hundred lines of colour data
 // transcribed by hand would be five hundred chances to mistype a channel, and
 // nothing downstream would notice. Re-run the script instead of editing this.
 //
