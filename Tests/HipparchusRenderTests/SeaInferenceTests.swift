@@ -153,6 +153,94 @@ final class SeaInferenceTests: XCTestCase {
         }
     }
 
+    /// An island is land whatever it scores, so it must not break a tie between
+    /// the faces that are being weighed. It did: with the halves alike and an
+    /// island scoring as land, both halves — the town among them — became sea.
+    func testAnIslandDoesNotBreakATieBetweenTheOtherFaces() throws {
+        let island = Feature(
+            id: "c/1", layer: "coastline", source: "test",
+            geometry: .polygon(Polygon(exterior: [
+                Coordinate(lon: 23.01, lat: 37.04), Coordinate(lon: 23.03, lat: 37.04),
+                Coordinate(lon: 23.03, lat: 37.06), Coordinate(lon: 23.01, lat: 37.06),
+            ])),
+            provenance: .measured
+        )
+        let hut = Feature(
+            id: "b/0", layer: "buildings", source: "test",
+            geometry: .polygon(Polygon(exterior: [
+                Coordinate(lon: 23.015, lat: 37.045), Coordinate(lon: 23.02, lat: 37.045),
+                Coordinate(lon: 23.02, lat: 37.05), Coordinate(lon: 23.015, lat: 37.05),
+            ])),
+            provenance: .measured
+        )
+        let scene = try scene(["coastline": [coastline(), island], "buildings": [hut]])
+        XCTAssertNil(water(scene)?.geometries.first, "a sea was invented from a tie")
+    }
+
+    /// Causeways and bridges are land evidence standing in the sea. A bay crossed
+    /// by enough of them reached the old 64-point cap the city reached, and the
+    /// tie inferred nothing; Biscayne Bay at the 6 km frame was one.
+    func testABayCrossedByCausewaysIsStillTheSea() throws {
+        let causeways = (0..<32).map { index in
+            let y = 37.002 + Double(index) * 0.003
+            return Feature(
+                id: "r/\(index)", layer: "roads", source: "test",
+                geometry: .lineString(LineString([
+                    Coordinate(lon: 23.01, lat: y), Coordinate(lon: 23.04, lat: y),
+                ])),
+                provenance: .measured
+            )
+        }
+        let city = (0..<400).map { index in
+            let x = 23.055 + Double(index % 20) * 0.0022
+            let y = 37.002 + Double(index / 20) * 0.0048
+            return Feature(
+                id: "b/\(index)", layer: "buildings", source: "test",
+                geometry: .polygon(Polygon(exterior: [
+                    Coordinate(lon: x, lat: y), Coordinate(lon: x + 0.001, lat: y),
+                    Coordinate(lon: x + 0.001, lat: y + 0.001), Coordinate(lon: x, lat: y + 0.001),
+                ])),
+                provenance: .measured
+            )
+        }
+        let scene = try scene(["coastline": [coastline()], "roads": causeways, "buildings": city])
+        XCTAssertEqual(
+            scene.diagnostics["inferred_sea_polygons"]?.doubleValue, 1,
+            "the causeways made the bay tie with the city"
+        )
+    }
+
+    /// Shallow water often measures at or above zero — Biscayne Bay does — and
+    /// the land's lowest band then covered the inferred sea, drawn above it. Where
+    /// the coastline says sea, the land's relief stops; the sea floor's does not.
+    func testTheLandsReliefStopsAtTheInferredSea() throws {
+        let band = Feature(
+            id: "e/0", layer: "elevation_bands", source: "test",
+            geometry: .polygon(Polygon(exterior: [
+                Coordinate(lon: 22.9, lat: 36.9), Coordinate(lon: 23.2, lat: 36.9),
+                Coordinate(lon: 23.2, lat: 37.2), Coordinate(lon: 22.9, lat: 37.2),
+            ])),
+            provenance: .measured
+        )
+        let scene = try scene([
+            "coastline": [coastline()], "buildings": buildings(), "elevation_bands": [band],
+        ])
+
+        let relief = try XCTUnwrap(scene.layers.first { $0.name == "elevation_bands" })
+        let projection = ProjectionProfile(bbox: bbox, mode: Quality.default.projectionMode)
+        let sea = Geometry.point(projection.project(Coordinate(lon: 23.02, lat: 37.05)))
+        let land = Geometry.point(projection.project(Coordinate(lon: 23.08, lat: 37.05)))
+        let geos = GEOSContext()
+        XCTAssertFalse(
+            try relief.geometries.contains { try geos.covers($0, sea) },
+            "the land's lowest band was drawn over the sea"
+        )
+        XCTAssertTrue(
+            try relief.geometries.contains { try geos.covers($0, land) },
+            "the land lost its own relief"
+        )
+    }
+
     // MARK: - Living with the water that was fetched
 
     /// Real water keeps its place; the sea goes underneath it.
