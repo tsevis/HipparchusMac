@@ -276,6 +276,7 @@ public struct SceneBuilder: Sendable {
             if !sea.isEmpty {
                 inferredSea = sea.count
                 layers = Self.prepending(sea, toWaterIn: layers, styleProfile: styleProfile)
+                layers = try Self.clearingLandRelief(from: layers, over: sea, geos: geos)
             }
         }
 
@@ -457,18 +458,20 @@ public struct SceneBuilder: Sendable {
         ["buildings", "parks", "fields", "forests", "natural", "landuse", "roads", "railways"]
         + roadHierarchy
 
-    /// Enough evidence to call a face land. Counting further cannot change which
-    /// face scores lowest unless every face reaches the cap — and a face holding
-    /// sixty-four intersecting buildings and roads is not the sea whatever the
-    /// arithmetic says. Without a cap this is a scan of every land feature in the
-    /// frame, which in a city is a hundred thousand of them.
-    static let landEvidenceCap = 64.0
+    /// How sparse a face's land evidence must be, per unit of area and against
+    /// the densest face on the sheet, before the face is called sea.
+    ///
+    /// Measured on Miami's waterfront at 1, 2.4 and 6 km: Biscayne Bay, crossed
+    /// by causeways, came to 0.2–2.2% of the city's density, and the other land
+    /// faces to 44% or more. A count with a cap, which this replaced, tied the
+    /// bay with the city as soon as the causeways alone reached the cap.
+    static let seaDensityShare = 0.1
 
     /// Infer the sea from the coastline and the frame.
     ///
     /// Ported from `_derive_sea_polygons`. The frame's own boundary and the
-    /// coastline together cut the page into faces; the face carrying the least
-    /// evidence of land is the water. **Measured, never assumed** — the same
+    /// coastline together cut the page into faces; a face carrying a small share
+    /// of the land's evidence per unit of area is the water. **Measured, never assumed** — the same
     /// principle as elevation bands, which sample the field at each face rather
     /// than reasoning about which ring contains which.
     ///
@@ -507,30 +510,33 @@ public struct SceneBuilder: Sendable {
             try LandEvidence(geometry: geometry, geos: geos)
         }
 
-        var scored: [(score: Double, polygon: Polygon)] = []
+        var candidates: [(polygon: Polygon, area: Double, isIsland: Bool)] = []
         for face in faces {
             let clipped = try geos.intersection(.polygon(face), clipRegion)
             // A single polygon only, as the Python takes it: a face that clipping
             // broke into pieces is not one body of water.
             guard case .polygon(let polygon) = clipped else { continue }
             // Slivers along the frame edge are artefacts of the cut, not sea.
-            guard try geos.area(clipped) >= frameArea * 0.005 else { continue }
+            let area = try geos.area(clipped)
+            guard area >= frameArea * 0.005 else { continue }
             // Inside a closed coastline is land by definition, whatever stands on it.
             let isIsland = try geos.pointOnSurface(clipped).map { point in
                 try islands.contains { try geos.covers(.polygon($0), .point(point)) }
             } ?? false
-            let score = isIsland
-                ? .infinity
-                : try landEvidenceScore(for: clipped, against: evidence, geos: geos)
-            scored.append((score, polygon))
+            candidates.append((polygon, area, isIsland))
         }
-        guard scored.count >= 2, let lowest = scored.map(\.score).min() else { return [] }
 
-        let sea = scored.filter { $0.score <= lowest + 1e-9 }
-        // Every face alike means the evidence says nothing — including the common
-        // case of no land features at all.
-        guard sea.count < scored.count else { return [] }
-        return sea.map(\.polygon)
+        let scores = Self.landEvidenceScores(of: candidates.map(\.polygon), from: evidence)
+        let densities = zip(candidates, scores).map { candidate, score in score / candidate.area }
+        // An island is land whatever it scores, so only the other faces are weighed:
+        // the densest of them sets what land looks like on this sheet.
+        let weighed = candidates.indices.filter { !candidates[$0].isIsland }
+        guard weighed.count >= 2,
+              let densest = weighed.map({ densities[$0] }).max(), densest > 0
+        else { return [] }
+        return weighed
+            .filter { densities[$0] < densest * Self.seaDensityShare }
+            .map { candidates[$0].polygon }
     }
 
     /// A land feature and the one point that says which side of the coast it
@@ -558,22 +564,25 @@ public struct SceneBuilder: Sendable {
         }
     }
 
-    private func landEvidenceScore(
-        for face: Geometry,
-        against evidence: [LandEvidence],
-        geos: GEOSContext
-    ) throws -> Double {
-        guard let faceBounds = face.bounds else { return 0 }
-        var score = 0.0
+    /// Every face's land evidence, each feature counted once, on the face that
+    /// holds its point.
+    ///
+    /// Ray casting on the rings rather than GEOS: a city is tens of thousands of
+    /// features, and handing a coastline-sized face to GEOS once per feature is
+    /// the whole cost of the sheet.
+    private static func landEvidenceScores(of faces: [Polygon], from evidence: [LandEvidence]) -> [Double] {
+        let bounds = faces.map { Geometry.polygon($0).bounds }
+        var scores = [Double](repeating: 0, count: faces.count)
         for item in evidence {
-            // The cheap rectangle test first: most land features are nowhere near
-            // any given face, and an overlay on each of them is the whole cost.
-            guard faceBounds.contains(item.point) else { continue }
-            guard try geos.covers(face, .point(item.point)) else { continue }
-            score += item.weight
-            if score >= Self.landEvidenceCap { break }
+            let home = faces.indices.first { index in
+                guard let box = bounds[index], box.contains(item.point) else { return false }
+                let face = faces[index]
+                return face.exterior.contains(item.point)
+                    && !face.holes.contains { $0.contains(item.point) }
+            }
+            if let home { scores[home] += item.weight }
         }
-        return score
+        return scores
     }
 
     /// Put the sea under the water that was fetched, making the layer if the map
@@ -613,6 +622,44 @@ public struct SceneBuilder: Sendable {
             result.append(water)
         }
         return result
+    }
+
+    /// The land's relief, which stops at the coastline when the sea was inferred.
+    ///
+    /// Bathymetry and the depth bands are left alone: they are the sea floor.
+    static let landReliefLayers: Set<String> = [
+        TerrainLayer.elevationBands, TerrainLayer.hillshade,
+        TerrainLayer.minorContours, TerrainLayer.indexContours, TerrainLayer.summits,
+    ]
+
+    /// Cut the inferred sea out of the land's relief.
+    ///
+    /// Shallow water often measures at or above zero — Biscayne Bay does — and
+    /// the land's lowest band, drawn above the water, then covered the sea the
+    /// coastline had just found. The Python never meets this, because it draws
+    /// the sea over the relief; this engine draws relief over the water on
+    /// purpose, so the cut is made here and only where a sea was inferred.
+    private static func clearingLandRelief(
+        from layers: [RenderLayer],
+        over sea: [Polygon],
+        geos: GEOSContext
+    ) throws -> [RenderLayer] {
+        let water = try geos.unaryUnion(sea.map(Geometry.polygon))
+        return try layers.map { layer in
+            guard landReliefLayers.contains(layer.name) else { return layer }
+            var cleared = RenderLayer(
+                name: layer.name,
+                style: layer.style,
+                labels: try layer.labels.filter { !(try geos.covers(water, .point($0.position))) },
+                rawFeatureCount: layer.rawFeatureCount
+            )
+            for (index, geometry) in layer.geometries.enumerated() {
+                let land = try geos.difference(geometry, water)
+                guard !(try geos.isEmpty(land)) else { continue }
+                cleared.append(land, weight: layer.weight(at: index), fillColor: layer.fillColor(at: index))
+            }
+            return cleared
+        }
     }
 
     // MARK: - Derived layers
