@@ -1,6 +1,7 @@
 import XCTest
 import HipparchusData
 import HipparchusGeometry
+import HipparchusGEOS
 @testable import HipparchusRender
 
 /// The sea, inferred from a coastline that only describes its edge.
@@ -100,6 +101,56 @@ final class SeaInferenceTests: XCTestCase {
         )
         let scene = try scene(["coastline": [stub], "buildings": buildings()])
         XCTAssertNil(water(scene)?.geometries.first)
+    }
+
+    // MARK: - A real shore
+
+    /// Piers, bridges and waterfront parks cross the coastline. Counted on every
+    /// face they touch, they raised the sea to the land's score and the two tied,
+    /// which is how Biscayne Bay came out as land beside Miami's arena: both
+    /// halves of the sheet hit the cap. Each feature belongs to one side.
+    func testFeaturesStraddlingTheCoastAreCountedOnOneSideOnly() throws {
+        let piers = (0..<20).map { index in
+            let y = 37.005 + Double(index) * 0.0045
+            return Feature(
+                id: "p/\(index)", layer: "buildings", source: "test",
+                geometry: .polygon(Polygon(exterior: [
+                    Coordinate(lon: 23.048, lat: y), Coordinate(lon: 23.06, lat: y),
+                    Coordinate(lon: 23.06, lat: y + 0.002), Coordinate(lon: 23.048, lat: y + 0.002),
+                ])),
+                provenance: .measured
+            )
+        }
+        let scene = try scene(["coastline": [coastline()], "buildings": buildings() + piers])
+        XCTAssertEqual(
+            scene.diagnostics["inferred_sea_polygons"]?.doubleValue, 1,
+            "the shoreline features tied the sea with the land"
+        )
+    }
+
+    /// OSM closes an island's coastline into a ring, which arrives as a polygon.
+    /// Ignored, the island was cut into the sea and painted over.
+    func testAnIslandInTheSeaIsNotPaintedOver() throws {
+        let island = Feature(
+            id: "c/1", layer: "coastline", source: "test",
+            geometry: .polygon(Polygon(exterior: [
+                Coordinate(lon: 23.01, lat: 37.04), Coordinate(lon: 23.03, lat: 37.04),
+                Coordinate(lon: 23.03, lat: 37.06), Coordinate(lon: 23.01, lat: 37.06),
+            ])),
+            provenance: .measured
+        )
+        let scene = try scene(["coastline": [coastline(), island], "buildings": buildings()])
+
+        let water = try XCTUnwrap(water(scene), "no sea was inferred at all")
+        let projection = ProjectionProfile(bbox: bbox, mode: Quality.default.projectionMode)
+        let centre = projection.project(Coordinate(lon: 23.02, lat: 37.05))
+        let geos = GEOSContext()
+        for geometry in water.geometries {
+            XCTAssertFalse(
+                try geos.covers(geometry, .point(centre)),
+                "the sea was painted over the island"
+            )
+        }
     }
 
     // MARK: - Living with the water that was fetched
