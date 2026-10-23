@@ -482,7 +482,12 @@ public struct SceneBuilder: Sendable {
         geos: GEOSContext
     ) throws -> [Polygon] {
         let coastlines = layers.first { $0.name == "coastline" }?.geometries ?? []
-        let lines = coastlines.flatMap(\.lineStrings)
+        // An island's coastline closes into a ring and arrives as a polygon. Its
+        // rings cut the frame like any coast, so the island becomes a face of its
+        // own instead of a patch of sea painted over the land.
+        let islands = coastlines.flatMap(\.polygons)
+        let rings = islands.flatMap { [$0.exterior] + $0.holes }.map { LineString($0.coordinates) }
+        let lines = coastlines.flatMap(\.lineStrings) + rings
         guard !lines.isEmpty, let frame = clipRegion.bounds else { return [] }
 
         // Unioned before polygonizing, because GEOS polygonizes noded input only:
@@ -496,8 +501,10 @@ public struct SceneBuilder: Sendable {
         let frameArea = try geos.area(clipRegion)
         guard frameArea > 0 else { return [] }
 
-        let evidence = Self.landEvidenceLayers.flatMap { name in
+        let evidence = try Self.landEvidenceLayers.flatMap { name in
             layers.first { $0.name == name }?.geometries ?? []
+        }.compactMap { geometry in
+            try LandEvidence(geometry: geometry, geos: geos)
         }
 
         var scored: [(score: Double, polygon: Polygon)] = []
@@ -508,7 +515,14 @@ public struct SceneBuilder: Sendable {
             guard case .polygon(let polygon) = clipped else { continue }
             // Slivers along the frame edge are artefacts of the cut, not sea.
             guard try geos.area(clipped) >= frameArea * 0.005 else { continue }
-            scored.append((try landEvidenceScore(for: clipped, against: evidence, geos: geos), polygon))
+            // Inside a closed coastline is land by definition, whatever stands on it.
+            let isIsland = try geos.pointOnSurface(clipped).map { point in
+                try islands.contains { try geos.covers(.polygon($0), .point(point)) }
+            } ?? false
+            let score = isIsland
+                ? .infinity
+                : try landEvidenceScore(for: clipped, against: evidence, geos: geos)
+            scored.append((score, polygon))
         }
         guard scored.count >= 2, let lowest = scored.map(\.score).min() else { return [] }
 
@@ -519,25 +533,44 @@ public struct SceneBuilder: Sendable {
         return sea.map(\.polygon)
     }
 
+    /// A land feature and the one point that says which side of the coast it
+    /// stands on.
+    ///
+    /// A pier, a bridge or a waterfront park crosses the coastline. Counted on
+    /// every face it touched, it raised the sea to the land's score, and a shore
+    /// busy enough tied them: Biscayne Bay beside Miami's arena came out as land.
+    /// A point on the feature itself — not the centre of its bounds, which a
+    /// curving road can put in the water — gives it to exactly one face.
+    struct LandEvidence {
+        let point: Coordinate
+        let weight: Double
+
+        init?(geometry: Geometry, geos: GEOSContext) throws {
+            guard let point = try geos.pointOnSurface(geometry) else { return nil }
+            self.point = point
+            // A polygon is stronger evidence than a line: a road may bridge the
+            // water, a building does not float on it.
+            switch geometry {
+            case .polygon, .multiPolygon: weight = 4
+            case .lineString, .multiLineString: weight = 2
+            default: weight = 1
+            }
+        }
+    }
+
     private func landEvidenceScore(
         for face: Geometry,
-        against evidence: [Geometry],
+        against evidence: [LandEvidence],
         geos: GEOSContext
     ) throws -> Double {
         guard let faceBounds = face.bounds else { return 0 }
         var score = 0.0
-        for geometry in evidence {
+        for item in evidence {
             // The cheap rectangle test first: most land features are nowhere near
             // any given face, and an overlay on each of them is the whole cost.
-            guard let bounds = geometry.bounds, bounds.intersects(faceBounds) else { continue }
-            guard try geos.intersects(face, geometry) else { continue }
-            // A polygon on a face is stronger evidence than a line crossing it: a
-            // road may bridge the water, a building does not float on it.
-            switch geometry {
-            case .polygon, .multiPolygon: score += 4
-            case .lineString, .multiLineString: score += 2
-            default: score += 1
-            }
+            guard faceBounds.contains(item.point) else { continue }
+            guard try geos.covers(face, .point(item.point)) else { continue }
+            score += item.weight
             if score >= Self.landEvidenceCap { break }
         }
         return score

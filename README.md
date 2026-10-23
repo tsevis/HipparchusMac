@@ -27,7 +27,7 @@ fixture rather than by narrowing to one direction of truth.
 **Status: the app is built and running.** Every online source, the composing
 source stack, the sixteen presets, seventeen palettes over any of them, illuminated
 contours, relief shading, an adjustable line weight, the three-column interface
-and export at a real printed size are in, with <!--tests-->1070<!--/tests--> tests and the output checked
+and export at a real printed size are in, with <!--tests-->1072<!--/tests--> tests and the output checked
 against real ground.
 
 The sea has since stopped being a by-product: OpenStreetMap's `seamark:*` marks
