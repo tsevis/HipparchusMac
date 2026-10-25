@@ -133,8 +133,22 @@ public struct SVGExporter: Sendable {
         }
 
         out += "  <g id=\"map_layers\">\n"
-        for layer in scene.layers {
-            out += group(for: layer, transform: transform)
+        // Turns rather than layers, so a road network writes every casing before
+        // any of its lines. See `RoadNetwork`. Hidden layers take their turns too:
+        // an unticked layer is still written so it can be switched back on.
+        // The same labels the canvas draws: placed across the visible layers at
+        // once. See `LabelPlacement`.
+        let placed = transform.map {
+            LabelPlacement.accepted(
+                in: scene.visibleLayers, transform: $0,
+                typeSize: PlaceLabel.typeSize * scene.labelScale, labelScale: scene.labelScale
+            )
+        } ?? []
+        for turn in RoadNetwork.turns(of: scene.layers) {
+            out += turn.part == .casing
+                ? casingGroup(for: turn.layer, transform: transform)
+                : group(for: turn.layer, part: turn.part, labelScale: scene.labelScale,
+                        placed: placed, transform: transform)
         }
         out += "  </g>\n"
         out += furniture(for: scene, transform: transform)
@@ -149,9 +163,10 @@ public struct SVGExporter: Sendable {
 
     // MARK: -
 
-    private func group(for layer: RenderLayer, transform: CanvasTransform?) -> String {
-        let identifier = svgID(layer.name)
-        var out = "    <g id=\"\(identifier)\" data-layer-name=\"\(escape(layer.name))\""
+    /// The opening of a layer's group: its name, and the opacity and visibility
+    /// every mark inside it inherits.
+    private func openingTag(id: String, for layer: RenderLayer) -> String {
+        var out = "    <g id=\"\(id)\" data-layer-name=\"\(escape(layer.name))\""
         if layer.style.opacity != 1.0 {
             out += " opacity=\"\(format(layer.style.opacity))\""
         }
@@ -160,7 +175,34 @@ public struct SVGExporter: Sendable {
             // and hiding it in the file lets it be switched back on in Illustrator.
             out += " display=\"none\""
         }
-        out += ">\n"
+        return out + ">\n"
+    }
+
+    /// A road layer's casing, written ahead of the network's lines.
+    ///
+    /// A group of its own at the top level, under the id the casing has always
+    /// had inside its layer, and carrying the layer's opacity and visibility, so
+    /// it is still the thing you select on its own in Illustrator.
+    private func casingGroup(for layer: RenderLayer, transform: CanvasTransform?) -> String {
+        guard let transform, layer.style.casingWidth > 0, !layer.geometries.isEmpty else { return "" }
+        let style = layer.style
+        var out = openingTag(id: "\(svgID(layer.name))_casing", for: layer)
+        for geometry in layer.geometries {
+            for data in pathData(for: geometry, transform: transform) {
+                out += "      <path d=\"\(data)\" fill=\"none\" stroke=\"\(style.casingColor.hex)\""
+                out += " stroke-width=\"\(format(style.casingWidth))\" vector-effect=\"non-scaling-stroke\""
+                out += " stroke-linejoin=\"round\" stroke-linecap=\"round\"/>\n"
+            }
+        }
+        return out + "    </g>\n"
+    }
+
+    private func group(
+        for layer: RenderLayer, part: RoadNetwork.Part = .whole, labelScale: Double = 1,
+        placed: Set<LabelPlacement.Key> = [], transform: CanvasTransform?
+    ) -> String {
+        let identifier = svgID(layer.name)
+        var out = openingTag(id: identifier, for: layer)
 
         guard let transform else {
             return out + "    </g>\n"
@@ -169,7 +211,7 @@ public struct SVGExporter: Sendable {
         let style = layer.style
         let stroke = style.strokeColor.hex
 
-        if style.casingWidth > 0 && !layer.geometries.isEmpty {
+        if part == .whole && style.casingWidth > 0 && !layer.geometries.isEmpty {
             out += "      <g id=\"\(identifier)_casing\">\n"
             for geometry in layer.geometries {
                 for data in pathData(for: geometry, transform: transform) {
@@ -220,10 +262,15 @@ public struct SVGExporter: Sendable {
         // Each label is a halo/text pair, as the Python exports it: the halo is
         // the same string stroked wide in the ground colour behind the fill text,
         // which is what keeps a street name legible over the linework it sits on.
-        for label in layer.labels where !label.name.isEmpty {
+        // A hidden layer keeps every label, so switching it on in Illustrator
+        // brings its names back; a visible one writes only what was placed.
+        for (index, label) in layer.labels.enumerated() where !label.name.isEmpty
+            && (!style.visible || placed.contains(LabelPlacement.Key(layer: layer.name, index: index))) {
             let point = transform.worldToScreen(label.position)
             var shared = "x=\"\(format(point.x))\" y=\"\(format(point.y))\""
-            shared += " font-family=\"Arial, Helvetica, sans-serif\" font-size=\"12\""
+            // Scaled with the sheet, like the canvas: see `RenderScene.labelScale`.
+            shared += " font-family=\"\(PlaceLabel.svgFontFamily)\""
+            shared += " font-size=\"\(format(PlaceLabel.typeSize * labelScale))\""
             shared += " text-anchor=\"middle\" dominant-baseline=\"central\""
             if label.rotation != 0 {
                 shared += " transform=\"rotate(\(format(label.rotation)) \(format(point.x)) \(format(point.y)))\""
@@ -231,7 +278,7 @@ public struct SVGExporter: Sendable {
             let name = escape(label.name)
             let halo = style.labelHaloColor.hex
             out += "      <text \(shared) fill=\"\(halo)\" stroke=\"\(halo)\""
-            out += " stroke-width=\"\(format(style.labelHaloWidth))\" stroke-linejoin=\"round\">\(name)</text>\n"
+            out += " stroke-width=\"\(format(style.labelHaloWidth * labelScale))\" stroke-linejoin=\"round\">\(name)</text>\n"
             out += "      <text \(shared) fill=\"\(style.strokeColor.hex)\" stroke=\"none\">\(name)</text>\n"
         }
 

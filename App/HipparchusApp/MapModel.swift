@@ -2133,7 +2133,9 @@ final class MapModel {
         options.composition.paperPreset = page.paperName
         options.composition.orientation = page.orientation
         export(type: .svg, extension: "svg") { [weak self] scene, url in
-            let diagnostics = try SVGExporter(options: options).write(scene, to: url)
+            // Scaled to the size the file is written at; the window is not.
+            let sheet = scene.scaledForSheet(width: Double(options.width), height: Double(options.height))
+            let diagnostics = try SVGExporter(options: options).write(sheet, to: url)
             // The diagnostics belong beside the file, as the Python writes them:
             // a map separated from this conversation should still be able to say
             // what it counted. The sandbox grants access to the file the user
@@ -2186,7 +2188,9 @@ final class MapModel {
         options.width = size.width
         options.height = size.height
         export(type: .pdf, extension: "pdf") { scene, url in
-            try PDFExporter(options: options).write(scene, to: url)
+            try PDFExporter(options: options).write(
+                scene.scaledForSheet(width: options.width, height: options.height), to: url
+            )
         }
     }
 
@@ -2235,7 +2239,8 @@ final class MapModel {
         }
         export(type: .png, extension: "png") { scene, url in
             guard let image = CoreGraphicsRenderer().image(
-                of: scene, size: CGSize(width: size.width, height: size.height),
+                of: scene.scaledForSheet(width: Double(size.width), height: Double(size.height)),
+                size: CGSize(width: size.width, height: size.height),
                 margin: self.edgeToEdge ? 0 : nil
             ) else {
                 // Reached when the allocation fails under the limit rather than

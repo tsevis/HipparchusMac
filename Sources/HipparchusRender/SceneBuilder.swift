@@ -95,9 +95,12 @@ public struct SceneBuilder: Sendable {
         "seamark_areas", "seamark_harbours",
         // The built environment.
         "buildings", "barriers", "power",
-        // Roads, major to minor.
-        "roads_motorway", "roads_trunk", "roads_primary", "roads_secondary",
-        "roads_tertiary", "roads_residential", "roads_service", "roads_other", "roads",
+        // Roads, minor to major, so a major road's line is the last ink at its
+        // junctions. Drawn major to minor, every residential street painted
+        // itself across the secondary road it met. The casings of the whole run
+        // go down first; see `RoadNetwork`.
+        "roads", "roads_other", "roads_service", "roads_residential", "roads_tertiary",
+        "roads_secondary", "roads_primary", "roads_trunk", "roads_motorway",
         "railways", "ferry_routes",
         // A border draws above the network it usually follows, below every label.
         "admin_boundaries",

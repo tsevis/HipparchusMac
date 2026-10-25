@@ -22,7 +22,7 @@ public struct CoreGraphicsRenderer: Sendable {
         /// and the status bar is already saying what the map is made of.
         public var drawNotForNavigation = true
         /// Points. Summit heights are small type on a busy sheet.
-        public var labelFontSize: Double = 9.0
+        public var labelFontSize: Double = PlaceLabel.typeSize
 
         public init() {}
     }
@@ -54,12 +54,21 @@ public struct CoreGraphicsRenderer: Sendable {
             return nil
         }
 
-        for layer in scene.visibleLayers {
-            draw(layer: layer, in: context, transform: transform)
+        // Turns rather than layers, so a road network lays every casing down
+        // before any of its lines. See `RoadNetwork`.
+        for turn in RoadNetwork.turns(of: scene.visibleLayers) {
+            draw(layer: turn.layer, part: turn.part, in: context, transform: transform)
         }
         if options.drawLabels {
-            for layer in scene.visibleLayers {
-                drawLabels(of: layer, in: context, transform: transform)
+            // Placed across every layer at once, on this canvas, so the window
+            // re-places as it zooms. See `LabelPlacement`.
+            let layers = scene.visibleLayers
+            let placed = LabelPlacement.accepted(
+                in: layers, transform: transform,
+                typeSize: options.labelFontSize * scene.labelScale, labelScale: scene.labelScale
+            )
+            for layer in layers {
+                drawLabels(of: layer, in: context, transform: transform, scale: scene.labelScale, placed: placed)
             }
         }
         // The one thing this renderer draws that is not the map.
@@ -169,7 +178,10 @@ public struct CoreGraphicsRenderer: Sendable {
 
     // MARK: -
 
-    private func draw(layer: RenderLayer, in context: CGContext, transform: CanvasTransform) {
+    private func draw(
+        layer: RenderLayer, part: RoadNetwork.Part = .whole,
+        in context: CGContext, transform: CanvasTransform
+    ) {
         guard !layer.geometries.isEmpty else { return }
         let style = layer.style
 
@@ -179,7 +191,7 @@ public struct CoreGraphicsRenderer: Sendable {
         context.setLineCap(style.lineCap == .round ? .round : .butt)
 
         // Casing first, so the road colour lands on top of it.
-        if style.casingWidth > 0 {
+        if style.casingWidth > 0 && part != .body {
             context.setStrokeColor(style.casingColor.cgColor)
             context.setLineWidth(style.casingWidth)
             for geometry in layer.geometries {
@@ -187,6 +199,11 @@ public struct CoreGraphicsRenderer: Sendable {
                 context.addPath(path)
                 context.strokePath()
             }
+        }
+
+        guard part != .casing else {
+            context.restoreGState()
+            return
         }
 
         for (index, geometry) in layer.geometries.enumerated() {
@@ -213,11 +230,17 @@ public struct CoreGraphicsRenderer: Sendable {
         context.restoreGState()
     }
 
-    private func drawLabels(of layer: RenderLayer, in context: CGContext, transform: CanvasTransform) {
+    private func drawLabels(
+        of layer: RenderLayer, in context: CGContext, transform: CanvasTransform, scale: Double,
+        placed: Set<LabelPlacement.Key>
+    ) {
         guard !layer.labels.isEmpty else { return }
-        let font = CTFontCreateWithName("HelveticaNeue" as CFString, options.labelFontSize, nil)
+        // Scaled with the sheet, so a print keeps the screen's type beside its roads.
+        let fontSize = options.labelFontSize * scale
+        let font = CTFontCreateWithName(LabelPlacement.fontName as CFString, fontSize, nil)
 
-        for label in layer.labels where !label.name.isEmpty {
+        for (index, label) in layer.labels.enumerated()
+        where !label.name.isEmpty && placed.contains(LabelPlacement.Key(layer: layer.name, index: index)) {
             let point = transform.worldToScreen(label.position)
             // CoreText's own attribute keys, not AppKit's: this target has to build
             // and draw with no UI framework so the CLI and the tests can use it.
@@ -249,12 +272,16 @@ public struct CoreGraphicsRenderer: Sendable {
             // *over* the letters. At 2 pt around 9 pt type that swallowed them
             // whole: the first real render of Santorini showed the summit heights
             // as white blobs. Stroking first and filling second puts the halo where
-            // a halo goes, and the width follows the font size rather than being an
-            // absolute that only looks right at one scale.
+            // a halo goes.
+            //
+            // The width is the one the preset states, as the SVG writes it, scaled
+            // with the sheet like the type. It was 0.22 × the type size, which
+            // ignored every preset's halo and made the canvas and the SVG of one
+            // sheet disagree.
             if layer.style.labelHaloWidth > 0 {
                 context.saveGState()
                 context.textPosition = origin
-                context.setLineWidth(options.labelFontSize * 0.22)
+                context.setLineWidth(layer.style.labelHaloWidth * scale)
                 context.setLineJoin(.round)
                 context.setStrokeColor(layer.style.labelHaloColor.cgColor)
                 context.setTextDrawingMode(.stroke)
