@@ -600,8 +600,12 @@ func run(_ place: Place, options: Options) async throws {
                      raster.width, raster.height, cost.megapixels, cost.megabytes / 1000.0))
     } else {
         let started = ContinuousClock.now
+        // Each file scales its line weights and type to the size it is written
+        // at, so a print is the picture enlarged rather than hairlines. See
+        // `RenderScene.scaledForSheet`.
+        let sheet = scene.scaledForSheet(width: Double(raster.width), height: Double(raster.height))
         if let image = CoreGraphicsRenderer().image(
-            of: scene, size: CGSize(width: raster.width, height: raster.height), margin: bleed
+            of: sheet, size: CGSize(width: raster.width, height: raster.height), margin: bleed
         ) {
             try writePNG(image, to: base.appendingPathExtension("png"))
             if cost.megapixels > 8 {
@@ -646,12 +650,18 @@ func run(_ place: Place, options: Options) async throws {
         svgOptions.width = size.width
         svgOptions.height = size.height
     }
-    let diagnostics = try SVGExporter(options: svgOptions).write(scene, to: base.appendingPathExtension("svg"))
+    let diagnostics = try SVGExporter(options: svgOptions).write(
+        scene.scaledForSheet(width: Double(svgOptions.width), height: Double(svgOptions.height)),
+        to: base.appendingPathExtension("svg")
+    )
     var pdfOptions = PDFExporter.Options()
     let points = options.page.pointSize(canvasWidth: canvasWidth, canvasHeight: canvasHeight)
     pdfOptions.width = points.width
     pdfOptions.height = points.height
-    try PDFExporter(options: pdfOptions).write(scene, to: base.appendingPathExtension("pdf"))
+    try PDFExporter(options: pdfOptions).write(
+        scene.scaledForSheet(width: pdfOptions.width, height: pdfOptions.height),
+        to: base.appendingPathExtension("pdf")
+    )
     try diagnostics.jsonData().write(to: base.appendingPathExtension("diagnostics.json"))
 
     // The drawing has been written; this writes the ground it was drawn from.

@@ -1000,8 +1000,9 @@ final class RoadHierarchyTests: XCTestCase {
         }
     }
 
-    /// Drawn major over minor, so a motorway is not buried under the side streets.
-    func testTheHierarchyIsDrawnMajorOverMinor() throws {
+    /// Drawn minor to major, so a motorway's line is the last ink at its junctions
+    /// and the side streets do not paint across it.
+    func testTheHierarchyIsDrawnMinorToMajor() throws {
         let scene = try scene(["service", "motorway", "residential", "primary"])
         let order = scene.layers.map(\.name)
 
@@ -1010,9 +1011,9 @@ final class RoadHierarchyTests: XCTestCase {
         let residential = try XCTUnwrap(order.firstIndex(of: "roads_residential"))
         let service = try XCTUnwrap(order.firstIndex(of: "roads_service"))
 
-        XCTAssertLessThan(motorway, primary)
-        XCTAssertLessThan(primary, residential)
-        XCTAssertLessThan(residential, service)
+        XCTAssertLessThan(service, residential)
+        XCTAssertLessThan(residential, primary)
+        XCTAssertLessThan(primary, motorway)
     }
 
     /// With the hierarchy populated, an always-empty "Roads" row is noise.

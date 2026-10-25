@@ -132,6 +132,16 @@ public struct LayerStyle: Sendable, Equatable {
 }
 
 public struct PlaceLabel: Sendable, Equatable {
+
+    /// The type every label is set in, on the canvas and in the SVG alike.
+    ///
+    /// The canvas — and so the window, the PNG and the PDF — set labels at 9 in
+    /// Helvetica Neue while the SVG wrote 12 in Arial, so one sheet exported
+    /// twice carried two different sets of type. Stated once here; both scale it
+    /// with the sheet (`RenderScene.labelScale`).
+    public static let typeSize = 9.0
+    public static let svgFontFamily = "'Helvetica Neue', Helvetica, Arial, sans-serif"
+
     public var name: String
     /// World coordinates, in the scene's projection.
     public var position: Coordinate
@@ -277,6 +287,14 @@ public struct RenderScene: Sendable {
     public var background: RGBAColor
     public var metadata: [String: PropertyValue]
     public var diagnostics: [String: PropertyValue]
+
+    /// How much larger the labels and their halos draw than their stated size.
+    ///
+    /// One for the window and for any sheet at or under the reference canvas.
+    /// Set by `scaledForSheet` beside the line weights, so a print carries type
+    /// in the same proportion to its roads as the screen does; the Line Weight
+    /// control leaves it alone, because type is not getting bigger there.
+    public var labelScale: Double = 1.0
 
     public init(
         layers: [RenderLayer] = [],

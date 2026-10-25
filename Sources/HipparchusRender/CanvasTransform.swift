@@ -27,6 +27,9 @@ public struct CanvasTransform: Sendable, Equatable {
     public let pivotX: Double
     public let pivotY: Double
 
+    /// The canvas this maps onto, in points.
+    public var canvasSize: CGSize { CGSize(width: pivotX * 2, height: pivotY * 2) }
+
     /// Points of breathing room around the map, so linework does not run to the
     /// very edge of the canvas.
     public static func margin(width: Double, height: Double) -> Double {
